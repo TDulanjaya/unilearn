@@ -1,7 +1,5 @@
 package com.unilearn.server.model;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,31 +13,39 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "hod_dean_assignments")
+@Table(name = "audit_logs")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class HodDeanAssignment {
+public class AuditLog {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID assignmentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long logId;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 20)
-    private String scopeType; 
+    @Column(nullable = false, length = 100)
+    private String action;
 
-    @ManyToOne
-    @JoinColumn(name = "faculty_id")
-    private Faculty faculty;
+    @Column(nullable = false, length = 50)
+    private String entityType;
 
-    @ManyToOne
-    @JoinColumn(name = "department_id")
-    private Department department;
+    @Column(nullable = false)
+    private Integer entityId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details")
+    private String details;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

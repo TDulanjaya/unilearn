@@ -1,7 +1,5 @@
 package com.unilearn.server.model;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,29 +15,25 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "hod_dean_assignments")
+@Table(name = "attendance_records")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class HodDeanAssignment {
+public class AttendanceRecord {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID assignmentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long recordId;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @Column(nullable = false, length = 20)
-    private String scopeType; 
+    @JoinColumn(name = "session_id", nullable = false)
+    private AttendanceSession session;
 
     @ManyToOne
-    @JoinColumn(name = "faculty_id")
-    private Faculty faculty;
+    @JoinColumn(name = "student_id", nullable = false)
+    private Student student;
 
-    @ManyToOne
-    @JoinColumn(name = "department_id")
-    private Department department;
+    @Column(nullable = false, length = 10)
+    private String status; // present, absent, late
 }

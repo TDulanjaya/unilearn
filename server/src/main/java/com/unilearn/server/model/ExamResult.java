@@ -1,7 +1,5 @@
 package com.unilearn.server.model;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,30 +14,34 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "hod_dean_assignments")
+@Table(name = "exam_results")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class HodDeanAssignment {
+public class ExamResult {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID assignmentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long resultId;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @Column(nullable = false, length = 20)
-    private String scopeType; 
+    @JoinColumn(name = "exam_id", nullable = false)
+    private Exam exam;
 
     @ManyToOne
-    @JoinColumn(name = "faculty_id")
-    private Faculty faculty;
+    @JoinColumn(name = "student_id", nullable = false)
+    private Student student;
 
-    @ManyToOne
-    @JoinColumn(name = "department_id")
-    private Department department;
+    @Column(nullable = false, precision = 6, scale = 2)
+    private BigDecimal score;
+
+    @Column(length = 5)
+    private String grade;
+
+    private LocalDateTime publishedAt;
 }

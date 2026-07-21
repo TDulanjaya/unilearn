@@ -1,7 +1,5 @@
 package com.unilearn.server.model;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,30 +14,31 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "hod_dean_assignments")
+@Table(name = "exam_attempts")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class HodDeanAssignment {
+public class ExamAttempt {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID assignmentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long attemptId;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @Column(nullable = false, length = 20)
-    private String scopeType; 
+    @JoinColumn(name = "exam_id", nullable = false)
+    private Exam exam;
 
     @ManyToOne
-    @JoinColumn(name = "faculty_id")
-    private Faculty faculty;
+    @JoinColumn(name = "student_id", nullable = false)
+    private Student student;
 
-    @ManyToOne
-    @JoinColumn(name = "department_id")
-    private Department department;
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
+
+    @Column(length = 20)
+    private String status = "not_started"; // not_started, in_progress, submitted, flagged
 }

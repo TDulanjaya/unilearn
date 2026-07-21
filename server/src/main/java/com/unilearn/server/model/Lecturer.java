@@ -1,6 +1,5 @@
 package com.unilearn.server.model;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -15,36 +14,22 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "students")
+@Table(name = "lecturers")
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class Student {
+public class Lecturer {
     @Id
-    private Long studentId;
+    private Long lecturerId;
 
     @OneToOne
     @MapsId
-    @JoinColumn(name = "student_id")
-    @ToString.Exclude
+    @JoinColumn(name = "lecturer_id")
     private User user;
-
-    @Column(nullable = false, unique = true, length = 30)
-    private String studentNo;
 
     @ManyToOne
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
-
-    @ManyToOne
-    @JoinColumn(name = "batch_id", nullable = false)
-    private Batch batch;
-
-    @Column(nullable = false)
-    private Integer enrollmentYear;
-
-    @Column(length = 20)
-    private String feeStatus = "pending";
 }

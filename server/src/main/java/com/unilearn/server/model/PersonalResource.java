@@ -1,8 +1,5 @@
 package com.unilearn.server.model;
 
-import java.time.LocalTime;
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,34 +14,34 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "timetable_slots")
+@Table(name = "personal_resources")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class TimetableSlot {
+public class PersonalResource {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID slotId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long resourceId;
+
+    @ManyToOne
+    @JoinColumn(name = "student_id", nullable = false)
+    private Student student;
 
     @ManyToOne
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
-    @Column(nullable = false, length = 10)
-    private String dayOfWeek; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    @Column(nullable = false, length = 200)
+    private String title;
 
-    @Column(nullable = false)
-    private LocalTime startTime;
+    @Column(nullable = false, length = 500)
+    private String fileUrl;
 
-    @Column(nullable = false)
-    private LocalTime endTime;
-
-    @Column(length = 100)
-    private String venue;
-
-    @Column(length = 20)
-    private String slotType = "lecture";
+    private Integer fileSizeKb;
+    private LocalDateTime uploadedAt = LocalDateTime.now();
 }

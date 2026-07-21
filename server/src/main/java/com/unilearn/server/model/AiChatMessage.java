@@ -1,14 +1,12 @@
 package com.unilearn.server.model;
 
-import java.time.LocalTime;
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -17,34 +15,34 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "timetable_slots")
+@Table(name = "ai_chat_messages")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class TimetableSlot {
+public class AiChatMessage {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID slotId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long messageId;
+
+    @ManyToOne
+    @JoinColumn(name = "student_id", nullable = false)
+    private Student student;
 
     @ManyToOne
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
     @Column(nullable = false, length = 10)
-    private String dayOfWeek; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    private String role;
 
+    @Lob
     @Column(nullable = false)
-    private LocalTime startTime;
+    private String content;
 
-    @Column(nullable = false)
-    private LocalTime endTime;
-
-    @Column(length = 100)
-    private String venue;
-
-    @Column(length = 20)
-    private String slotType = "lecture";
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

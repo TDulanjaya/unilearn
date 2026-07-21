@@ -1,8 +1,5 @@
 package com.unilearn.server.model;
 
-import java.time.LocalTime;
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,35 +13,39 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "timetable_slots")
+@Table(name = "materials")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class TimetableSlot {
+public class Material {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID slotId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long materialId;
 
     @ManyToOne
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
-    @Column(nullable = false, length = 10)
-    private String dayOfWeek; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    @Column(nullable = false, length = 200)
+    private String title;
 
-    @Column(nullable = false)
-    private LocalTime startTime;
+    @Column(nullable = false, length = 20)
+    private String resourceType; // pdf, video, slides, link, other
 
-    @Column(nullable = false)
-    private LocalTime endTime;
+    @Column(length = 500)
+    private String fileUrl;
 
-    @Column(length = 100)
-    private String venue;
+    @Column(length = 500)
+    private String linkUrl;
 
-    @Column(length = 20)
-    private String slotType = "lecture";
+    @ManyToOne
+    @JoinColumn(name = "uploaded_by", nullable = false)
+    private Lecturer uploadedBy;
+
+    private LocalDateTime uploadedAt = LocalDateTime.now();
 }

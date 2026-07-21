@@ -1,13 +1,12 @@
 package com.unilearn.server.model;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -16,30 +15,37 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "hod_dean_assignments")
+@Table(name = "events")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class HodDeanAssignment {
+public class Event {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID assignmentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long eventId;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(nullable = false, length = 200)
+    private String title;
 
-    @Column(nullable = false, length = 20)
-    private String scopeType; 
+    @Lob
+    private String description;
+
+    @Column(length = 100)
+    private String venue;
+
+    @Column(nullable = false)
+    private LocalDateTime eventDate;
 
     @ManyToOne
     @JoinColumn(name = "faculty_id")
     private Faculty faculty;
 
     @ManyToOne
-    @JoinColumn(name = "department_id")
-    private Department department;
+    @JoinColumn(name = "created_by", nullable = false)
+    private StaffAdmin createdBy;
 }

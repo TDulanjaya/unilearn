@@ -1,8 +1,5 @@
 package com.unilearn.server.model;
 
-import java.time.LocalTime;
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,34 +14,36 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.math.BigDecimal;
+
 @Entity
-@Table(name = "timetable_slots")
+@Table(name = "gradebook_entries")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @ToString
-public class TimetableSlot {
+public class GradebookEntry {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID slotId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long gradebookId;
 
     @ManyToOne
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
-    @Column(nullable = false, length = 10)
-    private String dayOfWeek; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    @ManyToOne
+    @JoinColumn(name = "student_id", nullable = false)
+    private Student student;
 
-    @Column(nullable = false)
-    private LocalTime startTime;
+    @Column(nullable = false, length = 30)
+    private String component; // assignment, midterm_inclass, final, attendance
 
-    @Column(nullable = false)
-    private LocalTime endTime;
+    private Integer componentRefId;
 
-    @Column(length = 100)
-    private String venue;
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal weightPct;
 
-    @Column(length = 20)
-    private String slotType = "lecture";
+    @Column(nullable = false, precision = 6, scale = 2)
+    private BigDecimal score;
 }
