@@ -1,0 +1,27 @@
+package com.unilearn.server.repository;
+
+import com.unilearn.server.model.CourseOffering;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface CourseOfferingRepository extends JpaRepository<CourseOffering, Long> {
+
+    List<CourseOffering> findByCourse_CourseId(Long courseId);
+
+    List<CourseOffering> findByBatch_BatchId(Long batchId);
+
+    List<CourseOffering> findBySemester_SemesterId(Long semesterId);
+
+    List<CourseOffering> findByPrimaryLecturer_LecturerId(Long lecturerId);
+
+    Optional<CourseOffering> findByCourse_CourseIdAndBatch_BatchIdAndSemester_SemesterId(Long courseId, Long batchId, Long semesterId);
+
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.courseOffering.offeringId = :offeringId")
+    long countEnrollmentsByOfferingId(@Param("offeringId") Long offeringId);
+}

@@ -1,7 +1,6 @@
 package com.unilearn.server.model;
 
 import java.time.LocalTime;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,15 +25,15 @@ import lombok.ToString;
 @ToString
 public class TimetableSlot {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID slotId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long slotId;
 
     @ManyToOne
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
     @Column(nullable = false, length = 10)
-    private String dayOfWeek; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    private String dayOfWeek;
 
     @Column(nullable = false)
     private LocalTime startTime;

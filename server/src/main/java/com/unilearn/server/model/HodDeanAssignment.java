@@ -1,7 +1,5 @@
 package com.unilearn.server.model;
 
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -25,8 +23,8 @@ import lombok.ToString;
 @ToString
 public class HodDeanAssignment {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID assignmentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long assignmentId;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)

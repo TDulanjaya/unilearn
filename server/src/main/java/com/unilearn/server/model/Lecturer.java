@@ -1,5 +1,8 @@
 package com.unilearn.server.model;
 
+import java.time.LocalDate;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -32,4 +35,11 @@ public class Lecturer {
     @ManyToOne
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
+
+    @Column(length = 100)
+    private String designation;
+
+    private Boolean isGuest = false;
+
+    private LocalDate contractEndDate;
 }

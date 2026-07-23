@@ -1,12 +1,16 @@
 package com.unilearn.server.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,6 +20,7 @@ import lombok.ToString;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Table(name = "exams")
@@ -25,22 +30,23 @@ import java.time.LocalTime;
 @AllArgsConstructor
 @ToString
 public class Exam {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long examId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
     @Column(nullable = false, length = 20)
-    private String examType; // final, midterm_inclass
+    private String examType;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "scheduled_by_user_id", nullable = false)
     private User scheduledBy;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "linked_slot_id")
     private TimetableSlot linkedSlot;
 
@@ -60,5 +66,15 @@ public class Exam {
     private Integer durationMinutes;
 
     @Column(length = 20)
-    private String status = "published"; // draft, published, cancelled
+    private String status = "published";
+
+    @OneToMany(mappedBy = "exam", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JsonIgnore
+    @ToString.Exclude
+    private List<ExamAttempt> examAttempts;
+
+    @OneToMany(mappedBy = "exam", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JsonIgnore
+    @ToString.Exclude
+    private List<ExamResult> examResults;
 }

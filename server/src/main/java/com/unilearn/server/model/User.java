@@ -12,6 +12,8 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -22,7 +24,7 @@ import lombok.ToString;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userId;
 
     @Column(nullable = false, length = 150)
@@ -45,5 +47,7 @@ public class User {
 
     @Column(length = 20)
     private String status = "active";
+
+    private LocalDateTime createdAt = LocalDateTime.now();
 
 }
