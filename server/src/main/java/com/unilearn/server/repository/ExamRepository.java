@@ -3,13 +3,14 @@ package com.unilearn.server.repository;
 import com.unilearn.server.model.Exam;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Repository
+@EnableJpaRepositories
 public interface ExamRepository extends JpaRepository<Exam, Long> {
 
     List<Exam> findByCourseOffering_OfferingId(Long offeringId);

@@ -2,11 +2,12 @@ package com.unilearn.server.repository;
 
 import com.unilearn.server.model.Examiner;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
+@EnableJpaRepositories
 public interface ExaminerRepository extends JpaRepository<Examiner, Long> {
 
     List<Examiner> findByDepartment_DepartmentId(Long departmentId);
