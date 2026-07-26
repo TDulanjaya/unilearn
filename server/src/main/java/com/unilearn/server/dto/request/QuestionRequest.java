@@ -1,7 +1,10 @@
 package com.unilearn.server.dto.request;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,6 +24,7 @@ import java.math.BigDecimal;
 public class QuestionRequest {
 
     @NotNull(message = "Bank ID is required")
+    @Positive(message = "Bank ID must be positive")
     private Long bankId;
 
     @NotBlank(message = "Question text is required")
@@ -35,6 +39,9 @@ public class QuestionRequest {
     private String correctAnswer;
 
     @NotNull(message = "Marks are required")
+    @Positive(message = "Marks must be positive")
+    @DecimalMin(value = "0.01", message = "Marks must be at least 0.01")
+    @DecimalMax(value = "999.99", message = "Marks must not exceed 999.99")
     private BigDecimal marks;
 
     @Size(max = 10, message = "Difficulty must not exceed 10 characters")

@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -27,4 +28,10 @@ public class CourseOfferingResponse {
     private Long semesterId;
     private String semesterLabel;
     private LocalDateTime createdAt;
+    private List<EnrollmentResponse> enrollments;
+    private List<MaterialResponse> materials;
+    private List<AssignmentResponse> assignments;
+    private List<ExamResponse> exams;
+    private List<AttendanceSessionResponse> attendanceSessions;
+    private List<PersonalResourceResponse> personalResources;
 }

@@ -1,7 +1,10 @@
 package com.unilearn.server.dto.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +14,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Getter
@@ -22,32 +26,36 @@ import java.time.LocalTime;
 public class ExamRequest {
 
     @NotNull(message = "Offering ID is required")
+    @Positive(message = "Offering ID must be positive")
     private Long offeringId;
 
     @NotBlank(message = "Exam type is required")
-    @Size(max = 20, message = "Exam type must not exceed 20 characters")
+    @Size(max = 30, message = "Exam type must not exceed 30 characters")
     private String examType;
 
-    @NotNull(message = "Scheduled by user ID is required")
-    private Long scheduledByUserId;
+    private LocalDateTime scheduledAt;
 
-    private Long linkedSlotId;
-
-    @NotNull(message = "Exam date is required")
     private LocalDate examDate;
 
-    @NotNull(message = "Start time is required")
     private LocalTime startTime;
 
-    @NotNull(message = "End time is required")
     private LocalTime endTime;
+
+    @NotNull(message = "Duration in minutes is required")
+    @Positive(message = "Duration must be positive")
+    @Min(value = 1, message = "Duration must be at least 1 minute")
+    @Max(value = 1440, message = "Duration must not exceed 1440 minutes (24 hours)")
+    private Integer durationMinutes;
 
     @Size(max = 100, message = "Venue must not exceed 100 characters")
     private String venue;
 
-    @NotNull(message = "Duration in minutes is required")
-    private Integer durationMinutes;
+    private Long linkedSlotId;
 
     @Size(max = 20, message = "Status must not exceed 20 characters")
     private String status;
+
+    @NotNull(message = "Examiner / scheduled by ID is required")
+    @Positive(message = "Examiner ID must be positive")
+    private Long scheduledById;
 }

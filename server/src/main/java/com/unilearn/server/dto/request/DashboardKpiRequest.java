@@ -1,5 +1,6 @@
 package com.unilearn.server.dto.request;
 
+import jakarta.validation.constraints.PastOrPresent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,8 +17,13 @@ import java.time.LocalDate;
 @ToString
 @Builder
 public class DashboardKpiRequest {
+
     private Long facultyId;
     private Long departmentId;
+
+    @PastOrPresent(message = "Start date must be in the past or present")
     private LocalDate startDate;
+
+    @PastOrPresent(message = "End date must be in the past or present")
     private LocalDate endDate;
 }

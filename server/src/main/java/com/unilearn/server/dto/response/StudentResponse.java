@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.List;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -23,4 +25,9 @@ public class StudentResponse {
     private String departmentName;
     private Long batchId;
     private String batchName;
+    private List<EnrollmentResponse> enrollments;
+    private List<SubmissionResponse> submissions;
+    private List<ExamAttemptResponse> examAttempts;
+    private List<PersonalResourceResponse> personalResources;
+    private List<AttendanceRecordResponse> attendanceRecords;
 }

@@ -10,6 +10,7 @@ import lombok.ToString;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -32,4 +33,6 @@ public class ExamResponse {
     private String status;
     private Long scheduledById;
     private String scheduledByName;
+    private List<ExamAttemptResponse> examAttempts;
+    private List<ExamResultResponse> examResults;
 }
