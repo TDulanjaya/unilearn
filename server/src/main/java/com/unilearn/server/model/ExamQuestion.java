@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,6 +26,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class ExamQuestion {
 
     @Id
@@ -40,11 +42,14 @@ public class ExamQuestion {
     @Column(precision = 5, scale = 2)
     private BigDecimal marksOverride;
 
+    private Integer questionOrder;
+
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     @EqualsAndHashCode
+    @Builder
     public static class ExamQuestionId implements Serializable {
         private Long exam;
         private Long question;

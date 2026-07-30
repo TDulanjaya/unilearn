@@ -12,6 +12,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class Course {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,8 +47,10 @@ public class Course {
     @Lob
     private String description;
 
+    @Builder.Default
     @Column(length = 20)
     private String syllabusVersion = "v1";
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

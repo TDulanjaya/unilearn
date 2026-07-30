@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class AiChatMessage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,5 +46,6 @@ public class AiChatMessage {
     @Column(nullable = false)
     private String content;
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

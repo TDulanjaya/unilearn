@@ -29,4 +29,6 @@ public class AcademicYearRequest {
 
     @NotNull(message = "End date is required")
     private LocalDate endDate;
+
+    private Boolean isCurrent;
 }

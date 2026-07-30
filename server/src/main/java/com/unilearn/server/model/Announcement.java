@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class Announcement {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -55,5 +57,6 @@ public class Announcement {
     @JoinColumn(name = "posted_by", nullable = false)
     private User postedBy;
 
+    @Builder.Default
     private LocalDateTime postedAt = LocalDateTime.now();
 }

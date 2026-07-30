@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -23,6 +24,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class TimetableSlot {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,6 +46,7 @@ public class TimetableSlot {
     @Column(length = 100)
     private String venue;
 
+    @Builder.Default
     @Column(length = 20)
     private String slotType = "lecture";
 }

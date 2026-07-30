@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class Message {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,6 +43,7 @@ public class Message {
     @Column(nullable = false)
     private String content;
 
+    @Builder.Default
     private LocalDateTime sentAt = LocalDateTime.now();
     private LocalDateTime readAt;
 }

@@ -1,7 +1,6 @@
 package com.unilearn.server.model;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +24,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class Enrollment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,8 +38,10 @@ public class Enrollment {
     @JoinColumn(name = "offering_id", nullable = false)
     private CourseOffering courseOffering;
 
+    @Builder.Default
     private LocalDate enrollmentDate = LocalDate.now();
 
+    @Builder.Default
     @Column(length = 20)
     private String status = "active";
 }

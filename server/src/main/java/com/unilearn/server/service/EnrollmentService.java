@@ -1,0 +1,24 @@
+package com.unilearn.server.service;
+
+import com.unilearn.server.dto.request.EnrollmentRequest;
+import com.unilearn.server.dto.response.EnrollmentResponse;
+import com.unilearn.server.dto.response.PageResponseDTO;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+
+/**
+ * Service interface for managing course enrollments.
+ */
+public interface EnrollmentService {
+
+    EnrollmentResponse enrollStudent(EnrollmentRequest request);
+
+    void dropEnrollment(Long enrollmentId);
+
+    List<EnrollmentResponse> getEnrollmentsByStudent(Long studentId);
+
+    PageResponseDTO<EnrollmentResponse> getEnrollmentsByOffering(Long offeringId, Pageable pageable);
+
+    EnrollmentResponse updateStatus(Long enrollmentId, String status);
+}

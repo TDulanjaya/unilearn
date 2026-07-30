@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,6 +24,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class CourseOfferingLecturer {
     @Id
     @ManyToOne
@@ -39,6 +41,7 @@ public class CourseOfferingLecturer {
     @NoArgsConstructor
     @AllArgsConstructor
     @EqualsAndHashCode
+    @Builder
     public static class CourseOfferingLecturerId implements Serializable {
         private Long courseOffering;
         private Long lecturer;

@@ -22,5 +22,6 @@ public class UserResponse {
     private String phone;
     private String photoUrl;
     private String role;
+    private String status;
     private LocalDateTime createdAt;
 }

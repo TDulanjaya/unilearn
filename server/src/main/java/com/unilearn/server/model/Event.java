@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class Event {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,6 +42,8 @@ public class Event {
 
     @Column(nullable = false)
     private LocalDateTime eventDate;
+
+    private Integer capacity;
 
     @ManyToOne
     @JoinColumn(name = "faculty_id")

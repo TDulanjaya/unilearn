@@ -24,6 +24,7 @@ public class SubmissionResponse {
     private String fileUrl;
     private LocalDateTime submittedAt;
     private Boolean isResubmission;
+    private Boolean isLate;
     private BigDecimal score;
     private BigDecimal grade;
     private String feedback;

@@ -6,10 +6,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 @ToString
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class User {
 
     @Id
@@ -33,7 +35,7 @@ public class User {
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 255)
     private String passwordHash;
 
     @Column(length = 30)
@@ -45,9 +47,11 @@ public class User {
     @Column(nullable = false, length = 20)
     private String role;
 
+    @Builder.Default
     @Column(length = 20)
     private String status = "active";
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
 }

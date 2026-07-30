@@ -11,6 +11,7 @@ import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -23,6 +24,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class Lecturer {
     @Id
     private Long lecturerId;
@@ -39,6 +41,7 @@ public class Lecturer {
     @Column(length = 100)
     private String designation;
 
+    @Builder.Default
     private Boolean isGuest = false;
 
     private LocalDate contractEndDate;

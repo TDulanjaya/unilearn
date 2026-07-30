@@ -20,4 +20,5 @@ public class AcademicYearResponse {
     private String yearLabel;
     private LocalDate startDate;
     private LocalDate endDate;
+    private Boolean isCurrent;
 }

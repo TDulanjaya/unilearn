@@ -20,5 +20,6 @@ public class BatchResponse {
     private String departmentName;
     private Long academicYearId;
     private String academicYearName;
+    private String academicYearLabel;
     private Integer enrollmentYear;
 }

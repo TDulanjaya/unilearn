@@ -13,6 +13,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,6 +29,7 @@ import java.util.List;
 @ToString
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class Faculty {
 
     @Id
@@ -44,6 +46,7 @@ public class Faculty {
     @JoinColumn(name = "dean_user_id")
     private User dean;
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "faculty", fetch = FetchType.LAZY)

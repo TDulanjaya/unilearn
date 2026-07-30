@@ -3,7 +3,6 @@ package com.unilearn.server.repository;
 import com.unilearn.server.model.EventRegistration;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,4 +17,6 @@ public interface EventRegistrationRepository extends JpaRepository<EventRegistra
     Optional<EventRegistration> findByEvent_EventIdAndStudent_StudentId(Long eventId, Long studentId);
 
     boolean existsByEvent_EventIdAndStudent_StudentId(Long eventId, Long studentId);
+
+    long countByEvent_EventId(Long eventId);
 }

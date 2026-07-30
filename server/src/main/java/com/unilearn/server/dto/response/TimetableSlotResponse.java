@@ -19,6 +19,7 @@ public class TimetableSlotResponse {
     private Long slotId;
     private Long offeringId;
     private String courseCode;
+    private String courseName;
     private String dayOfWeek;
     private LocalTime startTime;
     private LocalTime endTime;

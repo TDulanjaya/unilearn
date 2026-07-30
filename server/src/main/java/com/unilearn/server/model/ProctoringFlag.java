@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class ProctoringFlag {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,8 +38,18 @@ public class ProctoringFlag {
     @Column(nullable = false, length = 50)
     private String flagType;
 
+    @Builder.Default
     private LocalDateTime flaggedAt = LocalDateTime.now();
 
     @Lob
     private String notes;
+
+    @Builder.Default
+    private Boolean reviewed = false;
+
+    @Lob
+    private String reviewNotes;
+
+    @Builder.Default
+    private Boolean falsePositive = false;
 }

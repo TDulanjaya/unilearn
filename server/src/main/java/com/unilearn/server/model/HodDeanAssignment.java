@@ -9,10 +9,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "hod_dean_assignments")
@@ -21,6 +24,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class HodDeanAssignment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,4 +44,9 @@ public class HodDeanAssignment {
     @ManyToOne
     @JoinColumn(name = "department_id")
     private Department department;
+
+    @Builder.Default
+    private Boolean active = true;
+
+    private LocalDate endDate;
 }

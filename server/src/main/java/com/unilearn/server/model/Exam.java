@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -29,6 +30,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class Exam {
 
     @Id
@@ -45,6 +47,10 @@ public class Exam {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "scheduled_by_user_id", nullable = false)
     private User scheduledBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "examiner_id")
+    private Examiner examiner;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "linked_slot_id")
@@ -65,6 +71,7 @@ public class Exam {
     @Column(nullable = false)
     private Integer durationMinutes;
 
+    @Builder.Default
     @Column(length = 20)
     private String status = "published";
 

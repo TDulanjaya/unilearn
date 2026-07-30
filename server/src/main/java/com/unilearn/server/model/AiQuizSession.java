@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,6 +29,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class AiQuizSession {
 
     @Id
@@ -51,6 +53,7 @@ public class AiQuizSession {
     @Column(nullable = false, length = 20)
     private String sourceScope;
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "quizSession", fetch = FetchType.LAZY, cascade = CascadeType.ALL)

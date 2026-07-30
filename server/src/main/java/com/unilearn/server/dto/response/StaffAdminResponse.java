@@ -19,4 +19,8 @@ public class StaffAdminResponse {
     private String fullName;
     private String email;
     private String scopeLevel;
+    private Long facultyId;
+    private String facultyName;
+    private Long departmentId;
+    private String departmentName;
 }

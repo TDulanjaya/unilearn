@@ -25,8 +25,12 @@ public class CourseOfferingResponse {
     private String batchName;
     private Long lecturerId;
     private String lecturerName;
+    private Long primaryLecturerId;
+    private String primaryLecturerName;
     private Long semesterId;
     private String semesterLabel;
+    private String semesterName;
+    private Integer capacity;
     private LocalDateTime createdAt;
     private List<EnrollmentResponse> enrollments;
     private List<MaterialResponse> materials;

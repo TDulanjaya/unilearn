@@ -13,6 +13,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,6 +28,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class Student {
 
     @Id
@@ -52,6 +54,7 @@ public class Student {
     @Column(nullable = false)
     private Integer enrollmentYear;
 
+    @Builder.Default
     @Column(length = 20)
     private String feeStatus = "pending";
 

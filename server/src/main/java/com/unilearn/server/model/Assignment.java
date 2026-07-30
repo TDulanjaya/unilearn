@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,6 +31,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class Assignment {
 
     @Id
@@ -52,12 +54,14 @@ public class Assignment {
     @Column(nullable = false, precision = 6, scale = 2)
     private BigDecimal maxScore;
 
+    @Builder.Default
     private Boolean allowResubmission = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private Lecturer createdBy;
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "assignment", fetch = FetchType.LAZY, cascade = CascadeType.ALL)

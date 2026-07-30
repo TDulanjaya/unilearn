@@ -29,6 +29,8 @@ public class CourseRequest {
     @Size(max = 150, message = "Course name must not exceed 150 characters")
     private String name;
 
+    private String title;
+
     @NotNull(message = "Credit hours are required")
     @Positive(message = "Credit hours must be positive")
     @Min(value = 1, message = "Credit hours must be at least 1")
@@ -40,4 +42,10 @@ public class CourseRequest {
     private Long departmentId;
 
     private String description;
+
+    private String syllabusVersion;
+
+    public String getTitle() {
+        return title != null ? title : name;
+    }
 }

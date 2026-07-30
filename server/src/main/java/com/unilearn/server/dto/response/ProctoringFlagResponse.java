@@ -22,4 +22,7 @@ public class ProctoringFlagResponse {
     private String description;
     private String notes;
     private LocalDateTime flaggedAt;
+    private Boolean reviewed;
+    private String reviewNotes;
+    private Boolean falsePositive;
 }

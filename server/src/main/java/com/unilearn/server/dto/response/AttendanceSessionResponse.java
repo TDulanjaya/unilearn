@@ -9,6 +9,7 @@ import lombok.ToString;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,6 +21,7 @@ public class AttendanceSessionResponse {
     private Long sessionId;
     private Long offeringId;
     private String courseCode;
+    private String courseName;
     private LocalDate sessionDate;
     private LocalTime startTime;
     private LocalTime endTime;
@@ -29,4 +31,7 @@ public class AttendanceSessionResponse {
     private Integer lateCount;
     private Long markedById;
     private String markedByName;
+    private Long markedByLecturerId;
+    private String markedByLecturerName;
+    private List<AttendanceRecordResponse> attendanceRecords;
 }

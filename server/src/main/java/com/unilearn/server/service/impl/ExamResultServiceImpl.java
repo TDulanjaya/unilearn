@@ -1,0 +1,144 @@
+package com.unilearn.server.service.impl;
+
+import com.unilearn.server.dto.request.ExamResultRequest;
+import com.unilearn.server.dto.response.ExamResultResponse;
+import com.unilearn.server.exception.EntryNotFoundException;
+import com.unilearn.server.exception.ValidationException;
+import com.unilearn.server.model.Exam;
+import com.unilearn.server.model.ExamAnswer;
+import com.unilearn.server.model.ExamAttempt;
+import com.unilearn.server.model.ExamResult;
+import com.unilearn.server.model.Student;
+import com.unilearn.server.repository.ExamAnswerRepository;
+import com.unilearn.server.repository.ExamAttemptRepository;
+import com.unilearn.server.repository.ExamRepository;
+import com.unilearn.server.repository.ExamResultRepository;
+import com.unilearn.server.repository.StudentRepository;
+import com.unilearn.server.service.ExamResultService;
+import com.unilearn.server.util.ExamResultMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ExamResultServiceImpl implements ExamResultService {
+
+    private final ExamResultRepository examResultRepository;
+    private final ExamRepository examRepository;
+    private final StudentRepository studentRepository;
+    private final ExamAttemptRepository examAttemptRepository;
+    private final ExamAnswerRepository examAnswerRepository;
+    private final ExamResultMapper examResultMapper;
+
+    @Override
+    @Transactional
+    public ExamResultResponse publishResult(ExamResultRequest request) {
+        if (request == null) {
+            throw new ValidationException("ExamResult request cannot be null");
+        }
+
+        Exam exam = examRepository.findById(request.getExamId())
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + request.getExamId()));
+
+        Student student = studentRepository.findById(request.getStudentId())
+                .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
+
+        ExamResult result = examResultRepository.findByExam_ExamIdAndStudent_StudentId(request.getExamId(), request.getStudentId())
+                .orElseGet(() -> examResultMapper.toExamResult(request, exam, student));
+
+        result.setScore(request.getScore());
+        result.setGrade(request.getGrade());
+        result.setPublishedAt(LocalDateTime.now());
+
+        ExamResult saved = examResultRepository.save(result);
+        return examResultMapper.toExamResultResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ExamResultResponse publishResultForStudent(Long examId, Long studentId) {
+        if (examId == null || studentId == null) {
+            throw new ValidationException("Exam ID and Student ID cannot be null");
+        }
+
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + studentId));
+
+        ExamAttempt attempt = examAttemptRepository.findByExam_ExamIdAndStudent_StudentId(examId, studentId)
+                .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found for exam ID: " + examId + " and student ID: " + studentId));
+
+        List<ExamAnswer> answers = examAnswerRepository.findByAttempt_AttemptId(attempt.getAttemptId());
+        BigDecimal totalScore = answers.stream()
+                .map(a -> a.getMarksAwarded() != null ? a.getMarksAwarded() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        ExamResult result = examResultRepository.findByExam_ExamIdAndStudent_StudentId(examId, studentId)
+                .orElseGet(() -> ExamResult.builder().exam(exam).student(student).build());
+
+        result.setScore(totalScore);
+        result.setPublishedAt(LocalDateTime.now());
+
+        ExamResult saved = examResultRepository.save(result);
+        return examResultMapper.toExamResultResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public List<ExamResultResponse> publishAllResultsForExam(Long examId) {
+        if (examId == null) {
+            throw new ValidationException("Exam ID cannot be null");
+        }
+
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        List<ExamAttempt> attempts = examAttemptRepository.findByExam_ExamId(examId);
+        List<ExamResultResponse> responses = new ArrayList<>();
+
+        for (ExamAttempt attempt : attempts) {
+            if (attempt.getStudent() != null) {
+                ExamResultResponse res = publishResultForStudent(examId, attempt.getStudent().getStudentId());
+                responses.add(res);
+            }
+        }
+
+        return responses;
+    }
+
+    @Override
+    public ExamResultResponse getResultForStudent(Long examId, Long studentId) {
+        if (examId == null || studentId == null) {
+            throw new ValidationException("Exam ID and Student ID cannot be null");
+        }
+
+        ExamResult result = examResultRepository.findByExam_ExamIdAndStudent_StudentId(examId, studentId)
+                .orElseThrow(() -> new EntryNotFoundException("ExamResult not found for exam ID: " + examId + " and student ID: " + studentId));
+
+        return examResultMapper.toExamResultResponse(result);
+    }
+
+    @Override
+    public List<ExamResultResponse> getResultsForExam(Long examId) {
+        if (examId == null) {
+            throw new ValidationException("Exam ID cannot be null");
+        }
+        if (!examRepository.existsById(examId)) {
+            throw new EntryNotFoundException("Exam not found with ID: " + examId);
+        }
+
+        return examResultRepository.findByExam_ExamId(examId)
+                .stream()
+                .map(examResultMapper::toExamResultResponse)
+                .toList();
+    }
+}

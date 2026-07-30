@@ -20,6 +20,8 @@ import lombok.ToString;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import lombok.Builder;
+
 @Entity
 @Table(name = "departments")
 @Getter
@@ -27,6 +29,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class Department {
 
     @Id
@@ -47,6 +50,7 @@ public class Department {
     @JoinColumn(name = "hod_user_id")
     private User hod;
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "department", fetch = FetchType.LAZY)

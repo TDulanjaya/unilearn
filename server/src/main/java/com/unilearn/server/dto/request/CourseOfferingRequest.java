@@ -27,4 +27,6 @@ public class CourseOfferingRequest {
 
     @NotNull(message = "Primary lecturer ID is required")
     private Long primaryLecturerId;
+
+    private Integer capacity;
 }

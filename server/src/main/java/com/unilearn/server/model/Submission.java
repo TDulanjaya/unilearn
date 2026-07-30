@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 public class Submission {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,8 +43,14 @@ public class Submission {
     @Column(length = 500)
     private String fileUrl;
 
+    @Builder.Default
     private LocalDateTime submittedAt = LocalDateTime.now();
+
+    @Builder.Default
     private Boolean isResubmission = false;
+
+    @Builder.Default
+    private Boolean isLate = false;
 
     @Column(precision = 6, scale = 2)
     private BigDecimal grade;

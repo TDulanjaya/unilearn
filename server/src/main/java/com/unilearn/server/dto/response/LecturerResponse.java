@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -20,5 +22,7 @@ public class LecturerResponse {
     private String email;
     private Long departmentId;
     private String departmentName;
+    private String designation;
     private Boolean isGuest;
+    private LocalDate contractEndDate;
 }

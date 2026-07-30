@@ -12,6 +12,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,6 +28,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 public class CourseOffering {
 
     @Id
@@ -49,6 +51,9 @@ public class CourseOffering {
     @JoinColumn(name = "lecturer_id", nullable = false)
     private Lecturer primaryLecturer;
 
+    private Integer capacity;
+
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "courseOffering", fetch = FetchType.LAZY)
