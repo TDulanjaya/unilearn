@@ -9,7 +9,7 @@ import com.unilearn.server.model.Semester;
 import com.unilearn.server.repository.AcademicYearRepository;
 import com.unilearn.server.repository.SemesterRepository;
 import com.unilearn.server.service.SemesterService;
-import com.unilearn.server.util.SemesterMapper;
+import com.unilearn.server.util.mapper.SemesterMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -107,6 +107,19 @@ public class SemesterServiceImpl implements SemesterService {
         return semesterRepository.findByAcademicYear_AcademicYearId(academicYearId)
                 .stream()
                 .map(semesterMapper::toSemesterResponse)
+                .toList();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.semester.SemesterOptionDTO> getSemesterOptions(Long academicYearId, String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        List<Semester> semesters = (academicYearId != null)
+                ? semesterRepository.findByAcademicYear_AcademicYearId(academicYearId)
+                : semesterRepository.findAll();
+
+        return semesters.stream()
+                .filter(s -> filter.isEmpty() || s.getName().toLowerCase().contains(filter))
+                .map(semesterMapper::toSemesterOptionDTO)
                 .toList();
     }
 }

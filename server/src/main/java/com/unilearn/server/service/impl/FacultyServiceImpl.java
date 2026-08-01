@@ -3,6 +3,7 @@ package com.unilearn.server.service.impl;
 import com.unilearn.server.dto.request.FacultyRequest;
 import com.unilearn.server.dto.response.FacultyResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
+import com.unilearn.server.exception.DuplicateEntryException;
 import com.unilearn.server.exception.EntryNotFoundException;
 
 import com.unilearn.server.exception.ValidationException;
@@ -12,7 +13,7 @@ import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.FacultyService;
-import com.unilearn.server.util.FacultyMapper;
+import com.unilearn.server.util.mapper.FacultyMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,7 +40,7 @@ public class FacultyServiceImpl implements FacultyService {
         }
 
         if (facultyRepository.existsByCode(request.getCode())) {
-            throw new ValidationException("Faculty code already exists: " + request.getCode());
+            throw new DuplicateEntryException("Faculty code already exists: " + request.getCode());
         }
 
         User dean = null;
@@ -68,7 +69,7 @@ public class FacultyServiceImpl implements FacultyService {
 
         if (!faculty.getCode().equalsIgnoreCase(request.getCode())
                 && facultyRepository.existsByCode(request.getCode())) {
-            throw new ValidationException("Faculty code already exists: " + request.getCode());
+            throw new DuplicateEntryException("Faculty code already exists: " + request.getCode());
         }
 
         User dean = null;
@@ -141,5 +142,14 @@ public class FacultyServiceImpl implements FacultyService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.faculty.FacultyOptionDTO> getFacultyOptions(String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        return facultyRepository.findAll().stream()
+                .filter(f -> filter.isEmpty() || f.getName().toLowerCase().contains(filter) || f.getCode().toLowerCase().contains(filter))
+                .map(facultyMapper::toFacultyOptionDTO)
+                .toList();
     }
 }

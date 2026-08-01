@@ -2,6 +2,7 @@ package com.unilearn.server.service;
 
 import com.unilearn.server.dto.request.CourseOfferingRequest;
 import com.unilearn.server.dto.response.CourseOfferingResponse;
+import com.unilearn.server.dto.response.courseoffering.CourseOfferingListItemDTO;
 
 import java.util.List;
 
@@ -25,6 +26,8 @@ public interface CourseOfferingService {
     List<CourseOfferingResponse> getOfferingsBySemester(Long semesterId);
 
     List<CourseOfferingResponse> getOfferingsByLecturer(Long lecturerId);
+
+    List<CourseOfferingListItemDTO> getOfferingListItemsByBatch(Long batchId);
 
     long getEnrollmentCount(Long offeringId);
 }

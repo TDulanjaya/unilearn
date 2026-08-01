@@ -15,7 +15,7 @@ import com.unilearn.server.repository.EnrollmentRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.StudentService;
-import com.unilearn.server.util.StudentMapper;
+import com.unilearn.server.util.mapper.StudentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -53,7 +53,7 @@ public class StudentServiceImpl implements StudentService {
                 .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
 
         if (studentRepository.existsByStudentNo(request.getStudentNo())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Student number already exists: " + request.getStudentNo());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Student number already exists: " + request.getStudentNo());
         }
 
         Student student = studentMapper.toStudent(request, user, department, batch);
@@ -81,7 +81,7 @@ public class StudentServiceImpl implements StudentService {
                 .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
 
         if (!student.getStudentNo().equalsIgnoreCase(request.getStudentNo()) && studentRepository.existsByStudentNo(request.getStudentNo())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Student number already exists: " + request.getStudentNo());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Student number already exists: " + request.getStudentNo());
         }
 
         student.setStudentNo(request.getStudentNo());
@@ -169,5 +169,44 @@ public class StudentServiceImpl implements StudentService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    @Override
+    public PageResponseDTO<com.unilearn.server.dto.response.student.StudentListItemDTO> getStudentListItemsByBatch(Long batchId, Pageable pageable) {
+        if (batchId == null) {
+            throw new ValidationException("Batch ID cannot be null");
+        }
+        if (pageable == null) {
+            throw new ValidationException("Pageable parameter cannot be null");
+        }
+        if (!batchRepository.existsById(batchId)) {
+            throw new EntryNotFoundException("Batch not found with ID: " + batchId);
+        }
+
+        Page<Student> page = studentRepository.findByBatch_BatchId(batchId, pageable);
+        List<com.unilearn.server.dto.response.student.StudentListItemDTO> content = page.getContent()
+                .stream()
+                .map(studentMapper::toStudentListItemDTO)
+                .toList();
+
+        return PageResponseDTO.<com.unilearn.server.dto.response.student.StudentListItemDTO>builder()
+                .dataCount((int) page.getTotalElements())
+                .dataList(content)
+                .build();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.student.StudentOptionDTO> getStudentOptions(Long batchId, String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        List<Student> students = (batchId != null)
+                ? studentRepository.findByBatch_BatchId(batchId)
+                : studentRepository.findAll();
+
+        return students.stream()
+                .filter(s -> filter.isEmpty() 
+                        || (s.getUser() != null && s.getUser().getFullName() != null && s.getUser().getFullName().toLowerCase().contains(filter))
+                        || (s.getStudentNo() != null && s.getStudentNo().toLowerCase().contains(filter)))
+                .map(studentMapper::toStudentOptionDTO)
+                .toList();
     }
 }

@@ -1,6 +1,7 @@
 package com.unilearn.server.service.impl;
 
-import com.unilearn.server.dto.request.SubmissionRequest;
+import com.unilearn.server.dto.request.submission.SubmissionCreateRequestDTO;
+import com.unilearn.server.dto.request.submission.SubmissionGradeRequestDTO;
 import com.unilearn.server.dto.response.SubmissionResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
@@ -13,7 +14,7 @@ import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.repository.SubmissionRepository;
 import com.unilearn.server.service.SubmissionService;
-import com.unilearn.server.util.SubmissionMapper;
+import com.unilearn.server.util.mapper.SubmissionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +37,7 @@ public class SubmissionServiceImpl implements SubmissionService {
 
     @Override
     @Transactional
-    public SubmissionResponse submitAssignment(SubmissionRequest request) {
+    public SubmissionResponse submitAssignment(SubmissionCreateRequestDTO request) {
         if (request == null) {
             throw new ValidationException("Submission request cannot be null");
         }
@@ -71,31 +72,27 @@ public class SubmissionServiceImpl implements SubmissionService {
 
     @Override
     @Transactional
-    public SubmissionResponse gradeSubmission(Long submissionId, BigDecimal score, String feedback, Long gradedByLecturerId) {
+    public SubmissionResponse gradeSubmission(Long submissionId, SubmissionGradeRequestDTO gradeRequest) {
         if (submissionId == null) {
             throw new ValidationException("Submission ID cannot be null");
         }
-        if (score == null) {
-            throw new ValidationException("Score cannot be null");
+        if (gradeRequest == null) {
+            throw new ValidationException("Grade request cannot be null");
         }
-        if (gradedByLecturerId == null) {
-            throw new ValidationException("Graded by Lecturer ID cannot be null");
+        if (gradeRequest.getGrade() == null) {
+            throw new ValidationException("Score cannot be null");
         }
 
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new EntryNotFoundException("Submission not found with ID: " + submissionId));
 
-        Lecturer lecturer = lecturerRepository.findById(gradedByLecturerId)
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + gradedByLecturerId));
-
         BigDecimal maxScore = submission.getAssignment().getMaxScore();
-        if (score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(maxScore) > 0) {
+        if (gradeRequest.getGrade().compareTo(BigDecimal.ZERO) < 0 || gradeRequest.getGrade().compareTo(maxScore) > 0) {
             throw new ValidationException("Score cannot exceed maximum score of " + maxScore);
         }
 
-        submission.setGrade(score);
-        submission.setFeedback(feedback);
-        submission.setGradedBy(lecturer);
+        submission.setGrade(gradeRequest.getGrade());
+        submission.setFeedback(gradeRequest.getFeedback());
         submission.setGradedAt(LocalDateTime.now());
 
         Submission updated = submissionRepository.save(submission);

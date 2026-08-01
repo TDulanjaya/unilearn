@@ -1,6 +1,6 @@
 package com.unilearn.server.service;
 
-import com.unilearn.server.dto.request.ExamAttemptRequest;
+import com.unilearn.server.dto.request.examattempt.ExamAttemptStartRequestDTO;
 import com.unilearn.server.dto.response.ExamAttemptResponse;
 
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface ExamAttemptService {
 
-    ExamAttemptResponse startAttempt(ExamAttemptRequest request);
+    ExamAttemptResponse startAttempt(ExamAttemptStartRequestDTO request);
 
     ExamAttemptResponse submitAttempt(Long attemptId);
 

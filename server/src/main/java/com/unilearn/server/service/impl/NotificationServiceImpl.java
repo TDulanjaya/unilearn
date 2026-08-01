@@ -10,7 +10,7 @@ import com.unilearn.server.model.User;
 import com.unilearn.server.repository.NotificationRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.NotificationService;
-import com.unilearn.server.util.NotificationMapper;
+import com.unilearn.server.util.mapper.NotificationMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

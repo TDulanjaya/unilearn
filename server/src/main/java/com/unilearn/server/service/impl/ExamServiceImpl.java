@@ -1,6 +1,8 @@
 package com.unilearn.server.service.impl;
 
 import com.unilearn.server.dto.request.ExamRequest;
+import com.unilearn.server.dto.request.exam.ExamFinalCreateRequestDTO;
+import com.unilearn.server.dto.request.exam.ExamInClassCreateRequestDTO;
 import com.unilearn.server.dto.response.ExamResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
@@ -13,7 +15,7 @@ import com.unilearn.server.repository.ExamRepository;
 import com.unilearn.server.repository.TimetableSlotRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.ExamService;
-import com.unilearn.server.util.ExamMapper;
+import com.unilearn.server.util.mapper.ExamMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +60,52 @@ public class ExamServiceImpl implements ExamService {
         }
 
         Exam exam = examMapper.toExam(request, offering, scheduledBy, slot);
+        Exam saved = examRepository.save(exam);
+        return examMapper.toExamResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ExamResponse createFinalExam(ExamFinalCreateRequestDTO request) {
+        if (request == null) {
+            throw new ValidationException("Exam request cannot be null");
+        }
+
+        if (request.getExamDate() != null && request.getExamDate().isBefore(LocalDate.now())) {
+            throw new com.unilearn.server.exception.IllegalStateException("Exam date cannot be in the past");
+        }
+
+        CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
+                .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
+
+        User scheduledBy = userRepository.findById(request.getScheduledById())
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getScheduledById()));
+
+        Exam exam = examMapper.toFinalExam(request, offering, scheduledBy);
+        Exam saved = examRepository.save(exam);
+        return examMapper.toExamResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ExamResponse createInClassExam(ExamInClassCreateRequestDTO request) {
+        if (request == null) {
+            throw new ValidationException("Exam request cannot be null");
+        }
+
+        CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
+                .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
+
+        User scheduledBy = userRepository.findById(request.getScheduledById())
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getScheduledById()));
+
+        TimetableSlot slot = null;
+        if (request.getLinkedSlotId() != null) {
+            slot = timetableSlotRepository.findById(request.getLinkedSlotId())
+                    .orElseThrow(() -> new EntryNotFoundException("TimetableSlot not found with ID: " + request.getLinkedSlotId()));
+        }
+
+        Exam exam = examMapper.toInClassExam(request, offering, scheduledBy, slot);
         Exam saved = examRepository.save(exam);
         return examMapper.toExamResponse(saved);
     }
@@ -146,6 +194,21 @@ public class ExamServiceImpl implements ExamService {
         return examRepository.findByCourseOffering_OfferingId(offeringId)
                 .stream()
                 .map(examMapper::toExamResponse)
+                .toList();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.exam.ExamListItemDTO> getExamListItemsByOffering(Long offeringId) {
+        if (offeringId == null) {
+            throw new ValidationException("Offering ID cannot be null");
+        }
+        if (!courseOfferingRepository.existsById(offeringId)) {
+            throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
+        }
+
+        return examRepository.findByCourseOffering_OfferingId(offeringId)
+                .stream()
+                .map(examMapper::toExamListItemDTO)
                 .toList();
     }
 }

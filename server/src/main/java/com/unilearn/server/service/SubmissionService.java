@@ -1,9 +1,9 @@
 package com.unilearn.server.service;
 
-import com.unilearn.server.dto.request.SubmissionRequest;
+import com.unilearn.server.dto.request.submission.SubmissionCreateRequestDTO;
+import com.unilearn.server.dto.request.submission.SubmissionGradeRequestDTO;
 import com.unilearn.server.dto.response.SubmissionResponse;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -11,9 +11,9 @@ import java.util.List;
  */
 public interface SubmissionService {
 
-    SubmissionResponse submitAssignment(SubmissionRequest request);
+    SubmissionResponse submitAssignment(SubmissionCreateRequestDTO request);
 
-    SubmissionResponse gradeSubmission(Long submissionId, BigDecimal score, String feedback, Long gradedByLecturerId);
+    SubmissionResponse gradeSubmission(Long submissionId, SubmissionGradeRequestDTO gradeRequest);
 
     List<SubmissionResponse> getSubmissionsByAssignment(Long assignmentId);
 

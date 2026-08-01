@@ -11,7 +11,7 @@ import com.unilearn.server.repository.ExamAnswerRepository;
 import com.unilearn.server.repository.ExamAttemptRepository;
 import com.unilearn.server.repository.QuestionRepository;
 import com.unilearn.server.service.ExamAnswerService;
-import com.unilearn.server.util.ExamAnswerMapper;
+import com.unilearn.server.util.mapper.ExamAnswerMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

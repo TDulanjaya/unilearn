@@ -9,7 +9,7 @@ import com.unilearn.server.model.ProctoringFlag;
 import com.unilearn.server.repository.ExamAttemptRepository;
 import com.unilearn.server.repository.ProctoringFlagRepository;
 import com.unilearn.server.service.ProctoringFlagService;
-import com.unilearn.server.util.ProctoringFlagMapper;
+import com.unilearn.server.util.mapper.ProctoringFlagMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

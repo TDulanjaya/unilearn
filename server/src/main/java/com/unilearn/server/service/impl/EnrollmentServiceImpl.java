@@ -1,6 +1,6 @@
 package com.unilearn.server.service.impl;
 
-import com.unilearn.server.dto.request.EnrollmentRequest;
+import com.unilearn.server.dto.request.enrollment.EnrollmentCreateRequestDTO;
 import com.unilearn.server.dto.response.EnrollmentResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import com.unilearn.server.exception.EntryNotFoundException;
@@ -12,7 +12,7 @@ import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.EnrollmentRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.EnrollmentService;
-import com.unilearn.server.util.EnrollmentMapper;
+import com.unilearn.server.util.mapper.EnrollmentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +33,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional
-    public EnrollmentResponse enrollStudent(EnrollmentRequest request) {
+    public EnrollmentResponse enrollStudent(EnrollmentCreateRequestDTO request) {
         if (request == null) {
             throw new ValidationException("Enrollment request cannot be null");
         }
@@ -45,7 +45,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
         if (enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(request.getStudentId(), request.getOfferingId())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Student is already enrolled in this course offering");
+            throw new com.unilearn.server.exception.DuplicateEntryException("Student is already enrolled in this course offering");
         }
 
         if (offering.getCapacity() != null) {

@@ -14,9 +14,9 @@ import com.unilearn.server.repository.CourseOfferingLecturerRepository;
 import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.service.CourseOfferingLecturerService;
-import com.unilearn.server.util.CourseOfferingLecturerMapper;
-import com.unilearn.server.util.CourseOfferingMapper;
-import com.unilearn.server.util.LecturerMapper;
+import com.unilearn.server.util.mapper.CourseOfferingLecturerMapper;
+import com.unilearn.server.util.mapper.CourseOfferingMapper;
+import com.unilearn.server.util.mapper.LecturerMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,7 +50,7 @@ public class CourseOfferingLecturerServiceImpl implements CourseOfferingLecturer
 
         CourseOfferingLecturerId id = new CourseOfferingLecturerId(request.getOfferingId(), request.getLecturerId());
         if (courseOfferingLecturerRepository.existsById(id)) {
-            throw new com.unilearn.server.exception.IllegalStateException("Lecturer already assigned to this offering");
+            throw new com.unilearn.server.exception.DuplicateEntryException("Lecturer already assigned to this offering");
         }
 
         CourseOfferingLecturer col = courseOfferingLecturerMapper.toCourseOfferingLecturer(offering, lecturer);

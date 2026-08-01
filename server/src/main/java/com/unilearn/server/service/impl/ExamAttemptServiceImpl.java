@@ -1,6 +1,6 @@
 package com.unilearn.server.service.impl;
 
-import com.unilearn.server.dto.request.ExamAttemptRequest;
+import com.unilearn.server.dto.request.examattempt.ExamAttemptStartRequestDTO;
 import com.unilearn.server.dto.response.ExamAttemptResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
@@ -11,7 +11,7 @@ import com.unilearn.server.repository.ExamAttemptRepository;
 import com.unilearn.server.repository.ExamRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.ExamAttemptService;
-import com.unilearn.server.util.ExamAttemptMapper;
+import com.unilearn.server.util.mapper.ExamAttemptMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +32,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
 
     @Override
     @Transactional
-    public ExamAttemptResponse startAttempt(ExamAttemptRequest request) {
+    public ExamAttemptResponse startAttempt(ExamAttemptStartRequestDTO request) {
         if (request == null) {
             throw new ValidationException("ExamAttempt request cannot be null");
         }
@@ -47,7 +47,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (existingOpt.isPresent()) {
             ExamAttempt existing = existingOpt.get();
             if ("submitted".equalsIgnoreCase(existing.getStatus()) || existing.getEndTime() != null) {
-                throw new com.unilearn.server.exception.IllegalStateException("Student already has an active or completed attempt for this exam");
+                throw new com.unilearn.server.exception.DuplicateEntryException("Student already has an active or completed attempt for this exam");
             }
             return examAttemptMapper.toExamAttemptResponse(existing);
         }

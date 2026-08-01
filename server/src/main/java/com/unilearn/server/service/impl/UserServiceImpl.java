@@ -8,7 +8,7 @@ import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.User;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.UserService;
-import com.unilearn.server.util.UserMapper;
+import com.unilearn.server.util.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,7 +35,7 @@ public class UserServiceImpl implements UserService {
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Email already registered: " + request.getEmail());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
         }
 
         String passwordHash = passwordEncoder.encode(request.getPassword() != null ? request.getPassword() : "defaultPass123");
@@ -58,7 +58,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
 
         if (!user.getEmail().equalsIgnoreCase(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Email already registered: " + request.getEmail());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
         }
 
         user.setFullName(request.getFullName());

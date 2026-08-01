@@ -1,6 +1,7 @@
 package com.unilearn.server.service.impl;
 
-import com.unilearn.server.dto.request.HodDeanAssignmentRequest;
+import com.unilearn.server.dto.request.hoddeanassignment.HodDeanAssignRequestDTO;
+import com.unilearn.server.dto.request.hoddeanassignment.HodDeanRevokeRequestDTO;
 import com.unilearn.server.dto.response.HodDeanAssignmentResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
@@ -13,7 +14,7 @@ import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.HodDeanAssignmentRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.HodDeanAssignmentService;
-import com.unilearn.server.util.HodDeanAssignmentMapper;
+import com.unilearn.server.util.mapper.HodDeanAssignmentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,7 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
 
     @Override
     @Transactional
-    public HodDeanAssignmentResponse assignHodOrDean(HodDeanAssignmentRequest request) {
+    public HodDeanAssignmentResponse assignHodOrDean(HodDeanAssignRequestDTO request) {
         if (request == null) {
             throw new ValidationException("HodDeanAssignment request cannot be null");
         }
@@ -54,7 +55,7 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
 
             boolean hasActive = hodDeanAssignmentRepository.findByDepartment_DepartmentIdAndActiveTrue(request.getDepartmentId()).isPresent();
             if (hasActive) {
-                throw new com.unilearn.server.exception.IllegalStateException("Department already has an active HOD");
+                throw new com.unilearn.server.exception.DuplicateEntryException("Department already has an active HOD");
             }
         } else if ("faculty".equalsIgnoreCase(request.getScopeType())) {
             if (request.getFacultyId() == null) {
@@ -65,7 +66,7 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
 
             boolean hasActive = hodDeanAssignmentRepository.findByFaculty_FacultyIdAndActiveTrue(request.getFacultyId()).isPresent();
             if (hasActive) {
-                throw new com.unilearn.server.exception.IllegalStateException("Faculty already has an active Dean");
+                throw new com.unilearn.server.exception.DuplicateEntryException("Faculty already has an active Dean");
             }
         }
 
@@ -76,7 +77,7 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
 
     @Override
     @Transactional
-    public HodDeanAssignmentResponse revokeAssignment(Long assignmentId, LocalDate endDate) {
+    public HodDeanAssignmentResponse revokeAssignment(Long assignmentId, HodDeanRevokeRequestDTO revokeRequest) {
         if (assignmentId == null) {
             throw new ValidationException("Assignment ID cannot be null");
         }
@@ -85,7 +86,8 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
                 .orElseThrow(() -> new EntryNotFoundException("HodDeanAssignment not found with ID: " + assignmentId));
 
         assignment.setActive(false);
-        assignment.setEndDate(endDate != null ? endDate : LocalDate.now());
+        LocalDate endDate = (revokeRequest != null && revokeRequest.getEndDate() != null) ? revokeRequest.getEndDate() : LocalDate.now();
+        assignment.setEndDate(endDate);
 
         HodDeanAssignment updated = hodDeanAssignmentRepository.save(assignment);
         return hodDeanAssignmentMapper.toHodDeanAssignmentResponse(updated);

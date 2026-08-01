@@ -14,7 +14,7 @@ import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.StaffAdminRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.StaffAdminService;
-import com.unilearn.server.util.StaffAdminMapper;
+import com.unilearn.server.util.mapper.StaffAdminMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

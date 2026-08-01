@@ -11,7 +11,7 @@ import com.unilearn.server.repository.AttendanceSessionRepository;
 import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.service.AttendanceSessionService;
-import com.unilearn.server.util.AttendanceSessionMapper;
+import com.unilearn.server.util.mapper.AttendanceSessionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +41,10 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
 
         Lecturer lecturer = lecturerRepository.findById(request.getMarkedByLecturerId())
                 .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getMarkedByLecturerId()));
+
+        if (request.getSessionDate() != null && attendanceSessionRepository.existsByCourseOffering_OfferingIdAndSessionDate(request.getOfferingId(), request.getSessionDate())) {
+            throw new com.unilearn.server.exception.DuplicateEntryException("Attendance session already exists for offering ID " + request.getOfferingId() + " on date " + request.getSessionDate());
+        }
 
         AttendanceSession session = attendanceSessionMapper.toAttendanceSession(request, offering, lecturer);
         AttendanceSession saved = attendanceSessionRepository.save(session);

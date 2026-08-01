@@ -7,9 +7,7 @@ import com.unilearn.server.dto.response.LoginResponse;
 import com.unilearn.server.dto.response.RefreshTokenResponse;
 import com.unilearn.server.dto.response.RegisterResponse;
 
-/**
- * Service interface for authentication operations.
- */
+
 public interface AuthService {
 
     RegisterResponse register(RegisterRequest request);

@@ -16,7 +16,7 @@ import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.AnnouncementService;
-import com.unilearn.server.util.AnnouncementMapper;
+import com.unilearn.server.util.mapper.AnnouncementMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

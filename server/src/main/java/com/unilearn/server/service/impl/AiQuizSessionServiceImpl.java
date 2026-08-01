@@ -14,7 +14,7 @@ import com.unilearn.server.repository.AiQuizSessionRepository;
 import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.AiQuizSessionService;
-import com.unilearn.server.util.AiQuizSessionMapper;
+import com.unilearn.server.util.mapper.AiQuizSessionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

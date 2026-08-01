@@ -10,7 +10,7 @@ import com.unilearn.server.model.User;
 import com.unilearn.server.repository.AuditLogRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.AuditLogService;
-import com.unilearn.server.util.AuditLogMapper;
+import com.unilearn.server.util.mapper.AuditLogMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

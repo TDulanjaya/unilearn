@@ -13,7 +13,7 @@ import com.unilearn.server.repository.ExamRepository;
 import com.unilearn.server.repository.ExaminerRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.ExaminerService;
-import com.unilearn.server.util.ExaminerMapper;
+import com.unilearn.server.util.mapper.ExaminerMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

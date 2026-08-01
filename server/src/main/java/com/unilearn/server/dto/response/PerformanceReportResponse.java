@@ -1,11 +1,14 @@
 package com.unilearn.server.dto.response;
 
+import com.unilearn.server.dto.response.report.LabeledCountDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -24,4 +27,6 @@ public class PerformanceReportResponse {
     private Double averageExamScore;
     private Double passRatePercent;
     private Integer studentCount;
+
+    private List<LabeledCountDTO> gradeDistribution;
 }

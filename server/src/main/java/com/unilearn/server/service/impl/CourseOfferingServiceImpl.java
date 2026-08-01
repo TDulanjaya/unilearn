@@ -15,7 +15,7 @@ import com.unilearn.server.repository.CourseRepository;
 import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.repository.SemesterRepository;
 import com.unilearn.server.service.CourseOfferingService;
-import com.unilearn.server.util.CourseOfferingMapper;
+import com.unilearn.server.util.mapper.CourseOfferingMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +57,7 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
                 request.getCourseId(), request.getBatchId(), request.getSemesterId()).isPresent();
 
         if (exists) {
-            throw new com.unilearn.server.exception.IllegalStateException("This course is already offered to this batch in this semester");
+            throw new com.unilearn.server.exception.DuplicateEntryException("This course is already offered to this batch in this semester");
         }
 
         CourseOffering offering = courseOfferingMapper.toCourseOffering(request, course, batch, semester, lecturer);
@@ -189,5 +189,23 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
         }
         return courseOfferingRepository.countEnrollmentsByOfferingId(offeringId);
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.courseoffering.CourseOfferingListItemDTO> getOfferingListItemsByBatch(Long batchId) {
+        if (batchId == null) {
+            throw new ValidationException("Batch ID cannot be null");
+        }
+        if (!batchRepository.existsById(batchId)) {
+            throw new EntryNotFoundException("Batch not found with ID: " + batchId);
+        }
+
+        return courseOfferingRepository.findByBatch_BatchId(batchId)
+                .stream()
+                .map(offering -> {
+                    long count = courseOfferingRepository.countEnrollmentsByOfferingId(offering.getOfferingId());
+                    return courseOfferingMapper.toCourseOfferingListItemDTO(offering, count);
+                })
+                .toList();
     }
 }

@@ -11,7 +11,7 @@ import com.unilearn.server.repository.AssignmentRepository;
 import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.service.AssignmentService;
-import com.unilearn.server.util.AssignmentMapper;
+import com.unilearn.server.util.mapper.AssignmentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

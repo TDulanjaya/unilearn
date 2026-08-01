@@ -8,7 +8,7 @@ import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.AcademicYear;
 import com.unilearn.server.repository.AcademicYearRepository;
 import com.unilearn.server.service.AcademicYearService;
-import com.unilearn.server.util.AcademicYearMapper;
+import com.unilearn.server.util.mapper.AcademicYearMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

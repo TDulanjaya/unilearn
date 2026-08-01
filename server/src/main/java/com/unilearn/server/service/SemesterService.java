@@ -2,6 +2,7 @@ package com.unilearn.server.service;
 
 import com.unilearn.server.dto.request.SemesterRequest;
 import com.unilearn.server.dto.response.SemesterResponse;
+import com.unilearn.server.dto.response.semester.SemesterOptionDTO;
 
 import java.util.List;
 
@@ -19,4 +20,6 @@ public interface SemesterService {
     SemesterResponse getSemesterById(Long semesterId);
 
     List<SemesterResponse> getSemestersByAcademicYear(Long academicYearId);
+
+    List<SemesterOptionDTO> getSemesterOptions(Long academicYearId, String searchText);
 }

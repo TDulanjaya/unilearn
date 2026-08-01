@@ -33,7 +33,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Email already registered: " + request.getEmail());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
         }
 
         String passwordHash = passwordEncoder.encode(request.getPassword());

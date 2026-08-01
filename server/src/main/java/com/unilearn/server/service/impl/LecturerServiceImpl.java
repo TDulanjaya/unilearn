@@ -14,8 +14,8 @@ import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.LecturerService;
-import com.unilearn.server.util.CourseOfferingMapper;
-import com.unilearn.server.util.LecturerMapper;
+import com.unilearn.server.util.mapper.CourseOfferingMapper;
+import com.unilearn.server.util.mapper.LecturerMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -139,6 +139,19 @@ public class LecturerServiceImpl implements LecturerService {
         return courseOfferingRepository.findByPrimaryLecturer_LecturerId(lecturerId)
                 .stream()
                 .map(courseOfferingMapper::toCourseOfferingResponse)
+                .toList();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.lecturer.LecturerOptionDTO> getLecturerOptions(Long departmentId, String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        List<Lecturer> lecturers = (departmentId != null)
+                ? lecturerRepository.findByDepartment_DepartmentId(departmentId)
+                : lecturerRepository.findAll();
+
+        return lecturers.stream()
+                .filter(l -> filter.isEmpty() || (l.getUser() != null && l.getUser().getFullName() != null && l.getUser().getFullName().toLowerCase().contains(filter)))
+                .map(lecturerMapper::toLecturerOptionDTO)
                 .toList();
     }
 }

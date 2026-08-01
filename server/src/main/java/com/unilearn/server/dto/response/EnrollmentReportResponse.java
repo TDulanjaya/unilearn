@@ -1,11 +1,15 @@
 package com.unilearn.server.dto.response;
 
+import com.unilearn.server.dto.response.report.LabeledCountDTO;
+import com.unilearn.server.dto.response.report.MonthlyPointDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -25,4 +29,7 @@ public class EnrollmentReportResponse {
     private Integer enrolledCount;
     private Integer capacity;
     private Double enrollmentTrendPercent;
+
+    private List<MonthlyPointDTO> enrollmentTrend;
+    private List<LabeledCountDTO> byDepartment;
 }

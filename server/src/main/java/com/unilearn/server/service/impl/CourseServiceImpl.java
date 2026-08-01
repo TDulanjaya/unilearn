@@ -10,7 +10,7 @@ import com.unilearn.server.model.Department;
 import com.unilearn.server.repository.CourseRepository;
 import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.service.CourseService;
-import com.unilearn.server.util.CourseMapper;
+import com.unilearn.server.util.mapper.CourseMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,7 +39,7 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
 
         if (courseRepository.existsByCode(request.getCode())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Course code already exists: " + request.getCode());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Course code already exists: " + request.getCode());
         }
 
         Course course = courseMapper.toCourse(request, department);
@@ -64,7 +64,7 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
 
         if (!course.getCode().equalsIgnoreCase(request.getCode()) && courseRepository.existsByCode(request.getCode())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Course code already exists: " + request.getCode());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Course code already exists: " + request.getCode());
         }
 
         course.setCode(request.getCode());
@@ -141,5 +141,18 @@ public class CourseServiceImpl implements CourseService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.course.CourseOptionDTO> getCourseOptions(Long departmentId, String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        List<Course> courses = (departmentId != null)
+                ? courseRepository.findByDepartment_DepartmentId(departmentId)
+                : courseRepository.findAll();
+
+        return courses.stream()
+                .filter(c -> filter.isEmpty() || c.getTitle().toLowerCase().contains(filter) || c.getCode().toLowerCase().contains(filter))
+                .map(courseMapper::toCourseOptionDTO)
+                .toList();
     }
 }

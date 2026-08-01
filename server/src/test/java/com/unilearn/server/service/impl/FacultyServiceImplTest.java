@@ -3,15 +3,15 @@ package com.unilearn.server.service.impl;
 import com.unilearn.server.dto.request.FacultyRequest;
 import com.unilearn.server.dto.response.FacultyResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
+import com.unilearn.server.exception.DuplicateEntryException;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.IllegalStateException;
-import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.Faculty;
 import com.unilearn.server.model.User;
 import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.UserRepository;
-import com.unilearn.server.util.FacultyMapper;
+import com.unilearn.server.util.mapper.FacultyMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -100,12 +100,12 @@ class FacultyServiceImplTest {
     }
 
     @Test
-    @DisplayName("createFaculty - Throws ValidationException when code already exists")
+    @DisplayName("createFaculty - Throws DuplicateEntryException when code already exists")
     void createFaculty_DuplicateCode_ThrowsException() {
         when(facultyRepository.existsByCode("ENG")).thenReturn(true);
 
         assertThatThrownBy(() -> facultyService.createFaculty(facultyRequest))
-                .isInstanceOf(ValidationException.class)
+                .isInstanceOf(DuplicateEntryException.class)
                 .hasMessageContaining("Faculty code already exists");
 
         verify(facultyRepository, never()).save(any());

@@ -11,7 +11,7 @@ import com.unilearn.server.repository.CourseRepository;
 import com.unilearn.server.repository.ExaminerRepository;
 import com.unilearn.server.repository.QuestionBankRepository;
 import com.unilearn.server.service.QuestionBankService;
-import com.unilearn.server.util.QuestionBankMapper;
+import com.unilearn.server.util.mapper.QuestionBankMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

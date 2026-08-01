@@ -1,6 +1,6 @@
 package com.unilearn.server.service;
 
-import com.unilearn.server.dto.request.EnrollmentRequest;
+import com.unilearn.server.dto.request.enrollment.EnrollmentCreateRequestDTO;
 import com.unilearn.server.dto.response.EnrollmentResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
@@ -12,7 +12,7 @@ import java.util.List;
  */
 public interface EnrollmentService {
 
-    EnrollmentResponse enrollStudent(EnrollmentRequest request);
+    EnrollmentResponse enrollStudent(EnrollmentCreateRequestDTO request);
 
     void dropEnrollment(Long enrollmentId);
 

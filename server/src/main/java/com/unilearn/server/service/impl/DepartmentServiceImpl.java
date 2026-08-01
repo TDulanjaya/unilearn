@@ -12,7 +12,7 @@ import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.DepartmentService;
-import com.unilearn.server.util.DepartmentMapper;
+import com.unilearn.server.util.mapper.DepartmentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,7 +39,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         }
 
         if (departmentRepository.existsByCode(request.getCode())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Department code already exists: " + request.getCode());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Department code already exists: " + request.getCode());
         }
 
         Faculty faculty = facultyRepository.findById(request.getFacultyId())
@@ -71,7 +71,7 @@ public class DepartmentServiceImpl implements DepartmentService {
 
         if (!department.getCode().equalsIgnoreCase(request.getCode())
                 && departmentRepository.existsByCode(request.getCode())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Department code already exists: " + request.getCode());
+            throw new com.unilearn.server.exception.DuplicateEntryException("Department code already exists: " + request.getCode());
         }
 
         Faculty faculty = facultyRepository.findById(request.getFacultyId())
@@ -149,5 +149,18 @@ public class DepartmentServiceImpl implements DepartmentService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.department.DepartmentOptionDTO> getDepartmentOptions(Long facultyId, String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        List<Department> departments = (facultyId != null) 
+                ? departmentRepository.findByFaculty_FacultyId(facultyId) 
+                : departmentRepository.findAll();
+
+        return departments.stream()
+                .filter(d -> filter.isEmpty() || d.getName().toLowerCase().contains(filter) || d.getCode().toLowerCase().contains(filter))
+                .map(departmentMapper::toDepartmentOptionDTO)
+                .toList();
     }
 }

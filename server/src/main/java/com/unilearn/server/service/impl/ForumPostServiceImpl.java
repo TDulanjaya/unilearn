@@ -12,7 +12,7 @@ import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.ForumPostRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.ForumPostService;
-import com.unilearn.server.util.ForumPostMapper;
+import com.unilearn.server.util.mapper.ForumPostMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

@@ -1,12 +1,15 @@
 package com.unilearn.server.service.impl;
 
 import com.unilearn.server.dto.response.AttendanceReportResponse;
+import com.unilearn.server.dto.response.report.LabeledCountDTO;
+import com.unilearn.server.dto.response.report.MonthlyPointDTO;
 import com.unilearn.server.repository.AttendanceRecordRepository;
 import com.unilearn.server.service.AttendanceReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -19,6 +22,17 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
 
     @Override
     public List<AttendanceReportResponse> generateReport(Long facultyId, Long departmentId, Long offeringId) {
+        List<MonthlyPointDTO> trend = Arrays.asList(
+                MonthlyPointDTO.builder().month("2026-05").value(82.0).build(),
+                MonthlyPointDTO.builder().month("2026-06").value(85.0).build(),
+                MonthlyPointDTO.builder().month("2026-07").value(80.0).build()
+        );
+
+        List<LabeledCountDTO> byCourse = Arrays.asList(
+                LabeledCountDTO.builder().label("CS101").count(45).build(),
+                LabeledCountDTO.builder().label("SE201").count(35).build()
+        );
+
         return Collections.singletonList(
                 AttendanceReportResponse.builder()
                         .facultyId(facultyId)
@@ -29,6 +43,8 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
                         .absentCount(1)
                         .lateCount(1)
                         .attendanceRatePercent(80.0)
+                        .attendanceTrend(trend)
+                        .byCourse(byCourse)
                         .build()
         );
     }

@@ -12,7 +12,7 @@ import com.unilearn.server.repository.EventRepository;
 import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.StaffAdminRepository;
 import com.unilearn.server.service.EventService;
-import com.unilearn.server.util.EventMapper;
+import com.unilearn.server.util.mapper.EventMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

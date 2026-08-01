@@ -11,7 +11,7 @@ import com.unilearn.server.repository.AiChatMessageRepository;
 import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.AiChatMessageService;
-import com.unilearn.server.util.AiChatMessageMapper;
+import com.unilearn.server.util.mapper.AiChatMessageMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

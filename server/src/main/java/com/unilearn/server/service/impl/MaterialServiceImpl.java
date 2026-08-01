@@ -12,7 +12,7 @@ import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.repository.MaterialRepository;
 import com.unilearn.server.service.MaterialService;
-import com.unilearn.server.util.MaterialMapper;
+import com.unilearn.server.util.mapper.MaterialMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

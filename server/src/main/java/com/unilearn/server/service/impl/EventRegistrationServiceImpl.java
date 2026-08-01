@@ -1,6 +1,6 @@
 package com.unilearn.server.service.impl;
 
-import com.unilearn.server.dto.request.EventRegistrationRequest;
+import com.unilearn.server.dto.request.eventregistration.EventRegistrationCreateRequestDTO;
 import com.unilearn.server.dto.response.EventRegistrationResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
@@ -11,7 +11,7 @@ import com.unilearn.server.repository.EventRegistrationRepository;
 import com.unilearn.server.repository.EventRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.EventRegistrationService;
-import com.unilearn.server.util.EventRegistrationMapper;
+import com.unilearn.server.util.mapper.EventRegistrationMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +30,7 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
 
     @Override
     @Transactional
-    public EventRegistrationResponse registerForEvent(EventRegistrationRequest request) {
+    public EventRegistrationResponse registerForEvent(EventRegistrationCreateRequestDTO request) {
         if (request == null) {
             throw new ValidationException("EventRegistration request cannot be null");
         }
@@ -42,7 +42,7 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
 
         if (eventRegistrationRepository.existsByEvent_EventIdAndStudent_StudentId(request.getEventId(), request.getStudentId())) {
-            throw new com.unilearn.server.exception.IllegalStateException("Student is already registered for this event");
+            throw new com.unilearn.server.exception.DuplicateEntryException("Student is already registered for this event");
         }
 
         if (event.getCapacity() != null && eventRegistrationRepository.countByEvent_EventId(request.getEventId()) >= event.getCapacity()) {

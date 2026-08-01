@@ -15,8 +15,8 @@ import com.unilearn.server.repository.BatchRepository;
 import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.BatchService;
-import com.unilearn.server.util.BatchMapper;
-import com.unilearn.server.util.StudentMapper;
+import com.unilearn.server.util.mapper.BatchMapper;
+import com.unilearn.server.util.mapper.StudentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -141,5 +141,18 @@ public class BatchServiceImpl implements BatchService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.batch.BatchOptionDTO> getBatchOptions(Long departmentId, String searchText) {
+        String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
+        List<Batch> batches = (departmentId != null)
+                ? batchRepository.findByDepartment_DepartmentId(departmentId)
+                : batchRepository.findAll();
+
+        return batches.stream()
+                .filter(b -> filter.isEmpty() || b.getName().toLowerCase().contains(filter))
+                .map(batchMapper::toBatchOptionDTO)
+                .toList();
     }
 }

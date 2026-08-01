@@ -1,6 +1,6 @@
 package com.unilearn.server.service;
 
-import com.unilearn.server.dto.request.EventRegistrationRequest;
+import com.unilearn.server.dto.request.eventregistration.EventRegistrationCreateRequestDTO;
 import com.unilearn.server.dto.response.EventRegistrationResponse;
 
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface EventRegistrationService {
 
-    EventRegistrationResponse registerForEvent(EventRegistrationRequest request);
+    EventRegistrationResponse registerForEvent(EventRegistrationCreateRequestDTO request);
 
     void cancelRegistration(Long eventId, Long studentId);
 

@@ -7,7 +7,7 @@ import com.unilearn.server.model.AiQuizQuestion;
 import com.unilearn.server.repository.AiQuizQuestionRepository;
 import com.unilearn.server.repository.AiQuizSessionRepository;
 import com.unilearn.server.service.AiQuizQuestionService;
-import com.unilearn.server.util.AiQuizQuestionMapper;
+import com.unilearn.server.util.mapper.AiQuizQuestionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

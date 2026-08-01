@@ -10,7 +10,7 @@ import com.unilearn.server.model.QuestionBank;
 import com.unilearn.server.repository.QuestionBankRepository;
 import com.unilearn.server.repository.QuestionRepository;
 import com.unilearn.server.service.QuestionService;
-import com.unilearn.server.util.QuestionMapper;
+import com.unilearn.server.util.mapper.QuestionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

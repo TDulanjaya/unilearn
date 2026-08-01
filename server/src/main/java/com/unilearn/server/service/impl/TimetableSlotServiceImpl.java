@@ -9,7 +9,7 @@ import com.unilearn.server.model.TimetableSlot;
 import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.TimetableSlotRepository;
 import com.unilearn.server.service.TimetableSlotService;
-import com.unilearn.server.util.TimetableSlotMapper;
+import com.unilearn.server.util.mapper.TimetableSlotMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

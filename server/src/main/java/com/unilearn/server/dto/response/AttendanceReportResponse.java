@@ -1,5 +1,7 @@
 package com.unilearn.server.dto.response;
 
+import com.unilearn.server.dto.response.report.LabeledCountDTO;
+import com.unilearn.server.dto.response.report.MonthlyPointDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -7,11 +9,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.List;
+
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
 @Builder
 public class AttendanceReportResponse {
     private Long facultyId;
@@ -25,4 +28,7 @@ public class AttendanceReportResponse {
     private Integer absentCount;
     private Integer lateCount;
     private Double attendanceRatePercent;
+
+    private List<MonthlyPointDTO> attendanceTrend;
+    private List<LabeledCountDTO> byCourse;
 }

@@ -1,9 +1,9 @@
 package com.unilearn.server.service;
 
-import com.unilearn.server.dto.request.HodDeanAssignmentRequest;
+import com.unilearn.server.dto.request.hoddeanassignment.HodDeanAssignRequestDTO;
+import com.unilearn.server.dto.request.hoddeanassignment.HodDeanRevokeRequestDTO;
 import com.unilearn.server.dto.response.HodDeanAssignmentResponse;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -11,9 +11,9 @@ import java.util.List;
  */
 public interface HodDeanAssignmentService {
 
-    HodDeanAssignmentResponse assignHodOrDean(HodDeanAssignmentRequest request);
+    HodDeanAssignmentResponse assignHodOrDean(HodDeanAssignRequestDTO request);
 
-    HodDeanAssignmentResponse revokeAssignment(Long assignmentId, LocalDate endDate);
+    HodDeanAssignmentResponse revokeAssignment(Long assignmentId, HodDeanRevokeRequestDTO revokeRequest);
 
     List<HodDeanAssignmentResponse> getAssignmentsByUser(Long userId);
 

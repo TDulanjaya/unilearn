@@ -12,7 +12,7 @@ import com.unilearn.server.repository.ExamQuestionRepository;
 import com.unilearn.server.repository.ExamRepository;
 import com.unilearn.server.repository.QuestionRepository;
 import com.unilearn.server.service.ExamQuestionService;
-import com.unilearn.server.util.ExamQuestionMapper;
+import com.unilearn.server.util.mapper.ExamQuestionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +45,7 @@ public class ExamQuestionServiceImpl implements ExamQuestionService {
 
         ExamQuestionId id = new ExamQuestionId(request.getExamId(), request.getQuestionId());
         if (examQuestionRepository.existsById(id)) {
-            throw new com.unilearn.server.exception.IllegalStateException("Question is already added to this exam");
+            throw new com.unilearn.server.exception.DuplicateEntryException("Question is already added to this exam");
         }
 
         List<ExamQuestion> existing = examQuestionRepository.findByExam_ExamId(request.getExamId());

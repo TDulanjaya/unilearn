@@ -12,7 +12,7 @@ import com.unilearn.server.repository.AttendanceRecordRepository;
 import com.unilearn.server.repository.AttendanceSessionRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.AttendanceRecordService;
-import com.unilearn.server.util.AttendanceRecordMapper;
+import com.unilearn.server.util.mapper.AttendanceRecordMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

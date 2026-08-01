@@ -11,7 +11,7 @@ import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.GradebookEntryRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.service.GradebookEntryService;
-import com.unilearn.server.util.GradebookEntryMapper;
+import com.unilearn.server.util.mapper.GradebookEntryMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
