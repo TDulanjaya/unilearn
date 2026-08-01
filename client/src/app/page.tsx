@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -8,14 +9,14 @@ const SERVICES = [
     icon: "ti-sparkles",
     tileBg: "bg-[var(--primary)] text-[var(--secondary-container)]",
     title: "AI Study Assistant",
-    desc: "Grounded, course-aware quizzes and Q&A generated instantly from official course materials.",
+    desc: "Grounded, course-aware quizzes and Q&A generated instantly from official course materials to accelerate student mastery.",
     featured: true,
   },
   {
     icon: "ti-clipboard-check",
     tileBg: "bg-[#ffdad6] text-[#ba1a1a]",
     title: "Exams & Grading",
-    desc: "Full assessment lifecycle from exam workspace setup to gradebooks and results release.",
+    desc: "Full assessment lifecycle from workspace setup and live proctoring to automated gradebooks.",
     featured: false,
   },
   {
@@ -102,6 +103,7 @@ const TESTIMONIALS = [
     name: "Dr. K. Perera",
     role: "Senior Lecturer · Software Engineering",
     initials: "KP",
+    avatarGrad: "from-[#0d1c2e] to-[#006a61]",
     quote:
       "UniLearn's automated grading and AI quiz generation saves me hours every week during assessment preparation. It seamlessly bridges lecture content with evaluation.",
   },
@@ -109,6 +111,7 @@ const TESTIMONIALS = [
     name: "Nadeesha Silva",
     role: "Student · BSc (Hons) Software Engineering",
     initials: "NS",
+    avatarGrad: "from-[#006a61] to-[#0090a9]",
     quote:
       "The AI study assistant helped me master complex data structure topics with customized practice quizzes right before my mid-term examinations.",
   },
@@ -116,19 +119,32 @@ const TESTIMONIALS = [
     name: "Dr. S. Wickramasinghe",
     role: "Head of Department · Software Engineering",
     initials: "SW",
+    avatarGrad: "from-[#0090a9] to-[#6bd8cb]",
     quote:
       "Institution-wide analytics and real-time attendance tracking give our faculty complete visibility over student progress and academic performance.",
   },
 ];
 
 export default function Home() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--on-background)] transition-colors duration-300">
+      
       <header className="sticky top-0 z-50 glass border-b border-[var(--glass-border)]">
-        <div className="max-w-[1400px] mx-auto px-6 py-3.5 flex items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="lg:hidden p-2 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] rounded-lg transition-colors"
+              aria-label="Toggle menu"
+            >
+              <i className={`ti ${isMenuOpen ? "ti-x" : "ti-menu-2"} text-xl`}></i>
+            </button>
+            <Link href="/">
+              <Logo />
+            </Link>
+          </div>
 
           <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold">
             <Link href="/" className="text-[var(--tertiary)] font-bold">
@@ -142,255 +158,299 @@ export default function Home() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/login" className="btn-secondary hidden sm:inline-flex">
               Sign In
             </Link>
-            <Link href="/login" className="btn-primary">
-              Get Started <i className="ti ti-arrow-right"></i>
+            <Link href="/login" className="btn-primary group text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-2.5">
+              <span>Get Started</span>
+              <i className="ti ti-arrow-right text-xs sm:text-sm group-hover:translate-x-1 transition-transform"></i>
             </Link>
             <ThemeToggle />
           </div>
         </div>
+
+        {isMenuOpen && (
+          <nav className="lg:hidden px-4 pt-3 pb-4 border-t border-[var(--glass-border)] flex flex-col space-y-2 text-sm font-semibold">
+            <Link
+              href="/"
+              onClick={() => setIsMenuOpen(false)}
+              className="p-2 rounded-lg text-[var(--tertiary)] font-bold hover:bg-[var(--surface-container-low)]"
+            >
+              Home
+            </Link>
+            <a
+              href="#features"
+              onClick={() => setIsMenuOpen(false)}
+              className="p-2 rounded-lg text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
+            >
+              Features
+            </a>
+            <a
+              href="#role-solutions"
+              onClick={() => setIsMenuOpen(false)}
+              className="p-2 rounded-lg text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
+            >
+              Role Solutions
+            </a>
+            <div className="pt-2 border-t border-[var(--outline-variant)] sm:hidden flex flex-col gap-2">
+              <Link href="/login" className="btn-secondary w-full justify-center">
+                Sign In
+              </Link>
+            </div>
+          </nav>
+        )}
       </header>
 
       <main className="flex-1">
-        <section className="max-w-[1400px] mx-auto px-6 pt-16 pb-20 text-center flex flex-col items-center">
-          <div className="space-y-6 max-w-3xl">
-            <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-[54px] leading-[1.1] tracking-[-0.02em]">
+        
+        <section className="relative max-w-[1400px] mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-20 sm:pb-28 text-center overflow-hidden">
+          
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-tr from-[#0d1c2e] via-[#006a61] to-[#6bd8cb] opacity-25 blur-[110px] rounded-full -z-10 pointer-events-none"></div>
+
+          <div className="max-w-3xl mx-auto space-y-6 flex flex-col items-center">
+            <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-[60px] leading-[1.1] tracking-[-0.02em]">
               We Help You Build Your Academic{" "}
-              <span className="text-[var(--tertiary)] bg-clip-text text-transparent bg-gradient-to-r from-[var(--tertiary)] to-[var(--secondary)]">
+              <span className="bg-gradient-to-r from-[var(--tertiary)] via-[#006a61] to-[var(--secondary)] bg-clip-text text-transparent">
                 Future
               </span>
             </h1>
 
-            <p className="text-[var(--on-surface-variant)] text-base sm:text-lg leading-relaxed max-w-xl mx-auto">
+            <p className="text-[var(--on-surface-variant)] text-base sm:text-lg leading-relaxed max-w-2xl">
               Empower your institution with real-time course analytics, proctored exams, automated grading, and intelligent AI study assistance built for modern universities.
             </p>
 
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <Link href="/login" className="btn-primary text-base px-6 py-3 shadow-md">
-                Get Started <i className="ti ti-arrow-right"></i>
+            <div className="flex items-center gap-4 pt-2">
+              <Link href="/login" className="btn-primary text-base px-8 py-3.5 shadow-lg group">
+                <span>Get Started</span>
+                <i className="ti ti-arrow-right text-base group-hover:translate-x-1 transition-transform"></i>
               </Link>
-            </div>
-
-            <div className="flex items-center justify-center gap-3 pt-4 border-t border-[var(--outline-variant)]">
-              <span className="text-xs font-semibold text-[var(--on-surface-variant)] mr-1">Follow Us:</span>
-              <a href="#" className="w-8 h-8 rounded-lg glass flex items-center justify-center text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-brand-facebook text-base"></i>
-              </a>
-              <a href="#" className="w-8 h-8 rounded-lg glass flex items-center justify-center text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-brand-x text-base"></i>
-              </a>
-              <a href="#" className="w-8 h-8 rounded-lg glass flex items-center justify-center text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-brand-instagram text-base"></i>
-              </a>
             </div>
           </div>
         </section>
 
-        <section className="max-w-[1400px] mx-auto px-6 mb-24">
-          <div className="glass rounded-2xl p-8 border border-[var(--glass-border)] text-center">
-            <p className="text-xs font-extrabold uppercase tracking-widest text-[var(--on-surface-variant)] mb-6">
-              Powering Every Faculty
-            </p>
+        <section className="bg-[var(--surface-container-low)] border-y border-[var(--outline-variant)] py-14 relative">
+          <div className="max-w-[1400px] mx-auto px-6 text-center">
+            <p className="eyebrow mb-6">Powering Every Faculty</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-items-center">
-              <div className="flex items-center gap-2 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-code text-xl text-[var(--tertiary)]"></i>
+              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
+                <i className="ti ti-code text-2xl text-[var(--tertiary)]"></i>
                 <span>Faculty of Computing</span>
               </div>
-              <div className="flex items-center gap-2 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-building-bank text-xl text-[var(--tertiary)]"></i>
+              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
+                <i className="ti ti-building-bank text-2xl text-[var(--tertiary)]"></i>
                 <span>Faculty of Business</span>
               </div>
-              <div className="flex items-center gap-2 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-settings text-xl text-[var(--tertiary)]"></i>
+              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
+                <i className="ti ti-settings text-2xl text-[var(--tertiary)]"></i>
                 <span>Faculty of Engineering</span>
               </div>
-              <div className="flex items-center gap-2 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-                <i className="ti ti-palette text-xl text-[var(--tertiary)]"></i>
+              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
+                <i className="ti ti-palette text-2xl text-[var(--tertiary)]"></i>
                 <span>Faculty of Arts</span>
               </div>
             </div>
-
-            <div className="flex items-center justify-center gap-1.5 mt-8">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--tertiary)]"></span>
-              <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)]"></span>
-              <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)] opacity-50"></span>
-              <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)] opacity-30"></span>
-            </div>
           </div>
         </section>
 
-        <section id="features" className="max-w-[1400px] mx-auto px-6 pb-24">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="badge badge-accent mb-3">
-              <i className="ti ti-box"></i> Comprehensive Platform
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
-              Our Services
-            </h2>
-            <p className="text-[var(--on-surface-variant)] text-base">
+        <section id="features" className="max-w-[1400px] mx-auto px-6 py-28">
+          
+          <div className="md:flex md:items-end md:justify-between mb-14 pb-6 border-b border-[var(--outline-variant)] gap-8">
+            <div>
+              <p className="eyebrow mb-2">Comprehensive Platform</p>
+              <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--on-surface)]">
+                Our Services
+              </h2>
+            </div>
+            <p className="text-[var(--on-surface-variant)] text-sm sm:text-base max-w-md mt-3 md:mt-0">
               Tailored LMS solutions supporting academic excellence across every department.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-6">
-            {SERVICES.slice(0, 3).map((service, idx) => (
-              <div
-                key={idx}
-                className={`glass rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between ${
-                  service.featured
-                    ? "border-[var(--tertiary)] shadow-xl relative"
-                    : "border-[var(--glass-border)]"
-                }`}
-              >
-                {service.featured && (
-                  <span className="absolute -top-3 right-6 badge bg-[var(--tertiary)] text-white font-bold text-[10px] uppercase tracking-wider">
-                    Featured
-                  </span>
-                )}
-                <div>
-                  <div className={`w-11 h-11 rounded-xl ${service.tileBg} flex items-center justify-center mb-5 font-bold`}>
-                    <i className={`ti ${service.icon} text-xl`}></i>
-                  </div>
-                  <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
-                    {service.title}
-                  </h3>
-                  <p className="text-[var(--on-surface-variant)] text-sm leading-relaxed mb-6">
-                    {service.desc}
-                  </p>
+          <div className="grid md:grid-cols-3 gap-6">
+            
+            <div className="md:col-span-2 glass rounded-3xl p-8 border-t-4 border-t-[var(--tertiary)] border-x border-b border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
+              <div>
+                <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-[var(--secondary-container)] flex items-center justify-center mb-6 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
+                  <i className="ti ti-sparkles text-2xl"></i>
                 </div>
-                <a href="#ai-assistant" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] hover:underline">
-                  <span>Learn More</span>
-                  <i className="ti ti-arrow-right text-sm"></i>
-                </a>
+                <h3 className="font-display font-bold text-2xl mb-3 text-[var(--on-surface)]">
+                  {SERVICES[0].title}
+                </h3>
+                <p className="text-[var(--on-surface-variant)] text-base leading-relaxed mb-8 max-w-xl">
+                  {SERVICES[0].desc}
+                </p>
               </div>
-            ))}
-          </div>
+              <a href="#" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--tertiary)] group/link">
+                <span>Learn More</span>
+                <i className="ti ti-arrow-right text-base group-hover/link:translate-x-1 transition-transform"></i>
+              </a>
+            </div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {SERVICES.slice(3, 5).map((service, idx) => (
-              <div
-                key={idx}
-                className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between"
-              >
-                <div>
-                  <div className={`w-11 h-11 rounded-xl ${service.tileBg} flex items-center justify-center mb-5 font-bold`}>
-                    <i className={`ti ${service.icon} text-xl`}></i>
-                  </div>
-                  <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
-                    {service.title}
-                  </h3>
-                  <p className="text-[var(--on-surface-variant)] text-sm leading-relaxed mb-6">
-                    {service.desc}
-                  </p>
+            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
+                  <i className="ti ti-clipboard-check text-xl"></i>
                 </div>
-                <a href="#architecture" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] hover:underline">
-                  <span>Learn More</span>
-                  <i className="ti ti-arrow-right text-sm"></i>
-                </a>
+                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
+                  {SERVICES[1].title}
+                </h3>
+                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
+                  {SERVICES[1].desc}
+                </p>
               </div>
-            ))}
+              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
+                <span>Learn More</span>
+                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
+              </a>
+            </div>
+
+            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-[#86f2e4] text-[#006f66] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
+                  <i className="ti ti-calendar-event text-xl"></i>
+                </div>
+                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
+                  {SERVICES[2].title}
+                </h3>
+                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
+                  {SERVICES[2].desc}
+                </p>
+              </div>
+              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
+                <span>Learn More</span>
+                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
+              </a>
+            </div>
+
+            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-[#acedff] text-[#004e5c] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
+                  <i className="ti ti-speakerphone text-xl"></i>
+                </div>
+                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
+                  {SERVICES[3].title}
+                </h3>
+                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
+                  {SERVICES[3].desc}
+                </p>
+              </div>
+              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
+                <span>Learn More</span>
+                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
+              </a>
+            </div>
+
+            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
+                  <i className="ti ti-certificate text-xl"></i>
+                </div>
+                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
+                  {SERVICES[4].title}
+                </h3>
+                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
+                  {SERVICES[4].desc}
+                </p>
+              </div>
+              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
+                <span>Learn More</span>
+                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
+              </a>
+            </div>
           </div>
         </section>
 
-        <section className="max-w-[1400px] mx-auto px-6 pb-24">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="badge badge-accent mb-3">
-              <i className="ti ti-news"></i> Latest News
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
-              Campus Updates
-            </h2>
-            <p className="text-[var(--on-surface-variant)] text-base">
-              Stay informed with the latest platform rollouts and academic announcements.
-            </p>
-          </div>
+        <section className="bg-[var(--surface-container-lowest)] border-y border-[var(--outline-variant)] py-24">
+          <div className="max-w-[1400px] mx-auto px-6">
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <p className="eyebrow mb-2">Latest News</p>
+              <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
+                Campus Updates
+              </h2>
+              <p className="text-[var(--on-surface-variant)] text-base">
+                Stay informed with the latest platform rollouts and academic announcements.
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-10">
-            {UPDATES.map((item, idx) => (
-              <div key={idx} className="glass rounded-2xl overflow-hidden border border-[var(--glass-border)] shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col">
-                <div className={`h-40 bg-gradient-to-br ${item.gradient} relative overflow-hidden flex items-center justify-center p-6`}>
-                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]"></div>
-                  <i className="ti ti-article text-4xl text-white/80 z-10"></i>
-                </div>
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface-variant)] font-semibold">
-                    <i className="ti ti-calendar text-sm text-[var(--tertiary)]"></i>
-                    <span>{item.date}</span>
+            <div className="grid md:grid-cols-3 gap-6 mb-12">
+              {UPDATES.map((item, idx) => (
+                <div key={idx} className="glass rounded-2xl overflow-hidden border border-[var(--glass-border)] shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col group">
+                  <div className={`h-40 bg-gradient-to-br ${item.gradient} relative overflow-hidden flex items-center justify-center p-6`}>
+                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]"></div>
+                    <i className="ti ti-article text-4xl text-white/80 z-10 group-hover:scale-110 transition-transform"></i>
                   </div>
-                  <h3 className="font-display font-bold text-base text-[var(--on-surface)] leading-snug line-clamp-2">
-                    {item.title}
-                  </h3>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <Link href="/login" className="btn-primary">
-              View All Updates <i className="ti ti-arrow-right"></i>
-            </Link>
-          </div>
-        </section>
-
-        <section className="max-w-[1400px] mx-auto px-6 pb-24">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="badge badge-accent mb-3">
-              <i className="ti ti-calendar-event"></i> Academic Schedule
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
-              Upcoming Academic Events
-            </h2>
-            <p className="text-[var(--on-surface-variant)] text-base">
-              Mark your calendar for key university milestones and orientation dates.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {EVENTS.map((evt, idx) => (
-              <div key={idx} className="glass rounded-2xl p-6 border border-[var(--glass-border)] flex items-start gap-5 shadow-lg">
-                <div className="w-16 h-16 rounded-xl bg-[var(--surface-container-high)] border border-[var(--outline-variant)] flex flex-col items-center justify-center font-bold shrink-0 text-[var(--tertiary)]">
-                  <span className="text-xl leading-none">{evt.day}</span>
-                  <span className="text-[10px] tracking-wider uppercase">{evt.month}</span>
-                </div>
-                <div className="space-y-2 flex-1">
-                  <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-                    {evt.title}
-                  </h3>
-                  <p className="text-[var(--on-surface-variant)] text-xs leading-relaxed">
-                    {evt.desc}
-                  </p>
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface-variant)] font-medium">
-                      <i className="ti ti-clock text-sm text-[var(--tertiary)]"></i>
-                      <span>{evt.time}</span>
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface-variant)] font-semibold">
+                      <i className="ti ti-calendar text-sm text-[var(--tertiary)]"></i>
+                      <span>{item.date}</span>
                     </div>
-                    <a href="#" className="inline-flex items-center gap-1 text-xs font-bold text-[var(--tertiary)] hover:underline">
-                      <span>Learn More</span>
-                      <i className="ti ti-arrow-right text-xs"></i>
-                    </a>
+                    <h3 className="font-display font-bold text-base text-[var(--on-surface)] leading-snug line-clamp-2">
+                      {item.title}
+                    </h3>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="flex items-center justify-center gap-1.5 mt-8">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--tertiary)]"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)]"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)] opacity-50"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)] opacity-30"></span>
+            <div className="text-center">
+              <Link href="/login" className="btn-primary group">
+                <span>View All Updates</span>
+                <i className="ti ti-arrow-right text-sm group-hover:translate-x-1 transition-transform"></i>
+              </Link>
+            </div>
           </div>
         </section>
 
-        <section id="role-solutions" className="max-w-[1400px] mx-auto px-6 pb-24">
+        <section className="relative bg-dot-grid py-28 overflow-hidden">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-tr from-[#0d1c2e] via-[#006a61] to-[#6bd8cb] opacity-15 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
+
+          <div className="max-w-[1400px] mx-auto px-6">
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <p className="eyebrow mb-2">Academic Schedule</p>
+              <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
+                Upcoming Academic Events
+              </h2>
+              <p className="text-[var(--on-surface-variant)] text-base">
+                Mark your calendar for key university milestones and orientation dates.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {EVENTS.map((evt, idx) => (
+                <div key={idx} className="glass rounded-3xl p-7 border border-[var(--glass-border)] flex items-start gap-5 shadow-xl hover:shadow-2xl transition-all">
+                  <div className="w-16 h-16 rounded-2xl bg-[var(--surface-container-high)] border border-[var(--outline-variant)] flex flex-col items-center justify-center font-bold shrink-0 text-[var(--tertiary)]">
+                    <span className="text-xl leading-none">{evt.day}</span>
+                    <span className="text-[10px] tracking-wider uppercase mt-0.5">{evt.month}</span>
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
+                      {evt.title}
+                    </h3>
+                    <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed">
+                      {evt.desc}
+                    </p>
+                    <div className="flex items-center justify-between pt-3 border-t border-[var(--outline-variant)]">
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface-variant)] font-medium">
+                        <i className="ti ti-clock text-sm text-[var(--tertiary)]"></i>
+                        <span>{evt.time}</span>
+                      </div>
+                      <a href="#" className="inline-flex items-center gap-1 text-xs font-bold text-[var(--tertiary)] group/link">
+                        <span>Learn More</span>
+                        <i className="ti ti-arrow-right text-xs group-hover/link:translate-x-1 transition-transform"></i>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="role-solutions" className="max-w-[1400px] mx-auto px-6 py-28">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="badge badge-accent mb-3">
-              <i className="ti ti-building"></i> Faculties
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
+            <p className="eyebrow mb-2">Faculties</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
               Explore by Faculty
             </h2>
             <p className="text-[var(--on-surface-variant)] text-base">
@@ -400,86 +460,81 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-6">
             {FACULTIES.map((fac, idx) => (
-              <div key={idx} className="glass rounded-2xl p-6 border border-[var(--glass-border)] text-center space-y-4 hover:shadow-xl transition-all">
+              <div key={idx} className="glass rounded-2xl p-6 border border-[var(--glass-border)] text-center space-y-4 hover:shadow-xl transition-all group">
                 <div className={`h-36 rounded-xl bg-gradient-to-br ${fac.gradient} flex items-center justify-center shadow-inner`}>
-                  <i className={`ti ${fac.icon} text-4xl text-white`}></i>
+                  <i className={`ti ${fac.icon} text-4xl text-white group-hover:scale-110 transition-transform`}></i>
                 </div>
                 <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
                   {fac.name}
                 </h3>
-                <p className="text-[var(--on-surface-variant)] text-xs leading-relaxed">
+                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed">
                   {fac.desc}
                 </p>
               </div>
             ))}
           </div>
-
-          <div className="flex items-center justify-center gap-1.5 mt-8">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--tertiary)]"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)]"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)] opacity-50"></span>
-          </div>
         </section>
 
-        <section className="max-w-[1400px] mx-auto px-6 pb-24 relative">
-          <div className="text-center max-w-2xl mx-auto mb-14 relative">
-            <span className="badge badge-accent mb-3">
-              <i className="ti ti-quote"></i> Testimonials
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
-              What People Say
-            </h2>
-            <p className="text-[var(--on-surface-variant)] text-base">
-              Hear from lecturers, students, and department heads using UniLearn daily.
-            </p>
-          </div>
+        <section className="bg-[var(--surface-container-low)] border-y border-[var(--outline-variant)] py-28 relative">
+          <div className="max-w-[1400px] mx-auto px-6 text-center relative">
+            <div className="max-w-2xl mx-auto mb-14">
+              <p className="eyebrow mb-2">Testimonials</p>
+              <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
+                What People Say
+              </h2>
+              <p className="text-[var(--on-surface-variant)] text-base">
+                Hear from lecturers, students, and department heads using UniLearn daily.
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, idx) => (
-              <div key={idx} className="glass rounded-2xl p-6 border border-[var(--glass-border)] flex flex-col justify-between shadow-lg">
-                <p className="text-[var(--on-surface-variant)] text-xs leading-relaxed italic mb-6">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div className="flex items-center gap-3 pt-4 border-t border-[var(--outline-variant)]">
-                  <div className="avatar w-10 h-10 text-xs font-bold">
-                    {t.initials}
-                  </div>
-                  <div>
-                    <p className="font-display font-bold text-sm text-[var(--on-surface)]">
-                      {t.name}
-                    </p>
-                    <p className="text-[11px] text-[var(--on-surface-variant)]">
-                      {t.role}
-                    </p>
+            <div className="grid md:grid-cols-3 gap-6">
+              {TESTIMONIALS.map((t, idx) => (
+                <div key={idx} className="glass rounded-2xl p-7 border border-[var(--glass-border)] flex flex-col justify-between text-left shadow-lg">
+                  <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed italic mb-6">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <div className="flex items-center gap-3 pt-4 border-t border-[var(--outline-variant)]">
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${t.avatarGrad} text-white flex items-center justify-center font-bold text-xs shadow-md`}>
+                      {t.initials}
+                    </div>
+                    <div>
+                      <p className="font-display font-bold text-sm text-[var(--on-surface)]">
+                        {t.name}
+                      </p>
+                      <p className="text-[11px] text-[var(--on-surface-variant)]">
+                        {t.role}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-center gap-1.5 mt-8">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--tertiary)]"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)]"></span>
-            <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)] opacity-50"></span>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="bg-[#0a1626] text-white py-20 relative overflow-hidden border-t border-b border-[var(--outline-variant)]">
-          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#4cd7f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <section className="bg-[#0a1626] text-white py-32 relative overflow-hidden border-t border-b border-[var(--outline-variant)]">
+          
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#4cd7f6_1px,transparent_1px)] [background-size:20px_20px]"></div>
+
+          <div className="absolute -top-10 -left-10 w-96 h-96 bg-gradient-to-tr from-[#0d1c2e] to-[#006a61] opacity-30 blur-[100px] rounded-full pointer-events-none"></div>
+          <div className="absolute -bottom-10 -right-10 w-96 h-96 bg-gradient-to-tr from-[#006a61] to-[#4cd7f6] opacity-30 blur-[100px] rounded-full pointer-events-none"></div>
 
           <div className="max-w-[1400px] mx-auto px-6 relative z-10">
-            <div className="glass rounded-3xl p-10 md:p-14 text-center max-w-4xl mx-auto border border-white/10 shadow-2xl bg-white/5">
+            <div className="glass rounded-3xl p-10 md:p-16 text-center max-w-4xl mx-auto border border-white/10 shadow-2xl bg-white/5">
               <div className="space-y-6">
-                <h2 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight">
+                <p className="text-xs font-extrabold uppercase tracking-widest text-[#4cd7f6]">
+                  Get Started Today
+                </p>
+                <h2 className="font-display font-extrabold text-3xl sm:text-5xl leading-tight">
                   Ready to Elevate Your Campus?
                 </h2>
                 <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto">
                   Transform your institution&apos;s learning experience with UniLearn today.
                 </p>
                 <div className="pt-2">
-                  <Link href="/login" className="bg-gradient-to-r from-[#0d1c2e] via-[#006a61] to-[#0090a9] text-white px-8 py-3.5 rounded-xl font-bold text-base shadow-lg hover:opacity-95 transition-all duration-200 hover:scale-105 inline-flex items-center gap-2">
+                  <Link href="/login" className="bg-gradient-to-r from-[#0d1c2e] via-[#006a61] to-[#0090a9] text-white px-8 py-3.5 rounded-xl font-bold text-base shadow-lg hover:opacity-95 transition-all duration-200 hover:scale-105 inline-flex items-center gap-2 group">
                     <span>Get Started</span>
-                    <i className="ti ti-arrow-right"></i>
+                    <i className="ti ti-arrow-right text-base group-hover:translate-x-1 transition-transform"></i>
                   </Link>
                 </div>
               </div>
@@ -490,6 +545,7 @@ export default function Home() {
 
       <footer className="bg-[#07111e] text-slate-400 border-t border-white/10">
         <div className="max-w-[1400px] mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-4 gap-10 text-sm">
+          
           <div className="space-y-4">
             <Logo />
             <div className="text-xs leading-relaxed space-y-1 text-slate-400 pt-1">

@@ -1,9 +1,16 @@
 "use client";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import Logo from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 
 export default function StudentNavbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   const links = [
     { href: "/student/dashboard", label: "Dashboard" },
@@ -15,44 +22,146 @@ export default function StudentNavbar() {
     { href: "/student/ai-assistant", label: "AI Assistant" },
   ];
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setIsAccountOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    setIsOpen(false);
+    setIsAccountOpen(false);
+    router.push("/login");
+  };
+
   return (
-    <header className="bg-white border-b border-[#E7E8F0] px-8 py-3 flex items-center justify-between sticky top-0 z-40">
-      <div className="flex items-center gap-8">
-        <Link href="/student/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-accent text-white font-display font-extrabold flex items-center justify-center text-lg">
-            U
+    <header className="glass sticky top-0 z-40 border-b border-[var(--glass-border)] px-4 sm:px-8 py-3">
+      <div className="max-w-[1400px] mx-auto flex items-center justify-between">
+        <div className="flex items-center gap-4 md:gap-8">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden p-2 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] rounded-lg transition-colors"
+            aria-label="Toggle menu"
+          >
+            <i className={`ti ${isOpen ? "ti-x" : "ti-menu-2"} text-xl`}></i>
+          </button>
+          <Link href="/student/dashboard" className="flex items-center gap-2">
+            <Logo />
+            <span className="badge badge-accent text-[10px] hidden sm:inline-flex">STUDENT</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6">
+            {links.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`nav-link ${isActive ? "active" : ""}`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link href="/notifications" className="p-2 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] relative">
+            <i className="ti ti-bell text-xl"></i>
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--tertiary)]"></span>
+          </Link>
+          <Link href="/messages" className="p-2 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
+            <i className="ti ti-message-dots text-xl"></i>
+          </Link>
+          <ThemeToggle />
+
+          <div className="relative hidden sm:block" ref={accountRef}>
+            <button
+              onClick={() => setIsAccountOpen(!isAccountOpen)}
+              className="flex items-center gap-2 pl-2 border-l border-[var(--outline-variant)] hover:opacity-80 transition-opacity"
+              aria-label="Account menu"
+            >
+              <div className="avatar w-8 h-8 text-xs">N</div>
+              <span className="text-xs font-semibold text-[var(--on-surface)] hidden lg:inline">Nadeesha S.</span>
+              <i className="ti ti-chevron-down text-xs text-[var(--on-surface-variant)]"></i>
+            </button>
+
+            {isAccountOpen && (
+              <div className="absolute right-0 mt-2 w-56 glass rounded-2xl border border-[var(--glass-border)] shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
+                <Link
+                  href="/profile"
+                  onClick={() => setIsAccountOpen(false)}
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[var(--surface-container-low)] transition-colors"
+                >
+                  <div className="avatar w-8 h-8 text-xs">N</div>
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-[var(--on-surface)] truncate">Nadeesha Silva</p>
+                    <p className="text-[11px] text-[var(--on-surface-variant)] truncate">SE/2023/042</p>
+                  </div>
+                </Link>
+                <div className="my-1 border-t border-[var(--outline-variant)]"></div>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsAccountOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--on-surface)] rounded-xl hover:bg-[var(--surface-container-low)] transition-colors"
+                >
+                  <i className="ti ti-user text-base text-[var(--tertiary)]"></i>
+                  <span>Profile Settings</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--error)] rounded-xl hover:bg-[var(--error-container)]/30 transition-colors text-left"
+                >
+                  <i className="ti ti-logout text-base"></i>
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
           </div>
-          <span className="font-display font-extrabold text-lg">UniLearn</span>
-          <span className="badge badge-accent text-[10px]">STUDENT</span>
-        </Link>
-        <nav className="flex items-center gap-6">
+        </div>
+      </div>
+
+      {isOpen && (
+        <nav className="md:hidden pt-3 pb-2 mt-2 border-t border-[var(--glass-border)] flex flex-col space-y-1">
+          <Link
+            href="/profile"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-container-low)] mb-2"
+          >
+            <div className="avatar w-8 h-8 text-xs">N</div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-[var(--on-surface)] truncate">Nadeesha Silva</p>
+              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">Student Profile</p>
+            </div>
+          </Link>
           {links.map((link) => {
             const isActive = pathname === link.href;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`nav-link ${isActive ? "active" : ""}`}
+                onClick={() => setIsOpen(false)}
+                className={`sidebar-link ${isActive ? "active" : ""}`}
               >
-                {link.label}
+                <span>{link.label}</span>
               </Link>
             );
           })}
+          <div className="pt-2 border-t border-[var(--outline-variant)]">
+            <button
+              onClick={handleLogout}
+              className="sidebar-link w-full text-left text-[var(--error)] hover:bg-[var(--error-container)]/30"
+            >
+              <i className="ti ti-logout text-lg"></i>
+              <span>Logout</span>
+            </button>
+          </div>
         </nav>
-      </div>
-      <div className="flex items-center gap-4">
-        <Link href="/notifications" className="p-2 text-[#666B80] hover:text-ink relative">
-          <i className="ti ti-bell text-xl"></i>
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-accent"></span>
-        </Link>
-        <Link href="/messages" className="p-2 text-[#666B80] hover:text-ink">
-          <i className="ti ti-message-dots text-xl"></i>
-        </Link>
-        <Link href="/profile" className="flex items-center gap-2 pl-2 border-l border-[#E7E8F0]">
-          <div className="avatar w-8 h-8 text-xs">N</div>
-          <span className="text-xs font-semibold text-ink">Nadeesha S.</span>
-        </Link>
-      </div>
+      )}
     </header>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import StudentNavbar from "@/components/StudentNavbar";
 
 interface MCQQuestion {
   id: number;
@@ -121,18 +120,22 @@ export default function AiAssistantPage() {
   };
 
   return (
-    <div>
-      <StudentNavbar />
-      <main className="max-w-[1200px] mx-auto px-8 py-7">
-        <h1 className="font-display font-extrabold text-2xl mb-1">AI Study Assistant</h1>
-        <p className="text-[#666B80] text-sm mb-6">Interactive MCQ quiz engine, structured Q&A, and AI course chat.</p>
+    <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
+        <div className="mb-6">
+          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
+            AI Study Assistant
+          </h1>
+          <p className="text-[var(--on-surface-variant)] text-sm">
+            Interactive MCQ quiz engine, structured Q&A, and AI course chat.
+          </p>
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="space-y-6">
-            <div className="card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-bold text-base flex items-center gap-2">
-                  <i className="ti ti-brain text-accent text-xl"></i> MCQ Practice Engine
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-5 pb-3 border-b border-[var(--outline-variant)]">
+                <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
+                  <i className="ti ti-brain text-[var(--tertiary)] text-xl"></i> MCQ Practice Engine
                 </h3>
                 {quizState === "active" && (
                   <span className="badge badge-accent">Q {currentIdx + 1} of {MCQ_BANK.length}</span>
@@ -141,31 +144,31 @@ export default function AiAssistantPage() {
 
               {quizState === "idle" && (
                 <div className="text-center py-8">
-                  <i className="ti ti-sparkles text-4xl text-accent block mb-2"></i>
-                  <p className="font-semibold text-sm mb-1">Generate Customized Practice Quiz</p>
-                  <p className="text-xs text-[#666B80] mb-4">Test your knowledge on SE308.3 Software Process Management</p>
-                  <button onClick={startQuiz} className="btn-primary">Start Quiz</button>
+                  <i className="ti ti-sparkles text-4xl text-[var(--tertiary)] block mb-3"></i>
+                  <p className="font-semibold text-base mb-1 text-[var(--on-surface)]">Generate Customized Practice Quiz</p>
+                  <p className="text-xs text-[var(--on-surface-variant)] mb-5">Test your knowledge on SE308.3 Software Process Management</p>
+                  <button onClick={startQuiz} className="btn-primary shadow-md">Start Quiz</button>
                 </div>
               )}
 
               {quizState === "loading" && (
                 <div className="text-center py-8">
-                  <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                  <p className="text-xs font-semibold text-[#666B80]">Generating AI Quiz Questions...</p>
+                  <div className="w-8 h-8 border-4 border-[var(--tertiary)] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-xs font-semibold text-[var(--on-surface-variant)]">Generating AI Quiz Questions...</p>
                 </div>
               )}
 
               {quizState === "active" && (
                 <div>
-                  <p className="text-sm font-medium mb-4">{MCQ_BANK[currentIdx].question}</p>
-                  <div className="space-y-2 mb-4">
+                  <p className="text-sm font-semibold mb-4 text-[var(--on-surface)]">{MCQ_BANK[currentIdx].question}</p>
+                  <div className="space-y-2.5 mb-5">
                     {MCQ_BANK[currentIdx].options.map((opt, i) => {
-                      let btnClass = "mcq-option";
+                      let btnClass = "w-full text-left p-3.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-sm text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] transition-colors";
                       if (selectedOpt !== null) {
                         if (i === MCQ_BANK[currentIdx].correctIndex) {
-                          btnClass += " correct";
+                          btnClass = "w-full text-left p-3.5 rounded-xl border border-[var(--secondary)] bg-[var(--secondary-container)] text-[var(--on-secondary-container)] font-bold text-sm";
                         } else if (i === selectedOpt) {
-                          btnClass += " incorrect";
+                          btnClass = "w-full text-left p-3.5 rounded-xl border border-[var(--error)] bg-[var(--error-container)] text-[var(--on-error-container)] font-bold text-sm";
                         }
                       }
                       return (
@@ -182,7 +185,7 @@ export default function AiAssistantPage() {
                   </div>
 
                   {selectedOpt !== null && (
-                    <button onClick={handleNextQuestion} className="btn-primary w-full justify-center">
+                    <button onClick={handleNextQuestion} className="btn-primary w-full justify-center shadow-md">
                       {currentIdx + 1 < MCQ_BANK.length ? "Next Question" : "Finish Quiz"}
                     </button>
                   )}
@@ -191,27 +194,27 @@ export default function AiAssistantPage() {
 
               {quizState === "done" && (
                 <div className="text-center py-6">
-                  <i className="ti ti-trophy text-4xl text-[#16A34A] block mb-2"></i>
-                  <h4 className="font-display font-bold text-lg mb-1">Quiz Completed!</h4>
-                  <p className="text-sm text-[#666B80] mb-4">You scored <b>{score} / {MCQ_BANK.length}</b></p>
+                  <i className="ti ti-trophy text-4xl text-[var(--secondary)] block mb-2"></i>
+                  <h4 className="font-display font-bold text-lg mb-1 text-[var(--on-surface)]">Quiz Completed!</h4>
+                  <p className="text-sm text-[var(--on-surface-variant)] mb-5">You scored <b className="text-[var(--on-surface)]">{score} / {MCQ_BANK.length}</b></p>
                   <button onClick={startQuiz} className="btn-secondary text-xs">Try Another Quiz</button>
                 </div>
               )}
             </div>
 
-            <div className="card p-5">
-              <h3 className="font-display font-bold text-base mb-3 flex items-center gap-2">
-                <i className="ti ti-help-circle text-accent text-xl"></i> Structured Q&A Bank
+            <div className="card p-6">
+              <h3 className="font-display font-bold text-lg mb-4 text-[var(--on-surface)] flex items-center gap-2 pb-3 border-b border-[var(--outline-variant)]">
+                <i className="ti ti-help-circle text-[var(--tertiary)] text-xl"></i> Structured Q&A Bank
               </h3>
               <div className="space-y-3">
                 {STRUCTURED_BANK.map((item) => {
                   const isRevealed = !!revealedAnswers[item.id];
                   return (
-                    <div key={item.id} className="border border-[#E7E8F0] rounded-xl p-4 bg-white">
-                      <p className="text-sm font-semibold mb-2">{item.question}</p>
+                    <div key={item.id} className="border border-[var(--outline-variant)] rounded-xl p-4 bg-[var(--surface-container-low)]">
+                      <p className="text-sm font-semibold mb-2 text-[var(--on-surface)]">{item.question}</p>
                       {isRevealed ? (
-                        <div className="bg-[#EEEDFE] border border-accent rounded-lg p-3 text-xs text-[#3730A3] mt-2">
-                          <p className="font-bold mb-1">Sample Answer:</p>
+                        <div className="bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg p-3 text-xs text-[var(--on-surface)] mt-2">
+                          <p className="font-bold mb-1 text-[var(--tertiary)]">Sample Answer:</p>
                           {item.answer}
                         </div>
                       ) : (
@@ -229,9 +232,9 @@ export default function AiAssistantPage() {
             </div>
           </div>
 
-          <div className="card p-5 flex flex-col h-[600px]">
-            <h3 className="font-display font-bold text-base mb-4 flex items-center gap-2 pb-3 border-b border-[#E7E8F0]">
-              <i className="ti ti-messages text-accent text-xl"></i> Course AI Tutor Chat
+          <div className="card p-6 flex flex-col h-[600px]">
+            <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2 pb-3 border-b border-[var(--outline-variant)] text-[var(--on-surface)]">
+              <i className="ti ti-messages text-[var(--tertiary)] text-xl"></i> Course AI Tutor Chat
             </h3>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-4">
@@ -244,8 +247,8 @@ export default function AiAssistantPage() {
                   <div
                     className={`p-3 rounded-xl text-xs max-w-sm ${
                       m.sender === "user"
-                        ? "bg-accent text-white"
-                        : "bg-[#F6F7FB] border border-[#E7E8F0] text-ink"
+                        ? "bg-[var(--primary)] text-[var(--on-primary)]"
+                        : "bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
                     }`}
                   >
                     {m.text}
@@ -255,7 +258,7 @@ export default function AiAssistantPage() {
               <div ref={chatBottomRef} />
             </div>
 
-            <form onSubmit={handleSendChat} className="flex items-center gap-2 pt-3 border-t border-[#E7E8F0]">
+            <form onSubmit={handleSendChat} className="flex items-center gap-2 pt-3 border-t border-[var(--outline-variant)]">
               <input
                 type="text"
                 value={chatInput}
@@ -270,6 +273,5 @@ export default function AiAssistantPage() {
           </div>
         </div>
       </main>
-    </div>
   );
 }
