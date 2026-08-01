@@ -1,9 +1,68 @@
 "use client";
+import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useInteractive } from "@/lib/useInteractive";
 
+interface FacultyReportData {
+  facultyName: string;
+  totalStudents: number;
+  avgAttendancePercent: number;
+  avgGpa: number;
+  passRatePercent: number;
+  attendanceBars: { prev: number; curr: number }; // heights in %
+  performanceBars: { pass: number; retake: number };
+  enrollmentBars: { prev: number; curr: number };
+}
+
+const MOCK_REPORTS: Record<string, FacultyReportData> = {
+  "All faculties": {
+    facultyName: "All Faculties",
+    totalStudents: 1240,
+    avgAttendancePercent: 88,
+    avgGpa: 3.42,
+    passRatePercent: 94,
+    attendanceBars: { prev: 70, curr: 88 },
+    performanceBars: { pass: 85, retake: 50 },
+    enrollmentBars: { prev: 60, curr: 80 },
+  },
+  "Computing": {
+    facultyName: "Faculty of Computing",
+    totalStudents: 520,
+    avgAttendancePercent: 92,
+    avgGpa: 3.58,
+    passRatePercent: 96,
+    attendanceBars: { prev: 78, curr: 92 },
+    performanceBars: { pass: 92, retake: 35 },
+    enrollmentBars: { prev: 65, curr: 90 },
+  },
+  "Business": {
+    facultyName: "Faculty of Business",
+    totalStudents: 380,
+    avgAttendancePercent: 84,
+    avgGpa: 3.25,
+    passRatePercent: 91,
+    attendanceBars: { prev: 65, curr: 84 },
+    performanceBars: { pass: 78, retake: 55 },
+    enrollmentBars: { prev: 55, curr: 72 },
+  },
+  "Engineering": {
+    facultyName: "Faculty of Engineering",
+    totalStudents: 340,
+    avgAttendancePercent: 86,
+    avgGpa: 3.35,
+    passRatePercent: 93,
+    attendanceBars: { prev: 68, curr: 86 },
+    performanceBars: { pass: 82, retake: 45 },
+    enrollmentBars: { prev: 58, curr: 75 },
+  },
+};
+
 export default function Page() {
   useInteractive();
+
+  const [selectedFaculty, setSelectedFaculty] = useState("All faculties");
+  const report = MOCK_REPORTS[selectedFaculty] || MOCK_REPORTS["All faculties"];
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--background)] text-[var(--on-background)]">
       <Sidebar role="admin" name="R. Jayawardena" sub="Staff Admin · Institution-wide" />
@@ -25,34 +84,126 @@ export default function Page() {
           <span className="tab-btn" data-tab="aud">Audit log</span>
         </div>
 
+        {/* Reports Tab (FR-REP-01) */}
         <div id="rs-rep" data-tabpanel="rs">
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <select className="w-44"><option>All faculties</option></select>
-            <input type="date" className="w-40" />
-            <input type="date" className="w-40" />
+          {/* Faculty Filter Bar */}
+          <div className="card p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-bold text-[var(--on-surface-variant)] uppercase tracking-wider">
+                Filter by Faculty:
+              </label>
+              <select
+                value={selectedFaculty}
+                onChange={(e) => setSelectedFaculty(e.target.value)}
+                className="w-52 font-semibold"
+              >
+                <option>All faculties</option>
+                <option>Computing</option>
+                <option>Business</option>
+                <option>Engineering</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs font-semibold text-[var(--on-surface-variant)]">
+              <span>Scope: <b className="text-[var(--on-surface)]">{report.facultyName}</b></span>
+              <span>Enrolled: <b className="text-[var(--tertiary)]">{report.totalStudents} Students</b></span>
+            </div>
           </div>
+
+          {/* Quick Metrics Cards */}
+          <div className="grid sm:grid-cols-4 gap-4 mb-6">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Avg Attendance</p>
+              <p className="font-display font-extrabold text-2xl text-[var(--tertiary)]">{report.avgAttendancePercent}%</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Avg GPA</p>
+              <p className="font-display font-extrabold text-2xl text-[var(--secondary)]">{report.avgGpa}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Pass Rate</p>
+              <p className="font-display font-extrabold text-2xl text-[var(--secondary)]">{report.passRatePercent}%</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Total Enrolled</p>
+              <p className="font-display font-extrabold text-2xl text-[var(--on-surface)]">{report.totalStudents}</p>
+            </div>
+          </div>
+
+          {/* Interactive Dynamic Charts */}
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="card p-6">
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] mb-4">Attendance</h3>
-              <div className="flex items-end gap-3 h-32 pt-2">
-                <div className="flex-1 bg-[var(--surface-container)] rounded-t-lg border border-[var(--outline-variant)]" style={{ height: "70%" }}></div>
-                <div className="flex-1 bg-[var(--tertiary)] rounded-t-lg shadow-sm" style={{ height: "88%" }}></div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display font-bold text-sm text-[var(--on-surface)]">Attendance Trend</h3>
+                <span className="text-xs font-bold text-[var(--tertiary)]">{report.avgAttendancePercent}% avg</span>
+              </div>
+              <div className="flex items-end gap-3 h-32 pt-2 border-b border-[var(--outline-variant)] pb-2">
+                <div
+                  className="flex-1 bg-[var(--surface-container)] rounded-t-lg border border-[var(--outline-variant)] flex items-center justify-center text-[10px] font-bold text-[var(--on-surface-variant)] transition-all duration-300"
+                  style={{ height: `${report.attendanceBars.prev}%` }}
+                >
+                  {report.attendanceBars.prev}%
+                </div>
+                <div
+                  className="flex-1 bg-[var(--tertiary)] rounded-t-lg shadow-sm flex items-center justify-center text-[10px] font-bold text-white transition-all duration-300"
+                  style={{ height: `${report.attendanceBars.curr}%` }}
+                >
+                  {report.attendanceBars.curr}%
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-[var(--on-surface-variant)] font-semibold mt-2">
+                <span>Prev Semester</span>
+                <span>Current Semester</span>
               </div>
             </div>
 
             <div className="card p-6">
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] mb-4">Performance</h3>
-              <div className="flex items-end gap-3 h-32 pt-2">
-                <div className="flex-1 bg-[var(--secondary-container)] rounded-t-lg border border-[var(--outline-variant)]" style={{ height: "75%" }}></div>
-                <div className="flex-1 bg-[var(--warning-container)] rounded-t-lg border border-[var(--outline-variant)]" style={{ height: "50%" }}></div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display font-bold text-sm text-[var(--on-surface)]">Performance Distribution</h3>
+                <span className="text-xs font-bold text-[var(--secondary)]">{report.passRatePercent}% pass</span>
+              </div>
+              <div className="flex items-end gap-3 h-32 pt-2 border-b border-[var(--outline-variant)] pb-2">
+                <div
+                  className="flex-1 bg-[var(--secondary-container)] rounded-t-lg border border-[var(--outline-variant)] flex items-center justify-center text-[10px] font-bold text-[var(--on-secondary-container)] transition-all duration-300"
+                  style={{ height: `${report.performanceBars.pass}%` }}
+                >
+                  {report.performanceBars.pass}% Pass
+                </div>
+                <div
+                  className="flex-1 bg-[var(--warning-container)] rounded-t-lg border border-[var(--outline-variant)] flex items-center justify-center text-[10px] font-bold text-[var(--on-warning-container)] transition-all duration-300"
+                  style={{ height: `${report.performanceBars.retake}%` }}
+                >
+                  {report.performanceBars.retake}% Retake
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-[var(--on-surface-variant)] font-semibold mt-2">
+                <span>Passing Grade</span>
+                <span>Requires Retake</span>
               </div>
             </div>
 
             <div className="card p-6">
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] mb-4">Enrollment Trend</h3>
-              <div className="flex items-end gap-3 h-32 pt-2">
-                <div className="flex-1 bg-[var(--surface-container)] rounded-t-lg border border-[var(--outline-variant)]" style={{ height: "60%" }}></div>
-                <div className="flex-1 bg-[var(--tertiary)] rounded-t-lg shadow-sm" style={{ height: "80%" }}></div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display font-bold text-sm text-[var(--on-surface)]">Enrollment Growth</h3>
+                <span className="text-xs font-bold text-[var(--on-surface)]">{report.totalStudents}</span>
+              </div>
+              <div className="flex items-end gap-3 h-32 pt-2 border-b border-[var(--outline-variant)] pb-2">
+                <div
+                  className="flex-1 bg-[var(--surface-container)] rounded-t-lg border border-[var(--outline-variant)] flex items-center justify-center text-[10px] font-bold text-[var(--on-surface-variant)] transition-all duration-300"
+                  style={{ height: `${report.enrollmentBars.prev}%` }}
+                >
+                  {report.enrollmentBars.prev}%
+                </div>
+                <div
+                  className="flex-1 bg-[var(--tertiary)] rounded-t-lg shadow-sm flex items-center justify-center text-[10px] font-bold text-white transition-all duration-300"
+                  style={{ height: `${report.enrollmentBars.curr}%` }}
+                >
+                  {report.enrollmentBars.curr}%
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-[var(--on-surface-variant)] font-semibold mt-2">
+                <span>2025 Intake</span>
+                <span>2026 Intake</span>
               </div>
             </div>
           </div>
@@ -72,7 +223,6 @@ export default function Page() {
 
             <div className="card p-5 flex items-center gap-4">
               <div className="w-11 h-11 rounded-2xl bg-[var(--warning-container)] text-[var(--on-warning-container)] flex items-center justify-center font-bold">
-                <i className="ti ti-[alert-circle] ti-alert-circle text-xl"></i>
                 <i className="ti ti-clock text-xl"></i>
               </div>
               <div>

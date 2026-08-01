@@ -1,7 +1,10 @@
 "use client";
 import StudentNavbar from "@/components/StudentNavbar";
+import { useNotifications } from "@/lib/NotificationContext";
 
 export default function NotificationsPage() {
+  const { notifications } = useNotifications();
+
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)]">
       <StudentNavbar />
@@ -16,38 +19,22 @@ export default function NotificationsPage() {
         </div>
 
         <div className="card divide-y divide-[var(--outline-variant)] shadow-md overflow-hidden">
-          <div className="p-4 sm:p-5 flex items-start gap-4 hover:bg-[var(--surface-container-low)] transition-colors">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--surface-container)] text-[var(--tertiary)] flex items-center justify-center shrink-0 mt-0.5 font-bold">
-              <i className="ti ti-file-text text-xl"></i>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-[var(--on-surface)]">New Assignment Posted: SE308.3</p>
-              <p className="text-xs text-[var(--on-surface-variant)] mt-1">Assignment 2: Test Case Design is due on Dec 18, 2025.</p>
-              <span className="text-[11px] text-[var(--outline)] mt-1.5 font-medium block">10 mins ago</span>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-5 flex items-start gap-4 hover:bg-[var(--surface-container-low)] transition-colors">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--warning-container)] text-[var(--on-warning-container)] flex items-center justify-center shrink-0 mt-0.5 font-bold">
-              <i className="ti ti-calendar text-xl"></i>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-[var(--on-surface)]">Exam Scheduled: SE308.3 Software Process Mgmt</p>
-              <p className="text-xs text-[var(--on-surface-variant)] mt-1">Final exam scheduled for Dec 12, 2025 at Main Hall A.</p>
-              <span className="text-[11px] text-[var(--outline)] mt-1.5 font-medium block">2 hours ago</span>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-5 flex items-start gap-4 hover:bg-[var(--surface-container-low)] transition-colors">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--secondary-container)] text-[var(--on-secondary-container)] flex items-center justify-center shrink-0 mt-0.5 font-bold">
-              <i className="ti ti-certificate text-xl"></i>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-[var(--on-surface)]">Grade Published: SE202.2 Mid-term Exam</p>
-              <p className="text-xs text-[var(--on-surface-variant)] mt-1">You received 84% (Grade A-) in SE202.2 Database Systems.</p>
-              <span className="text-[11px] text-[var(--outline)] mt-1.5 font-medium block">Yesterday</span>
-            </div>
-          </div>
+          {notifications.length === 0 ? (
+            <p className="p-6 text-sm text-[var(--on-surface-variant)] text-center">No notifications found.</p>
+          ) : (
+            notifications.map((n) => (
+              <div key={n.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-[var(--surface-container-low)] transition-colors">
+                <div className={`w-10 h-10 rounded-2xl ${n.iconBg} ${n.iconColor} flex items-center justify-center shrink-0 mt-0.5 font-bold`}>
+                  <i className={`ti ${n.icon} text-xl`}></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-[var(--on-surface)]">{n.title}</p>
+                  <p className="text-xs text-[var(--on-surface-variant)] mt-1">{n.detail}</p>
+                  <span className="text-[11px] text-[var(--outline)] mt-1.5 font-medium block">{n.time}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </main>
     </div>

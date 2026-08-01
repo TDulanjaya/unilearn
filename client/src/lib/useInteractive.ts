@@ -4,17 +4,6 @@ import { useEffect } from "react";
 export function useInteractive() {
   useEffect(() => {
 
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (
-        event?.reason instanceof Event ||
-        (event?.reason && typeof event.reason === "object" && "type" in event.reason)
-      ) {
-        event.preventDefault();
-      }
-    };
-
-    window.addEventListener("unhandledrejection", handleUnhandledRejection);
-
     const handleTabClick = (e: MouseEvent) => {
       try {
         const target = e.target as HTMLElement | null;
@@ -77,7 +66,6 @@ export function useInteractive() {
     document.addEventListener("click", handleModalClick);
 
     return () => {
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
       document.removeEventListener("click", handleTabClick);
       document.removeEventListener("click", handleModalClick);
     };

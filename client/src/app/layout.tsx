@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 
 export const metadata: Metadata = {
   title: "UniLearn — Next-Gen University LMS",
@@ -18,6 +19,8 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: dark)", color: "#0d1c2e" },
   ],
 };
+
+import { NotificationProvider } from "@/lib/NotificationContext";
 
 export default function RootLayout({
   children,
@@ -41,7 +44,11 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[var(--background)] text-[var(--on-background)] min-h-screen font-sans antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <GlobalErrorBoundary>
+            <NotificationProvider>{children}</NotificationProvider>
+          </GlobalErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   );
