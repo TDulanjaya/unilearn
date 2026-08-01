@@ -46,7 +46,8 @@ public class FacultyServiceImpl implements FacultyService {
         User dean = null;
         if (request.getDeanUserId() != null) {
             dean = userRepository.findById(request.getDeanUserId())
-                    .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getDeanUserId()));
+                    .orElseThrow(
+                            () -> new EntryNotFoundException("User not found with ID: " + request.getDeanUserId()));
         }
 
         Faculty faculty = facultyMapper.toFaculty(request, dean);
@@ -75,7 +76,8 @@ public class FacultyServiceImpl implements FacultyService {
         User dean = null;
         if (request.getDeanUserId() != null) {
             dean = userRepository.findById(request.getDeanUserId())
-                    .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getDeanUserId()));
+                    .orElseThrow(
+                            () -> new EntryNotFoundException("User not found with ID: " + request.getDeanUserId()));
         }
 
         faculty.setName(request.getName());
@@ -98,7 +100,8 @@ public class FacultyServiceImpl implements FacultyService {
         }
 
         if (departmentRepository.existsByFaculty_FacultyId(facultyId)) {
-            throw new com.unilearn.server.exception.IllegalStateException("Cannot delete a faculty that still has departments");
+            throw new com.unilearn.server.exception.IllegalStateException(
+                    "Cannot delete a faculty that still has departments");
         }
 
         facultyRepository.deleteById(facultyId);
@@ -148,7 +151,8 @@ public class FacultyServiceImpl implements FacultyService {
     public List<com.unilearn.server.dto.response.faculty.FacultyOptionDTO> getFacultyOptions(String searchText) {
         String filter = (searchText == null) ? "" : searchText.trim().toLowerCase();
         return facultyRepository.findAll().stream()
-                .filter(f -> filter.isEmpty() || f.getName().toLowerCase().contains(filter) || f.getCode().toLowerCase().contains(filter))
+                .filter(f -> filter.isEmpty() || f.getName().toLowerCase().contains(filter)
+                        || f.getCode().toLowerCase().contains(filter))
                 .map(facultyMapper::toFacultyOptionDTO)
                 .toList();
     }
