@@ -2,6 +2,7 @@
 import { useState } from "react";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import { useNotifications } from "@/lib/NotificationContext";
+import { useAcademicData } from "@/context/AcademicDataContext";
 
 interface TeachingSlot {
   id: string;
@@ -14,59 +15,15 @@ interface TeachingSlot {
   enrolledStudents: { id: string; name: string; indexNo: string }[];
 }
 
-const INITIAL_SLOTS: TeachingSlot[] = [
-  {
-    id: "slot-1",
-    courseCode: "SE308.3",
-    courseTitle: "Software Process Management",
-    day: "Monday",
-    time: "09:00 AM - 11:00 AM",
-    venue: "Hall 3A",
-    type: "Lecture",
-    enrolledStudents: [
-      { id: "st-1", name: "Nadeesha Silva", indexNo: "SE/2023/042" },
-      { id: "st-2", name: "Kasun Perera", indexNo: "SE/2023/018" },
-      { id: "st-3", name: "Dilan Fernando", indexNo: "SE/2023/089" },
-      { id: "st-4", name: "Ruwan Munaweera", indexNo: "SE/2023/005" },
-      { id: "st-5", name: "Tharushi Wickrama", indexNo: "SE/2023/112" },
-      { id: "st-6", name: "Amaya Jayawardena", indexNo: "SE/2023/076" },
-      { id: "st-7", name: "Bhanuka Mendis", indexNo: "SE/2023/031" },
-      { id: "st-8", name: "Sachini Ratnayake", indexNo: "SE/2023/094" },
-    ],
-  },
-  {
-    id: "slot-2",
-    courseCode: "SE309.3",
-    courseTitle: "Software Verification & Validation",
-    day: "Wednesday",
-    time: "01:00 PM - 03:00 PM",
-    venue: "Lab 2B",
-    type: "Practical",
-    enrolledStudents: [
-      { id: "st-1", name: "Nadeesha Silva", indexNo: "SE/2023/042" },
-      { id: "st-2", name: "Kasun Perera", indexNo: "SE/2023/018" },
-      { id: "st-3", name: "Dilan Fernando", indexNo: "SE/2023/089" },
-      { id: "st-4", name: "Ruwan Munaweera", indexNo: "SE/2023/005" },
-      { id: "st-5", name: "Tharushi Wickrama", indexNo: "SE/2023/112" },
-      { id: "st-6", name: "Amaya Jayawardena", indexNo: "SE/2023/076" },
-    ],
-  },
-  {
-    id: "slot-3",
-    courseCode: "SE308.3",
-    courseTitle: "Software Process Management",
-    day: "Friday",
-    time: "10:00 AM - 12:00 PM",
-    venue: "Hall 3A",
-    type: "Tutorial",
-    enrolledStudents: [
-      { id: "st-1", name: "Nadeesha Silva", indexNo: "SE/2023/042" },
-      { id: "st-2", name: "Kasun Perera", indexNo: "SE/2023/018" },
-      { id: "st-3", name: "Dilan Fernando", indexNo: "SE/2023/089" },
-      { id: "st-7", name: "Bhanuka Mendis", indexNo: "SE/2023/031" },
-      { id: "st-8", name: "Sachini Ratnayake", indexNo: "SE/2023/094" },
-    ],
-  },
+const MOCK_STUDENTS = [
+  { id: "st-1", name: "Nadeesha Silva", indexNo: "SE/2023/042" },
+  { id: "st-2", name: "Kasun Perera", indexNo: "SE/2023/018" },
+  { id: "st-3", name: "Dilan Fernando", indexNo: "SE/2023/089" },
+  { id: "st-4", name: "Ruwan Munaweera", indexNo: "SE/2023/005" },
+  { id: "st-5", name: "Tharushi Wickrama", indexNo: "SE/2023/112" },
+  { id: "st-6", name: "Amaya Jayawardena", indexNo: "SE/2023/076" },
+  { id: "st-7", name: "Bhanuka Mendis", indexNo: "SE/2023/031" },
+  { id: "st-8", name: "Sachini Ratnayake", indexNo: "SE/2023/094" },
 ];
 
 interface InClassExam {
@@ -85,6 +42,18 @@ type AttendanceStatus = "Present" | "Absent" | "Late";
 
 export default function LecturerSchedulePage() {
   const { addNotification } = useNotifications();
+  const { slots } = useAcademicData();
+
+  const teachingSlots: TeachingSlot[] = slots.map((s) => ({
+    id: String(s.slotId),
+    courseCode: s.courseCode,
+    courseTitle: s.courseName,
+    day: s.dayOfWeek,
+    time: `${s.startTime} - ${s.endTime}`,
+    venue: s.venue,
+    type: s.slotType,
+    enrolledStudents: MOCK_STUDENTS,
+  }));
 
   const [inClassExams, setInClassExams] = useState<InClassExam[]>([]);
   const [selectedExamSlot, setSelectedExamSlot] = useState<TeachingSlot | null>(null);
@@ -187,7 +156,7 @@ export default function LecturerSchedulePage() {
           </div>
 
           <div className="space-y-4">
-            {INITIAL_SLOTS.map((slot) => {
+            {teachingSlots.map((slot) => {
               const examCount = inClassExams.filter((e) => e.slotId === slot.id).length;
               const isAttendanceSaved = savedSlotIds[slot.id];
 

@@ -1,6 +1,6 @@
 "use client";
-import { useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 /* ─── Mock course lookup ─── */
@@ -11,18 +11,61 @@ const COURSES: Record<string, { code: string; title: string; lecturer: string; d
 };
 
 /* ─── Mock materials ─── */
-const MOCK_MATERIALS = [
-  { id: 1, title: "Lecture 01 — Introduction to Software Processes", type: "PDF", date: "Jul 10, 2026" },
-  { id: 2, title: "Lecture 02 — CMMI & Process Maturity Models", type: "PDF", date: "Jul 17, 2026" },
-  { id: 3, title: "Tutorial 01 — SDLC Comparison Worksheet", type: "DOCX", date: "Jul 20, 2026" },
-  { id: 4, title: "Lecture 03 — Agile Frameworks & Scrum", type: "PPTX", date: "Jul 24, 2026" },
+const INITIAL_MATERIALS = [
+  { id: 1, title: "Lecture 01 — Introduction to Software Processes", type: "PDF", date: "Jul 10, 2026", size: "2.4 MB", summary: "Overview of software engineering process life cycles, classic waterfall vs evolutionary models." },
+  { id: 2, title: "Lecture 02 — CMMI & Process Maturity Models", type: "PDF", date: "Jul 17, 2026", size: "3.1 MB", summary: "Capability Maturity Model Integration (CMMI) levels 1 through 5 and process assessment frameworks." },
+  { id: 3, title: "Tutorial 01 — SDLC Comparison Worksheet", type: "DOCX", date: "Jul 20, 2026", size: "1.1 MB", summary: "Hands-on comparison exercise evaluating Agile vs Spiral vs V-Model for critical embedded systems." },
+  { id: 4, title: "Lecture 03 — Agile Frameworks & Scrum", type: "PPTX", date: "Jul 24, 2026", size: "5.8 MB", summary: "Scrum roles, sprint planning, daily stand-up dynamics, velocity tracking, and retrospective best practices." },
 ];
 
 /* ─── Mock assignments ─── */
-const MOCK_ASSIGNMENTS = [
-  { id: 1, title: "Assignment 1: SDLC Case Study Analysis", due: "Aug 05, 2026", status: "Submitted", grade: "A-" },
-  { id: 2, title: "Assignment 2: Test Case Design Document", due: "Aug 18, 2026", status: "Pending", grade: null },
-  { id: 3, title: "Lab Report: Unit Testing with JUnit", due: "Jul 28, 2026", status: "Graded", grade: "B+" },
+interface Assignment {
+  id: number;
+  title: string;
+  due: string;
+  status: "Pending" | "Submitted" | "Graded";
+  grade: string | null;
+  description: string;
+  maxScore: number;
+  feedback?: string;
+  submittedFile?: string;
+  submittedAt?: string;
+}
+
+const INITIAL_ASSIGNMENTS: Assignment[] = [
+  { 
+    id: 1, 
+    title: "Assignment 1: SDLC Case Study Analysis", 
+    due: "Aug 05, 2026", 
+    status: "Submitted", 
+    grade: "A-", 
+    maxScore: 100,
+    description: "Analyze the attached case study for HealthPlus EHR system. Select an appropriate software process model and justify your architectural choice with risk assessment matrices.",
+    submittedFile: "Nadeesha_Silva_SDLC_CaseStudy.pdf",
+    submittedAt: "Aug 03, 2026 10:14 AM",
+    feedback: "Excellent depth in risk identification and trade-off analysis. Minor omission in sprint retrospective cadence."
+  },
+  { 
+    id: 2, 
+    title: "Assignment 2: Test Case Design Document", 
+    due: "Aug 18, 2026", 
+    status: "Pending", 
+    grade: null, 
+    maxScore: 100,
+    description: "Formulate a comprehensive test suite using boundary value analysis and equivalence partitioning for the online banking transaction module."
+  },
+  { 
+    id: 3, 
+    title: "Lab Report: Unit Testing with JUnit", 
+    due: "Jul 28, 2026", 
+    status: "Graded", 
+    grade: "B+", 
+    maxScore: 100,
+    description: "Implement automated unit tests with JUnit 5 and Mockito for the payment gateway service with at least 85% branch coverage.",
+    submittedFile: "JUnit_LabReport_Nadeesha.zip",
+    submittedAt: "Jul 27, 2026 04:45 PM",
+    feedback: "Good coverage metrics and test isolation. Code formatting could be cleaned up in test fixture classes."
+  },
 ];
 
 /* ─── MCQ bank (per-course) ─── */
@@ -68,13 +111,70 @@ type Tab = "materials" | "assignments" | "resources" | "ai";
 
 export default function CourseWorkspacePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const courseId = (params.id as string) || "1";
   const course = COURSES[courseId] || COURSES["1"];
   const mcqBank = MCQ_BANKS[course.code] || MCQ_BANKS["SE308.3"];
   const structuredBank = STRUCTURED_BANKS[course.code] || STRUCTURED_BANKS["SE308.3"];
 
-  /* Tab state */
-  const [activeTab, setActiveTab] = useState<Tab>("materials");
+  /* Tab state initialized from URL param if available */
+  const initialTab = (searchParams.get("tab") as Tab) || "materials";
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab") as Tab;
+    if (tabParam && ["materials", "assignments", "resources", "ai"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  /* ─── Materials State & Modal ─── */
+  const [selectedMaterial, setSelectedMaterial] = useState<typeof INITIAL_MATERIALS[0] | null>(null);
+
+  const handleDownloadMaterial = (m: typeof INITIAL_MATERIALS[0]) => {
+    const blob = new Blob([`[UniLearn Course Material]\nTitle: ${m.title}\nCourse: ${course.code} - ${course.title}\nReleased: ${m.date}\nSummary: ${m.summary}`], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${m.title.replace(/[^a-zA-Z0-9]/g, "_")}.${m.type.toLowerCase()}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /* ─── Assignments State & Modals ─── */
+  const [assignments, setAssignments] = useState<Assignment[]>(INITIAL_ASSIGNMENTS);
+  const [submittingAssignment, setSubmittingAssignment] = useState<Assignment | null>(null);
+  const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
+  const [submitFile, setSubmitFile] = useState<File | null>(null);
+  const [submitNotes, setSubmitNotes] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 3500);
+  };
+
+  const handleConfirmSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!submittingAssignment) return;
+    const fileName = submitFile ? submitFile.name : `Submission_${submittingAssignment.id}_Nadeesha.pdf`;
+    setAssignments((prev) =>
+      prev.map((a) =>
+        a.id === submittingAssignment.id
+          ? {
+              ...a,
+              status: "Submitted",
+              submittedFile: fileName,
+              submittedAt: new Date().toLocaleString("en-US", { month: "short", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+            }
+          : a
+      )
+    );
+    setSubmittingAssignment(null);
+    setSubmitFile(null);
+    setSubmitNotes("");
+    showToast(`Assignment "${submittingAssignment.title}" submitted successfully!`);
+  };
 
   /* ─── Resources state ─── */
   const [resources, setResources] = useState<Resource[]>([
@@ -102,6 +202,7 @@ export default function CourseWorkspacePage() {
       uploadedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
     };
     setResources((prev) => [newRes, ...prev]);
+    showToast(`Resource "${file.name}" uploaded to personal vault.`);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -114,10 +215,14 @@ export default function CourseWorkspacePage() {
   const confirmRename = () => {
     if (editingId && editName.trim()) {
       setResources((prev) => prev.map((r) => r.id === editingId ? { ...r, fileName: editName.trim() } : r));
+      showToast("Resource renamed.");
     }
     setEditingId(null);
   };
-  const deleteResource = (id: number) => setResources((prev) => prev.filter((r) => r.id !== id));
+  const deleteResource = (id: number) => {
+    setResources((prev) => prev.filter((r) => r.id !== id));
+    showToast("Resource removed.");
+  };
 
   /* ─── AI Quiz state ─── */
   const [quizState, setQuizState] = useState<"idle" | "loading" | "active" | "done">("idle");
@@ -167,6 +272,14 @@ export default function CourseWorkspacePage() {
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[var(--surface-container-highest)] border border-[var(--tertiary)] text-[var(--on-surface)] px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 animate-bounce">
+          <i className="ti ti-check text-[var(--tertiary)] text-lg"></i>
+          <span className="text-xs font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-[var(--on-surface-variant)] mb-4 font-medium">
         <Link href="/student/courses" className="hover:text-[var(--tertiary)] transition-colors">My Courses</Link>
@@ -211,7 +324,7 @@ export default function CourseWorkspacePage() {
             <i className="ti ti-book text-[var(--tertiary)] text-xl"></i> Course Materials
           </h3>
           <div className="space-y-2.5">
-            {MOCK_MATERIALS.map((m) => (
+            {INITIAL_MATERIALS.map((m) => (
               <div key={m.id} className="flex items-center justify-between border border-[var(--outline-variant)] rounded-xl px-4 py-3 hover:bg-[var(--surface-container-low)] transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-[var(--surface-container)] text-[var(--tertiary)] flex items-center justify-center shrink-0">
@@ -219,14 +332,60 @@ export default function CourseWorkspacePage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[var(--on-surface)] truncate">{m.title}</p>
-                    <p className="text-xs text-[var(--on-surface-variant)]">{m.type} · {m.date}</p>
+                    <p className="text-xs text-[var(--on-surface-variant)]">{m.type} · {m.size} · Published {m.date}</p>
                   </div>
                 </div>
-                <button className="btn-secondary text-xs !py-1.5 shrink-0 ml-3">
-                  <i className="ti ti-download text-sm"></i> <span className="hidden sm:inline">Download</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                  <button onClick={() => setSelectedMaterial(m)} className="btn-secondary text-xs !py-1.5" title="Preview Summary">
+                    <i className="ti ti-eye text-sm"></i> <span className="hidden sm:inline">Preview</span>
+                  </button>
+                  <button onClick={() => handleDownloadMaterial(m)} className="btn-primary text-xs !py-1.5" title="Download Document">
+                    <i className="ti ti-download text-sm"></i> <span className="hidden sm:inline">Download</span>
+                  </button>
+                </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Material Preview Modal */}
+      {selectedMaterial && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-lg w-full p-6 animate-scaleIn">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)] mb-4">
+              <div className="flex items-center gap-2">
+                <i className="ti ti-file-text text-xl text-[var(--tertiary)]"></i>
+                <h3 className="font-display font-bold text-base text-[var(--on-surface)] truncate max-w-[280px]">
+                  {selectedMaterial.title}
+                </h3>
+              </div>
+              <button onClick={() => setSelectedMaterial(null)} className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
+                <i className="ti ti-x text-lg"></i>
+              </button>
+            </div>
+            <div className="space-y-3 mb-5 text-xs text-[var(--on-surface-variant)]">
+              <div className="flex justify-between border-b border-[var(--outline-variant)] pb-2">
+                <span>Format & Size:</span>
+                <span className="font-semibold text-[var(--on-surface)]">{selectedMaterial.type} ({selectedMaterial.size})</span>
+              </div>
+              <div className="flex justify-between border-b border-[var(--outline-variant)] pb-2">
+                <span>Release Date:</span>
+                <span className="font-semibold text-[var(--on-surface)]">{selectedMaterial.date}</span>
+              </div>
+              <div>
+                <p className="font-bold text-[var(--on-surface)] mb-1">Module Summary & Agenda:</p>
+                <p className="bg-[var(--surface-container-low)] p-3 rounded-xl border border-[var(--outline-variant)] text-[var(--on-surface)] leading-relaxed">
+                  {selectedMaterial.summary}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
+              <button onClick={() => setSelectedMaterial(null)} className="btn-secondary text-xs">Close</button>
+              <button onClick={() => { handleDownloadMaterial(selectedMaterial); setSelectedMaterial(null); }} className="btn-primary text-xs">
+                <i className="ti ti-download mr-1"></i> Download File
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -234,19 +393,130 @@ export default function CourseWorkspacePage() {
       {/* ═══ Assignments Tab ═══ */}
       {activeTab === "assignments" && (
         <div className="space-y-4">
-          {MOCK_ASSIGNMENTS.map((a) => (
+          {assignments.map((a) => (
             <div key={a.id} className="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-[var(--on-surface)] mb-1">{a.title}</p>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--on-surface-variant)]">
                   <span className="flex items-center gap-1"><i className="ti ti-calendar text-sm text-[var(--tertiary)]"></i> Due: {a.due}</span>
                   <span className={`badge ${a.status === "Submitted" ? "badge-accent" : a.status === "Graded" ? "badge-success" : "badge-warning"}`}>{a.status}</span>
-                  {a.grade && <span className="badge badge-success">{a.grade}</span>}
+                  {a.grade && <span className="badge badge-success">Grade: {a.grade}</span>}
                 </div>
               </div>
-              <button className="btn-secondary text-xs !py-1.5 shrink-0">{a.status === "Pending" ? "Submit" : "View"}</button>
+              <div className="flex items-center gap-2 shrink-0">
+                {a.status === "Pending" ? (
+                  <button onClick={() => setSubmittingAssignment(a)} className="btn-primary text-xs !py-1.5 shadow-sm">
+                    <i className="ti ti-upload text-sm"></i> Upload Submission
+                  </button>
+                ) : (
+                  <button onClick={() => setViewingAssignment(a)} className="btn-secondary text-xs !py-1.5">
+                    <i className="ti ti-eye text-sm"></i> View Details & Feedback
+                  </button>
+                )}
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Submission Upload Modal */}
+      {submittingAssignment && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleConfirmSubmit} className="card max-w-md w-full p-6 animate-scaleIn">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)] mb-4">
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                Submit Assignment
+              </h3>
+              <button type="button" onClick={() => setSubmittingAssignment(null)} className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
+                <i className="ti ti-x text-lg"></i>
+              </button>
+            </div>
+            <div className="space-y-4 mb-5">
+              <div>
+                <p className="text-xs font-bold text-[var(--on-surface)]">{submittingAssignment.title}</p>
+                <p className="text-xs text-[var(--on-surface-variant)]">Due: {submittingAssignment.due} · Max Score: {submittingAssignment.maxScore} pts</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--on-surface)] mb-1">Select Submission File</label>
+                <input
+                  type="file"
+                  required
+                  onChange={(e) => setSubmitFile(e.target.files ? e.target.files[0] : null)}
+                  className="block w-full text-xs text-[var(--on-surface)] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[var(--tertiary-container)] file:text-[var(--on-tertiary-container)] hover:file:opacity-90 cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--on-surface)] mb-1">Submission Notes (Optional)</label>
+                <textarea
+                  value={submitNotes}
+                  onChange={(e) => setSubmitNotes(e.target.value)}
+                  placeholder="Notes or references for lecturer..."
+                  className="w-full text-xs h-20 p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
+              <button type="button" onClick={() => setSubmittingAssignment(null)} className="btn-secondary text-xs">Cancel</button>
+              <button type="submit" className="btn-primary text-xs shadow-md">Confirm & Submit</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* View Assignment Brief & Feedback Modal */}
+      {viewingAssignment && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-lg w-full p-6 animate-scaleIn space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
+              <div>
+                <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                  {viewingAssignment.title}
+                </h3>
+                <span className={`badge ${viewingAssignment.status === "Graded" ? "badge-success" : "badge-accent"} mt-1`}>
+                  Status: {viewingAssignment.status}
+                </span>
+              </div>
+              <button onClick={() => setViewingAssignment(null)} className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
+                <i className="ti ti-x text-lg"></i>
+              </button>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-[var(--on-surface)] mb-1">Assignment Brief:</p>
+              <p className="text-xs text-[var(--on-surface-variant)] bg-[var(--surface-container-low)] p-3 rounded-xl border border-[var(--outline-variant)] leading-relaxed">
+                {viewingAssignment.description}
+              </p>
+            </div>
+
+            {viewingAssignment.submittedFile && (
+              <div className="flex items-center justify-between text-xs bg-[var(--surface-container-lowest)] p-3 rounded-xl border border-[var(--outline-variant)]">
+                <div className="flex items-center gap-2">
+                  <i className="ti ti-file-check text-base text-[var(--tertiary)]"></i>
+                  <div>
+                    <p className="font-bold text-[var(--on-surface)]">{viewingAssignment.submittedFile}</p>
+                    <p className="text-[10px] text-[var(--on-surface-variant)]">Uploaded on {viewingAssignment.submittedAt}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-[var(--tertiary)] font-bold">Verified Submission</span>
+              </div>
+            )}
+
+            {viewingAssignment.status === "Graded" && (
+              <div className="bg-[var(--secondary-container)] border border-[var(--secondary)] rounded-xl p-4 text-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-[var(--on-secondary-container)]">Lecturer Grade & Feedback</span>
+                  <span className="badge badge-success text-sm font-bold">{viewingAssignment.grade}</span>
+                </div>
+                <p className="text-[var(--on-secondary-container)] font-medium italic">
+                  "{viewingAssignment.feedback}"
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-[var(--outline-variant)]">
+              <button onClick={() => setViewingAssignment(null)} className="btn-secondary text-xs">Close</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -258,6 +528,7 @@ export default function CourseWorkspacePage() {
             <div className="w-9 h-9 rounded-xl bg-[var(--surface-container)] text-[var(--tertiary)] flex items-center justify-center shrink-0">
               <i className="ti ti-lock text-lg"></i>
             </div>
+
             <p className="text-xs text-[var(--on-surface-variant)] font-medium">
               <span className="font-bold text-[var(--on-surface)]">Personal resources are private</span> — visible only to you. Upload your study notes, past papers, and reference documents here.
             </p>

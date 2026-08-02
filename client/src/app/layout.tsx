@@ -21,6 +21,7 @@ export const viewport: Viewport = {
 };
 
 import { NotificationProvider } from "@/lib/NotificationContext";
+import { AcademicDataProvider } from "@/context/AcademicDataContext";
 
 export default function RootLayout({
   children,
@@ -46,7 +47,9 @@ export default function RootLayout({
       <body className="bg-[var(--background)] text-[var(--on-background)] min-h-screen font-sans antialiased">
         <ThemeProvider>
           <GlobalErrorBoundary>
-            <NotificationProvider>{children}</NotificationProvider>
+            <NotificationProvider>
+              <AcademicDataProvider>{children}</AcademicDataProvider>
+            </NotificationProvider>
           </GlobalErrorBoundary>
         </ThemeProvider>
       </body>
