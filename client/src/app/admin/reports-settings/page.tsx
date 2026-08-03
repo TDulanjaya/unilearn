@@ -72,7 +72,7 @@ export default function Page() {
             Reports & Settings
           </h1>
           <p className="text-[var(--on-surface-variant)] text-sm">
-            Institution reports, finance, settings, announcements and audit log.
+            Institution reports, finance, settings, and audit log.
           </p>
         </div>
 
@@ -80,7 +80,6 @@ export default function Page() {
           <span className="tab-btn active" data-tab="rep">Reports</span>
           <span className="tab-btn" data-tab="fin">Finance</span>
           <span className="tab-btn" data-tab="set">Settings</span>
-          <span className="tab-btn" data-tab="ann">Announcements</span>
           <span className="tab-btn" data-tab="aud">Audit log</span>
         </div>
 
@@ -288,18 +287,6 @@ export default function Page() {
           </div>
         </div>
 
-        <div id="rs-ann" data-tabpanel="rs" className="hidden">
-          <div className="card p-6 max-w-2xl">
-            <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
-              Institution-wide Announcement
-            </h3>
-            <div className="space-y-4">
-              <input type="text" placeholder="Title" />
-              <textarea rows={4} placeholder="Message"></textarea>
-              <button className="btn-primary shadow-md">Publish institution-wide</button>
-            </div>
-          </div>
-        </div>
 
         <div id="rs-aud" data-tabpanel="rs" className="hidden">
           <div className="card p-6">

@@ -21,6 +21,13 @@ interface EventItem {
   rsvps: RsvpAttendee[];
 }
 
+interface AnnouncementItem {
+  id: string;
+  title: string;
+  message: string;
+  publishedAt: string;
+}
+
 const INITIAL_EVENTS: EventItem[] = [
   {
     id: "ev-1",
@@ -50,18 +57,37 @@ const INITIAL_EVENTS: EventItem[] = [
   },
 ];
 
+const INITIAL_ANNOUNCEMENTS: AnnouncementItem[] = [
+  {
+    id: "ann-1",
+    title: "Semester 1 Final Examination Schedule Released",
+    message: "The finalized examination timetable for all undergraduate programs is now available on the student portal. Please review your exam dates and room allocations carefully.",
+    publishedAt: "2026-08-01 10:30 AM",
+  },
+  {
+    id: "ann-2",
+    title: "Campus Infrastructure Maintenance Notice",
+    message: "Network infrastructure maintenance will take place this Saturday from 00:00 to 04:00 AM. Student portal access may be briefly interrupted during this window.",
+    publishedAt: "2026-07-28 04:15 PM",
+  },
+];
+
 export default function Page() {
   useInteractive();
 
   const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
   const [selectedEventId, setSelectedEventId] = useState<string | null>("ev-1");
 
-  // New Event Form State
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newDate, setNewDate] = useState("");
   const [newVenue, setNewVenue] = useState("");
   const [newScope, setNewScope] = useState("Institution-wide");
+
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annMessage, setAnnMessage] = useState("");
+  const [annSuccessMsg, setAnnSuccessMsg] = useState<string | null>(null);
 
   const handleCreateEvent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +110,6 @@ export default function Page() {
     setNewVenue("");
   };
 
-  // Toggle Attendee RSVP status
   const handleToggleRsvpStatus = (eventId: string, rsvpId: string) => {
     const statusCycle: RsvpStatus[] = ["Attending", "Declined", "Pending"];
     setEvents((prev) =>
@@ -102,7 +127,6 @@ export default function Page() {
     );
   };
 
-  // Add Mock RSVP
   const handleAddMockRsvp = (eventId: string) => {
     const mockNames = [
       "Dinuka Karunaratne",
@@ -127,7 +151,26 @@ export default function Page() {
     );
   };
 
-  const activeEvent = events.find((e) => e.id === selectedEventId);
+  const handlePublishAnnouncement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!annTitle.trim() || !annMessage.trim()) return;
+
+    const now = new Date();
+    const formattedDate = `${now.toISOString().split("T")[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+    const newAnn: AnnouncementItem = {
+      id: "ann-" + Date.now(),
+      title: annTitle.trim(),
+      message: annMessage.trim(),
+      publishedAt: formattedDate,
+    };
+
+    setAnnouncements((prev) => [newAnn, ...prev]);
+    setAnnTitle("");
+    setAnnMessage("");
+    setAnnSuccessMsg("Announcement published successfully!");
+    setTimeout(() => setAnnSuccessMsg(null), 4000);
+  };
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--background)] text-[var(--on-background)]">
@@ -135,22 +178,20 @@ export default function Page() {
       <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full">
         <div className="mb-6">
           <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
-            Events & Enrollment
+            Events & Announcements
           </h1>
           <p className="text-[var(--on-surface-variant)] text-sm">
-            Create events, manage student RSVP registrations, and assign students to batches.
+            Create events, track student RSVP registrations, and publish institution-wide announcements.
           </p>
         </div>
 
         <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)]" data-tabgroup="evn">
-          <span className="tab-btn active" data-tab="ev">Events & RSVPs</span>
-          <span className="tab-btn" data-tab="reg">Registrations List</span>
-          <span className="tab-btn" data-tab="enr">Batch Enrollment</span>
+          <span className="tab-btn active" data-tab="ev">Events</span>
+          <span className="tab-btn" data-tab="ann">Announcements</span>
         </div>
 
         <div id="evn-ev" data-tabpanel="evn">
           <div className="grid lg:grid-cols-2 gap-6">
-            {/* Create Event Form */}
             <div className="card p-6">
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Create Event
@@ -201,7 +242,6 @@ export default function Page() {
               </form>
             </div>
 
-            {/* Upcoming Events & RSVP List (FR-EVENT-01) */}
             <div className="card p-6">
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Upcoming Events & RSVP Counts
@@ -244,7 +284,6 @@ export default function Page() {
                         </div>
                       </div>
 
-                      {/* Expandable RSVP Panel */}
                       {isExpanded && (
                         <div className="p-4 border-t border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] animate-in fade-in duration-150">
                           <div className="flex items-center justify-between mb-3">
@@ -291,71 +330,85 @@ export default function Page() {
           </div>
         </div>
 
-        <div id="evn-reg" data-tabpanel="evn" className="hidden">
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
-              <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-                {activeEvent ? `${activeEvent.title} — ${activeEvent.rsvps.length} registered` : "Event Registrations"}
+        <div id="evn-ann" data-tabpanel="evn" className="hidden">
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="card p-6 lg:col-span-1">
+              <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
+                Institution-wide Announcement
               </h3>
-              <button className="btn-secondary text-xs !py-1.5 shadow-sm">
-                <i className="ti ti-download"></i> Export
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead>
-                  <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] text-xs uppercase tracking-wider">
-                    <th className="pb-3 px-3 font-semibold">Student</th>
-                    <th className="pb-3 px-3 font-semibold">Batch</th>
-                    <th className="pb-3 px-3 font-semibold">RSVP Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--outline-variant)]">
-                  {activeEvent?.rsvps.map((r) => (
-                    <tr key={r.id} className="table-row transition-colors">
-                      <td className="py-3 px-3 font-semibold text-[var(--on-surface)]">{r.studentName}</td>
-                      <td className="py-3 px-3 text-[var(--on-surface-variant)]">{r.batchName}</td>
-                      <td className="py-3 px-3">
-                        <span className={`badge ${r.status === "Attending" ? "badge-success" : r.status === "Declined" ? "badge-danger" : "badge-warning"}`}>
-                          {r.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
 
-        <div id="evn-enr" data-tabpanel="evn" className="hidden">
-          <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-6 items-start">
-            <div className="card p-6">
-              <h3 className="font-display font-bold text-base text-[var(--on-surface)] mb-4 pb-2 border-b border-[var(--outline-variant)]">
-                Unassigned Students (42)
-              </h3>
-              <div className="space-y-2.5 text-sm">
-                <label className="flex items-center gap-3 border border-[var(--outline-variant)] rounded-xl px-4 py-2.5 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] transition-colors">
-                  <input type="checkbox" /> R. Munasinghe
-                </label>
-                <label className="flex items-center gap-3 border border-[var(--outline-variant)] rounded-xl px-4 py-2.5 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] transition-colors">
-                  <input type="checkbox" /> D. Abeywickrama
-                </label>
-              </div>
+              {annSuccessMsg && (
+                <div className="mb-4 p-3 rounded-xl bg-[var(--surface-container-high)] border border-[var(--tertiary)] text-[var(--tertiary)] text-xs font-semibold flex items-center justify-between animate-fadeIn">
+                  <span className="flex items-center gap-2">
+                    <i className="ti ti-circle-check text-base"></i> {annSuccessMsg}
+                  </span>
+                  <button onClick={() => setAnnSuccessMsg(null)} className="hover:opacity-75 font-bold text-sm">×</button>
+                </div>
+              )}
+
+              <form onSubmit={handlePublishAnnouncement} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Announcement title..."
+                    value={annTitle}
+                    onChange={(e) => setAnnTitle(e.target.value)}
+                    className="w-full text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
+                    Message
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Write message details..."
+                    value={annMessage}
+                    onChange={(e) => setAnnMessage(e.target.value)}
+                    className="w-full text-xs"
+                  ></textarea>
+                </div>
+                <button type="submit" className="btn-primary shadow-md w-full justify-center">
+                  <i className="ti ti-speakerphone mr-1"></i> Publish institution-wide
+                </button>
+              </form>
             </div>
-            <div className="pt-10 flex justify-center">
-              <button className="btn-primary shadow-md">
-                <i className="ti ti-arrow-right"></i>
-              </button>
-            </div>
-            <div className="card p-6">
-              <h3 className="font-display font-bold text-base text-[var(--on-surface)] mb-4 pb-2 border-b border-[var(--outline-variant)]">
-                Target: CS2026-A / SE101.1
+
+            <div className="card p-6 lg:col-span-2">
+              <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)] flex items-center justify-between">
+                <span>Published Announcements ({announcements.length})</span>
+                <span className="text-xs font-normal text-[var(--on-surface-variant)]">Most recent first</span>
               </h3>
-              <div className="space-y-3">
-                <select><option>Batch CS2026-A</option></select>
-                <select><option>Course offering SE101.1</option></select>
-              </div>
+
+              {announcements.length === 0 ? (
+                <p className="text-xs text-[var(--on-surface-variant)] italic text-center py-8">
+                  No announcements published yet. Fill in the form on the left to publish one.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {announcements.map((ann) => (
+                    <div
+                      key={ann.id}
+                      className="p-4 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] space-y-2 transition-colors hover:border-[var(--outline)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="font-bold text-sm text-[var(--on-surface)]">{ann.title}</h4>
+                        <span className="badge badge-accent text-[10px] flex items-center gap-1">
+                          <i className="ti ti-clock text-[9px]"></i> {ann.publishedAt}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed whitespace-pre-line">
+                        {ann.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

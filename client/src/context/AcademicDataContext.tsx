@@ -5,6 +5,7 @@ export interface CourseOffering {
   offeringId: number;
   courseCode: string;
   courseTitle: string;
+  departmentName?: string;
   batchName: string;
   semesterName: string;
   lecturerIds: number[]; // supports multiple lecturers per offering
@@ -42,6 +43,7 @@ const INITIAL_OFFERINGS: CourseOffering[] = [
     offeringId: 1,
     courseCode: "SE308.3",
     courseTitle: "Software Process Management",
+    departmentName: "Software Engineering",
     batchName: "CS2023-A",
     semesterName: "Semester 1",
     lecturerIds: [1, 3],
@@ -53,6 +55,7 @@ const INITIAL_OFFERINGS: CourseOffering[] = [
     offeringId: 2,
     courseCode: "SE202.2",
     courseTitle: "Database Systems",
+    departmentName: "Computer Science",
     batchName: "CS2023-B",
     semesterName: "Semester 1",
     lecturerIds: [2],
@@ -64,6 +67,7 @@ const INITIAL_OFFERINGS: CourseOffering[] = [
     offeringId: 3,
     courseCode: "SE309.3",
     courseTitle: "Software Verification & Validation",
+    departmentName: "Software Engineering",
     batchName: "CS2023-A",
     semesterName: "Semester 2",
     lecturerIds: [3, 1],
