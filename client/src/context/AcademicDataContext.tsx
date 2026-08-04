@@ -8,7 +8,7 @@ export interface CourseOffering {
   departmentName?: string;
   batchName: string;
   semesterName: string;
-  lecturerIds: number[]; // supports multiple lecturers per offering
+  lecturerIds: number[]; 
   lecturerNames: string[];
   enrollmentCount: number;
   capacity?: number;

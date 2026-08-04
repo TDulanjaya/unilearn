@@ -1,7 +1,9 @@
 "use client";
-import { useState, useRef } from "react";
+
+import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import { useInteractive } from "@/lib/useInteractive";
+import DataTable from "@/components/DataTable";
+import FileDropzone from "@/components/FileDropzone";
 
 interface UserRecord {
   id: string;
@@ -16,7 +18,7 @@ interface UserRecord {
   assignedCourses?: string[];
   engagementEndDate?: string;
   scopeLevel?: string;
-  status: string;
+  status: "Active" | "Locked";
 }
 
 interface CsvValidationRow {
@@ -33,772 +35,401 @@ interface CsvValidationRow {
 const INITIAL_USERS: UserRecord[] = [
   { id: "u-1", fullName: "Nadeesha Silva", email: "nadeesha.s@uni.edu", phone: "0771234567", role: "Student", department: "Software Eng.", batch: "CS2023-A", studentNumber: "SE/2023/042", status: "Active" },
   { id: "u-2", fullName: "Dr. K. Perera", email: "k.perera@uni.edu", phone: "0719876543", role: "Lecturer", department: "Software Eng.", designation: "Senior Lecturer", assignedCourses: ["SE308.3", "SE309.3"], status: "Active" },
-  { id: "u-3", fullName: "Prof. A. Fernando", email: "a.fernando@uni.edu", phone: "0701122334", role: "Examiner", department: "Computing", status: "Active" },
   { id: "u-4", fullName: "Dr. S. Wickramasinghe", email: "s.wick@uni.edu", phone: "0755544332", role: "HOD/Dean", department: "Software Eng.", scopeLevel: "Department", status: "Active" },
   { id: "u-5", fullName: "T. Bandara", email: "t.guest@uni.edu", phone: "0723344556", role: "Guest Lecturer", department: "Computing", assignedCourses: ["SE202.2"], engagementEndDate: "2026-12-31", status: "Active" },
   { id: "u-6", fullName: "R. Jayawardena", email: "r.jaya@uni.edu", phone: "0788877665", role: "Staff/Admin", scopeLevel: "Institution-wide", status: "Active" },
 ];
 
-const VALID_ROLES = [
-  "Student",
-  "Lecturer",
-  "Guest Lecturer",
-  "Examiner",
-  "HOD/Dean",
-  "Staff/Admin",
-];
+const VALID_ROLES = ["Student", "Lecturer", "Guest Lecturer", "HOD/Dean", "Staff/Admin"];
 
-const DEPARTMENTS = [
-  "Software Eng.",
-  "Computer Science",
-  "Business",
-  "Engineering",
-];
-
-const BATCHES = ["CS2023-A", "CS2023-B", "CS2026-A"];
-const DESIGNATIONS = ["Lecturer", "Senior Lecturer", "Professor"];
-const AVAILABLE_COURSES = ["SE308.3", "SE202.2", "SE309.3", "SE201.2"];
-
-export default function Page() {
-  useInteractive();
-
+export default function UserManagementPage() {
   const [users, setUsers] = useState<UserRecord[]>(INITIAL_USERS);
-  const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All roles");
+  const [toastMessage, setToastMessage] = useState("");
 
-  // Single User Registration Form State
-  const [role, setRole] = useState<string>("Student");
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
 
-  // Role Specific Form Fields
-  const [studentNumber, setStudentNumber] = useState("");
-  const [department, setDepartment] = useState(DEPARTMENTS[0]);
-  const [batch, setBatch] = useState(BATCHES[0]);
-  const [designation, setDesignation] = useState(DESIGNATIONS[0]);
-  const [assignedCourses, setAssignedCourses] = useState<string[]>([]);
-  const [engagementEndDate, setEngagementEndDate] = useState("");
-  const [scopeLevel, setScopeLevel] = useState("Department");
-  const [adminScope, setAdminScope] = useState("Institution-wide");
+  
+  const [newFullName, setNewFullName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState("Student");
+  const [newDept, setNewDept] = useState("Software Eng.");
 
-  // Validation Error States
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  // CSV Import State
+  
   const [parsedRows, setParsedRows] = useState<CsvValidationRow[] | null>(null);
-  const [isParsing, setIsParsing] = useState(false);
-  const [csvFileName, setCsvFileName] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Validate fields based on role
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!fullName.trim()) errors.fullName = "Full name is required";
-    if (!email.trim()) {
-      errors.email = "Email is required";
-    } else if (!email.includes("@")) {
-      errors.email = "Enter a valid email address";
-    }
-    if (!phone.trim()) errors.phone = "Phone number is required";
-
-    if (role === "Student") {
-      if (!studentNumber.trim()) errors.studentNumber = "Student number is required";
-      if (!department) errors.department = "Department is required";
-      if (!batch) errors.batch = "Batch selection is required";
-    } else if (role === "Lecturer") {
-      if (!department) errors.department = "Department is required";
-      if (!designation) errors.designation = "Designation is required";
-    } else if (role === "Guest Lecturer") {
-      if (!department) errors.department = "Department is required";
-      if (assignedCourses.length === 0) errors.assignedCourses = "At least one assigned course is required";
-      if (!engagementEndDate) errors.engagementEndDate = "Engagement end date is required";
-    } else if (role === "Examiner") {
-      if (!department) errors.department = "Department is required";
-    } else if (role === "HOD/Dean") {
-      if (!department) errors.department = "Department / Faculty is required";
-      if (!scopeLevel) errors.scopeLevel = "Scope level is required";
-    } else if (role === "Staff/Admin") {
-      if (!adminScope) errors.adminScope = "Scope level is required";
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 3000);
   };
 
-  const handleBlur = (field: string) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    validateForm();
-  };
-
-  // Toggle multi-select courses
-  const toggleCourseSelection = (code: string) => {
-    setAssignedCourses((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
-    );
-  };
-
-  // Reset Single User Registration Form
-  const resetRegistrationForm = () => {
-    setFullName("");
-    setEmail("");
-    setPhone("");
-    setStudentNumber("");
-    setDepartment(DEPARTMENTS[0]);
-    setBatch(BATCHES[0]);
-    setDesignation(DESIGNATIONS[0]);
-    setAssignedCourses([]);
-    setEngagementEndDate("");
-    setScopeLevel("Department");
-    setAdminScope("Institution-wide");
-    setTouched({});
-    setFormErrors({});
-  };
-
-  const handleRoleChange = (newRole: string) => {
-    setRole(newRole);
-    resetRegistrationForm();
-  };
-
-  // Single user submit handler
   const handleAddSingleUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!newFullName.trim() || !newEmail.trim()) return;
 
-    let newUser: UserRecord = {
-      id: "u-" + Date.now(),
-      fullName: fullName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      role,
+    const newUser: UserRecord = {
+      id: `u-${Date.now()}`,
+      fullName: newFullName.trim(),
+      email: newEmail.trim(),
+      role: newRole,
+      department: newDept,
       status: "Active",
     };
 
-    if (role === "Student") {
-      newUser = { ...newUser, studentNumber: studentNumber.trim(), department, batch };
-    } else if (role === "Lecturer") {
-      newUser = { ...newUser, department, designation, assignedCourses };
-    } else if (role === "Guest Lecturer") {
-      newUser = { ...newUser, department, assignedCourses, engagementEndDate };
-    } else if (role === "Examiner") {
-      newUser = { ...newUser, department };
-    } else if (role === "HOD/Dean") {
-      newUser = { ...newUser, department, scopeLevel };
-    } else if (role === "Staff/Admin") {
-      newUser = { ...newUser, scopeLevel: adminScope };
-    }
-
-    setUsers((prev) => [newUser, ...prev]);
-    resetRegistrationForm();
-
-    // Close modal
-    const modal = document.getElementById("add-user-modal");
-    if (modal) modal.classList.add("hidden");
+    setUsers([newUser, ...users]);
+    setNewFullName("");
+    setNewEmail("");
+    setShowAddModal(false);
+    showToast(`User ${newUser.fullName} added successfully.`);
   };
 
-  // CSV File Upload & Parsing
-  const handleFileUpload = (file: File) => {
-    if (!file) return;
-    setCsvFileName(file.name);
-    setIsParsing(true);
-
+  const handleCsvFilesSelected = (files: File[]) => {
+    if (files.length === 0) return;
+    const file = files[0];
     const reader = new FileReader();
+
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      if (!text) {
-        setIsParsing(false);
-        return;
-      }
+      if (!text) return;
 
       const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const rows: CsvValidationRow[] = [];
       const seenEmails = new Set<string>(users.map((u) => u.email.toLowerCase()));
 
-      const startIdx = lines[0].toLowerCase().includes("name") || lines[0].toLowerCase().includes("email") ? 1 : 0;
-
+      const startIdx = lines[0].toLowerCase().includes("email") ? 1 : 0;
       for (let i = startIdx; i < lines.length; i++) {
         const parts = lines[i].split(",").map((p) => p.trim().replace(/^["']|["']$/g, ""));
-        const rowName = parts[0] || "";
-        const rowEmail = parts[1] || "";
-        const rowRole = parts[2] || "";
-        const rowDept = parts[3] || "";
-        const rowBatch = parts[4] || "";
+        const fullName = parts[0] || "";
+        const email = parts[1] || "";
+        const role = parts[2] || "Student";
+        const department = parts[3] || "Software Eng.";
 
         let isValid = true;
         let errorMessage = "";
 
-        if (!rowName) {
+        if (!fullName) {
           isValid = false;
-          errorMessage = "Missing full name";
-        } else if (!rowEmail || !rowEmail.includes("@")) {
+          errorMessage = "Missing Full Name";
+        } else if (!email.includes("@")) {
           isValid = false;
-          errorMessage = "Invalid or missing email";
-        } else if (seenEmails.has(rowEmail.toLowerCase())) {
+          errorMessage = "Invalid Email";
+        } else if (seenEmails.has(email.toLowerCase())) {
           isValid = false;
-          errorMessage = "Duplicate email address";
-        } else if (!VALID_ROLES.map((r) => r.toLowerCase()).includes(rowRole.toLowerCase())) {
-          isValid = false;
-          errorMessage = `Invalid role "${rowRole}"`;
-        } else if (!rowDept && rowRole.toLowerCase() !== "staff/admin") {
-          isValid = false;
-          errorMessage = "Missing department";
+          errorMessage = "Duplicate Email";
         }
 
-        if (isValid) {
-          seenEmails.add(rowEmail.toLowerCase());
-        }
+        if (isValid) seenEmails.add(email.toLowerCase());
 
-        rows.push({
-          rowNumber: i + 1,
-          fullName: rowName,
-          email: rowEmail,
-          role: rowRole,
-          department: rowDept,
-          batch: rowBatch,
-          isValid,
-          errorMessage,
-        });
+        rows.push({ rowNumber: i + 1, fullName, email, role, department, isValid, errorMessage });
       }
 
       setParsedRows(rows);
-      setIsParsing(false);
     };
 
     reader.readAsText(file);
   };
 
-  const handleLoadSampleCsv = () => {
-    const sampleCsv = `Full Name,Email,Role,Department,Batch
-S. Karunaratne,nadeesha.s@uni.edu,Student,Software Eng.,CS2023-A
-M. Rathnayake,m.rathnayake@uni.edu,Lecturer,Software Eng.,
-D. Abeywickrama,d.abey@uni.edu,Student,Computer Science,CS2023-B
-R. Perera,r.perera@uni.edu,InvalidRole,Engineering,CS2023-A
-K. Wickrama,k.wick@uni.edu,Examiner,Computing,
-`;
-    const blob = new Blob([sampleCsv], { type: "text/csv" });
-    const file = new File([blob], "sample_users.csv", { type: "text/csv" });
-    handleFileUpload(file);
-  };
-
-  const handleConfirmImport = () => {
+  const handleConfirmBulkImport = () => {
     if (!parsedRows) return;
     const validRows = parsedRows.filter((r) => r.isValid);
     const newUsers: UserRecord[] = validRows.map((r) => ({
-      id: "u-" + Date.now() + "-" + r.rowNumber,
+      id: `u-${Date.now()}-${r.rowNumber}`,
       fullName: r.fullName,
       email: r.email,
-      role: VALID_ROLES.find((vr) => vr.toLowerCase() === r.role.toLowerCase()) || r.role,
+      role: r.role,
       department: r.department,
-      batch: r.batch || undefined,
       status: "Active",
     }));
 
-    setUsers((prev) => [...newUsers, ...prev]);
+    setUsers([...newUsers, ...users]);
     setParsedRows(null);
-    setCsvFileName("");
-
-    const modal = document.getElementById("add-user-modal");
-    if (modal) modal.classList.add("hidden");
+    setShowAddModal(false);
+    showToast(`Bulk imported ${newUsers.length} valid users.`);
   };
 
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === "All roles" || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  const handleSaveEdit = () => {
+    if (!editingUser) return;
+    setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? editingUser : u)));
+    setEditingUser(null);
+    showToast(`Updated user settings for ${editingUser.fullName}.`);
+  };
+
+  const handleTriggerPasswordReset = () => {
+    if (!editingUser) return;
+    showToast(`Password reset link dispatched to ${editingUser.email}.`);
+  };
+
+  const filteredUsers = users.filter(
+    (u) => roleFilter === "All roles" || u.role === roleFilter
+  );
+
+  const columns = [
+    {
+      header: "User Details",
+      accessor: (row: UserRecord) => (
+        <div className="flex items-center gap-2">
+          <div className="avatar w-8 h-8 text-xs shrink-0">{row.fullName.charAt(0)}</div>
+          <div>
+            <p className="font-bold text-xs text-[var(--on-surface)]">{row.fullName}</p>
+            <p className="text-[11px] text-[var(--on-surface-variant)]">{row.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "System Role",
+      accessor: (row: UserRecord) => (
+        <span className={`badge ${row.role === "Student" ? "badge-accent" : row.role === "HOD/Dean" ? "badge-danger" : row.role === "Guest Lecturer" ? "badge-warning" : "badge-gray"}`}>
+          {row.role}
+        </span>
+      ),
+    },
+    {
+      header: "Department / Batch",
+      accessor: (row: UserRecord) => (
+        <div className="text-xs text-[var(--on-surface-variant)]">
+          <p className="font-semibold text-[var(--on-surface)]">{row.department || "—"}</p>
+          {row.batch && <p className="text-[10px] opacity-80">Batch: {row.batch}</p>}
+        </div>
+      ),
+    },
+    {
+      header: "Status",
+      accessor: (row: UserRecord) => (
+        <span className={`badge ${row.status === "Active" ? "badge-success" : "badge-danger"}`}>
+          {row.status}
+        </span>
+      ),
+    },
+    {
+      header: "Actions",
+      accessor: (row: UserRecord) => (
+        <button
+          onClick={() => setEditingUser(row)}
+          className="btn-secondary text-xs !py-1 flex items-center gap-1"
+        >
+          <i className="ti ti-edit"></i> Edit Profile & Role
+        </button>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--background)] text-[var(--on-background)]">
       <Sidebar role="admin" name="R. Jayawardena" sub="Staff Admin · Institution-wide" />
-      <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full">
-        <div className="flex items-center justify-between mb-1">
-          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
-            User Management
-          </h1>
-          <button className="btn-primary shadow-md" data-modal-open="add-user-modal">
-            <i className="ti ti-plus"></i> Add user
-          </button>
-        </div>
-        <p className="text-[var(--on-surface-variant)] text-sm mb-6">
-          Manage students, lecturers, guest lecturers, examiners, HOD/Dean, and staff accounts.
-        </p>
+      <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full space-y-6">
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-[var(--surface-container-highest)] border border-[var(--tertiary)] text-[var(--on-surface)] px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 animate-bounce">
+            <i className="ti ti-check text-[var(--tertiary)] text-lg"></i>
+            <span className="text-xs font-semibold">{toastMessage}</span>
+          </div>
+        )}
 
-        {/* User List Table */}
-        <div className="card p-6 mb-6">
-          <div className="flex flex-wrap items-center gap-3 mb-5 pb-4 border-b border-[var(--outline-variant)]">
-            <input
-              type="text"
-              placeholder="Search users by name or email"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1"
-            />
-            <select className="w-44" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-              <option>All roles</option>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
+              User Management & Accounts
+            </h1>
+            <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm">
+              Role assignment, single/bulk CSV user registration, and account lock controls.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+            >
+              <option value="All roles">Filter: All Roles</option>
               {VALID_ROLES.map((r) => (
-                <option key={r}>{r}</option>
+                <option key={r} value={r}>{r}</option>
               ))}
             </select>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left min-w-[650px]">
-              <thead>
-                <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] text-xs uppercase tracking-wider">
-                  <th className="pb-3 px-3 font-semibold">Name & Contact</th>
-                  <th className="pb-3 px-3 font-semibold">Role</th>
-                  <th className="pb-3 px-3 font-semibold">Dept / Scope</th>
-                  <th className="pb-3 px-3 font-semibold">Details</th>
-                  <th className="pb-3 px-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--outline-variant)]">
-                {filteredUsers.map((u) => (
-                  <tr key={u.id} className="table-row transition-colors">
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2">
-                        <div className="avatar w-8 h-8 text-xs">{u.fullName.charAt(0)}</div>
-                        <div>
-                          <p className="font-semibold text-[var(--on-surface)]">{u.fullName}</p>
-                          <p className="text-xs text-[var(--on-surface-variant)]">{u.email} {u.phone && `· ${u.phone}`}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className={`badge ${u.role === "Student" ? "badge-accent" : u.role === "HOD/Dean" ? "badge-danger" : u.role === "Guest Lecturer" ? "badge-warning" : "badge-gray"}`}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-[var(--on-surface-variant)] text-xs">
-                      <b>{u.department || u.scopeLevel || "—"}</b>
-                      {u.batch && <span className="block text-[11px] opacity-80">Batch: {u.batch}</span>}
-                    </td>
-                    <td className="py-3.5 px-3 text-xs text-[var(--on-surface-variant)]">
-                      {u.studentNumber && <span>No: <b>{u.studentNumber}</b></span>}
-                      {u.designation && <span>{u.designation}</span>}
-                      {u.assignedCourses && u.assignedCourses.length > 0 && (
-                        <span className="block text-[11px]">Courses: {u.assignedCourses.join(", ")}</span>
-                      )}
-                      {u.engagementEndDate && (
-                        <span className="block text-[11px] text-[var(--tertiary)]">Until: {u.engagementEndDate}</span>
-                      )}
-                      {!u.studentNumber && !u.designation && (!u.assignedCourses || u.assignedCourses.length === 0) && "—"}
-                    </td>
-                    <td className="py-3.5 px-3"><span className="badge badge-success">{u.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs shadow-md shrink-0 whitespace-nowrap">
+              <i className="ti ti-user-plus mr-1"></i> Add / Bulk Import
+            </button>
           </div>
         </div>
 
-        {/* Modal: Add User & CSV Import */}
-        <div id="add-user-modal" className="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card w-full max-w-xl p-6 bg-[var(--surface-container-lowest)] shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
-              <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">Add User / Import</h3>
-              <button data-modal-close="add-user-modal" className="text-[var(--outline)] hover:text-[var(--on-surface)]">
-                <i className="ti ti-x text-xl"></i>
-              </button>
-            </div>
-
-            <div className="flex gap-2 mb-5 border-b border-[var(--outline-variant)]" data-tabgroup="addu">
-              <span className="tab-btn active" data-tab="single">Single Entry</span>
-              <span className="tab-btn" data-tab="bulk">Bulk CSV Import</span>
-            </div>
-
-            {/* Single Entry Tab */}
-            <div id="addu-single" data-tabpanel="addu">
-              <form onSubmit={handleAddSingleUser} className="space-y-4">
-                {/* 1. Target Role Selector */}
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Select Target Role</label>
-                  <select
-                    value={role}
-                    onChange={(e) => handleRoleChange(e.target.value)}
-                    className="w-full font-semibold text-xs"
-                  >
-                    {VALID_ROLES.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 2. Shared Fields for Every Role */}
-                <div className="p-3.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] space-y-3">
-                  <p className="text-xs font-bold text-[var(--on-surface)] flex items-center gap-1.5">
-                    <i className="ti ti-id text-[var(--tertiary)] text-base"></i> General Information
-                  </p>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Full Name *</label>
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      onBlur={() => handleBlur("fullName")}
-                      placeholder="e.g. Nadeesha Silva"
-                      className="w-full text-xs"
-                    />
-                    {touched.fullName && formErrors.fullName && (
-                      <p className="text-[11px] text-[var(--error)] mt-0.5 font-medium">{formErrors.fullName}</p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Email *</label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onBlur={() => handleBlur("email")}
-                        placeholder="email@uni.edu"
-                        className="w-full text-xs"
-                      />
-                      {touched.email && formErrors.email && (
-                        <p className="text-[11px] text-[var(--error)] mt-0.5 font-medium">{formErrors.email}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Phone *</label>
-                      <input
-                        type="text"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        onBlur={() => handleBlur("phone")}
-                        placeholder="e.g. 0771234567"
-                        className="w-full text-xs"
-                      />
-                      {touched.phone && formErrors.phone && (
-                        <p className="text-[11px] text-[var(--error)] mt-0.5 font-medium">{formErrors.phone}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Role-Specific Field Sets */}
-                <div className="p-3.5 rounded-xl border border-[var(--tertiary)] bg-[var(--surface-container-lowest)] space-y-3">
-                  <p className="text-xs font-bold text-[var(--tertiary)] flex items-center gap-1.5">
-                    <i className="ti ti-user-check text-base"></i> {role} Specific Fields
-                  </p>
-
-                  {/* Student Form */}
-                  {role === "Student" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Student Number *</label>
-                        <input
-                          type="text"
-                          value={studentNumber}
-                          onChange={(e) => setStudentNumber(e.target.value)}
-                          onBlur={() => handleBlur("studentNumber")}
-                          placeholder="e.g. SE/2023/042"
-                          className="w-full text-xs"
-                        />
-                        {touched.studentNumber && formErrors.studentNumber && (
-                          <p className="text-[11px] text-[var(--error)] mt-0.5 font-medium">{formErrors.studentNumber}</p>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Department *</label>
-                          <select
-                            value={department}
-                            onChange={(e) => setDepartment(e.target.value)}
-                            className="w-full text-xs"
-                          >
-                            {DEPARTMENTS.map((d) => (
-                              <option key={d} value={d}>{d}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Batch *</label>
-                          <select
-                            value={batch}
-                            onChange={(e) => setBatch(e.target.value)}
-                            className="w-full text-xs"
-                          >
-                            {BATCHES.map((b) => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Lecturer Form */}
-                  {role === "Lecturer" && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Department *</label>
-                          <select
-                            value={department}
-                            onChange={(e) => setDepartment(e.target.value)}
-                            className="w-full text-xs"
-                          >
-                            {DEPARTMENTS.map((d) => (
-                              <option key={d} value={d}>{d}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Designation *</label>
-                          <select
-                            value={designation}
-                            onChange={(e) => setDesignation(e.target.value)}
-                            className="w-full text-xs"
-                          >
-                            {DESIGNATIONS.map((des) => (
-                              <option key={des} value={des}>{des}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-1">
-                          Courses to Assign (Optional)
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {AVAILABLE_COURSES.map((code) => {
-                            const isSelected = assignedCourses.includes(code);
-                            return (
-                              <button
-                                type="button"
-                                key={code}
-                                onClick={() => toggleCourseSelection(code)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${isSelected ? "bg-[var(--tertiary)] text-white border-[var(--tertiary)]" : "bg-[var(--surface-container)] text-[var(--on-surface)] border-[var(--outline-variant)]"}`}
-                              >
-                                {isSelected && <i className="ti ti-check mr-1"></i>}{code}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Guest Lecturer Form */}
-                  {role === "Guest Lecturer" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Department *</label>
-                        <select
-                          value={department}
-                          onChange={(e) => setDepartment(e.target.value)}
-                          className="w-full text-xs"
-                        >
-                          {DEPARTMENTS.map((d) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-1">
-                          Assigned Course(s) * (Required for Guest Lecturers)
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {AVAILABLE_COURSES.map((code) => {
-                            const isSelected = assignedCourses.includes(code);
-                            return (
-                              <button
-                                type="button"
-                                key={code}
-                                onClick={() => toggleCourseSelection(code)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${isSelected ? "bg-[var(--tertiary)] text-white border-[var(--tertiary)]" : "bg-[var(--surface-container)] text-[var(--on-surface)] border-[var(--outline-variant)]"}`}
-                              >
-                                {isSelected && <i className="ti ti-check mr-1"></i>}{code}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {touched.assignedCourses && formErrors.assignedCourses && (
-                          <p className="text-[11px] text-[var(--error)] mt-1 font-medium">{formErrors.assignedCourses}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Engagement End Date *</label>
-                        <input
-                          type="date"
-                          value={engagementEndDate}
-                          onChange={(e) => setEngagementEndDate(e.target.value)}
-                          onBlur={() => handleBlur("engagementEndDate")}
-                          className="w-full text-xs"
-                        />
-                        {touched.engagementEndDate && formErrors.engagementEndDate && (
-                          <p className="text-[11px] text-[var(--error)] mt-0.5 font-medium">{formErrors.engagementEndDate}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Examiner Form */}
-                  {role === "Examiner" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Department *</label>
-                        <select
-                          value={department}
-                          onChange={(e) => setDepartment(e.target.value)}
-                          className="w-full text-xs"
-                        >
-                          {DEPARTMENTS.map((d) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* HOD / Dean Form */}
-                  {role === "HOD/Dean" && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Department / Faculty *</label>
-                          <select
-                            value={department}
-                            onChange={(e) => setDepartment(e.target.value)}
-                            className="w-full text-xs"
-                          >
-                            {DEPARTMENTS.map((d) => (
-                              <option key={d} value={d}>{d}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Scope Level *</label>
-                          <select
-                            value={scopeLevel}
-                            onChange={(e) => setScopeLevel(e.target.value)}
-                            className="w-full text-xs"
-                          >
-                            <option value="Department">Department</option>
-                            <option value="Faculty">Faculty</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Staff / Admin Form */}
-                  {role === "Staff/Admin" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--on-surface-variant)] mb-0.5">Scope Level *</label>
-                        <select
-                          value={adminScope}
-                          onChange={(e) => setAdminScope(e.target.value)}
-                          className="w-full text-xs font-medium"
-                        >
-                          <option value="Institution-wide">Institution-wide</option>
-                          <option value="Department-limited">Department-limited</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <button type="submit" className="btn-primary w-full justify-center shadow-md">
-                  <i className="ti ti-user-check mr-1"></i> Register User ({role})
-                </button>
-              </form>
-            </div>
-
-            {/* Bulk CSV Import Tab (FR-ADMIN-01) */}
-            <div id="addu-bulk" data-tabpanel="addu" className="hidden">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-              />
-
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (e.dataTransfer.files?.[0]) handleFileUpload(e.dataTransfer.files[0]);
-                }}
-                className="border-2 border-dashed border-[var(--outline-variant)] rounded-2xl p-6 text-center text-sm text-[var(--outline)] mb-3 bg-[var(--surface-container-low)] hover:border-[var(--tertiary)] cursor-pointer transition-colors"
-              >
-                <i className="ti ti-cloud-upload text-3xl block mb-2 text-[var(--tertiary)]"></i>
-                <p className="font-semibold text-[var(--on-surface)]">
-                  {csvFileName ? csvFileName : "Click or drag & drop a CSV file"}
-                </p>
-                <p className="text-xs text-[var(--on-surface-variant)] mt-1">Columns: Full Name, Email, Role, Department, Batch</p>
-              </div>
-
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  type="button"
-                  onClick={handleLoadSampleCsv}
-                  className="text-xs font-semibold text-[var(--tertiary)] hover:underline"
-                >
-                  <i className="ti ti-file-text mr-1"></i> Load Test CSV with Validation Errors
-                </button>
-              </div>
-
-              {/* Per-row validation table */}
-              {parsedRows && (
-                <div className="space-y-3 mb-4 max-h-[220px] overflow-y-auto pr-1">
-                  <div className="flex items-center justify-between text-xs font-bold px-1">
-                    <span className="text-[var(--on-surface)]">Validation Results ({parsedRows.length} rows)</span>
-                    <span className="text-[var(--secondary)]">{parsedRows.filter((r) => r.isValid).length} Valid</span>
-                    <span className="text-[var(--error)]">{parsedRows.filter((r) => !r.isValid).length} Failed</span>
-                  </div>
-
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] uppercase">
-                        <th className="pb-1.5 px-2">Row</th>
-                        <th className="pb-1.5 px-2">Name / Email</th>
-                        <th className="pb-1.5 px-2">Status</th>
-                        <th className="pb-1.5 px-2">Details</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--outline-variant)]">
-                      {parsedRows.map((row) => (
-                        <tr key={row.rowNumber} className="hover:bg-[var(--surface-container-low)]">
-                          <td className="py-2 px-2 font-mono">{row.rowNumber}</td>
-                          <td className="py-2 px-2">
-                            <p className="font-semibold text-[var(--on-surface)]">{row.fullName || "—"}</p>
-                            <p className="text-[10px] text-[var(--on-surface-variant)]">{row.email}</p>
-                          </td>
-                          <td className="py-2 px-2">
-                            {row.isValid ? (
-                              <span className="badge badge-success text-[10px]">✓ Valid</span>
-                            ) : (
-                              <span className="badge badge-danger text-[10px]">✗ Error</span>
-                            )}
-                          </td>
-                          <td className="py-2 px-2 text-[var(--on-surface-variant)]">
-                            {row.isValid ? `${row.role} · ${row.department}` : <span className="text-[var(--error)] font-semibold">{row.errorMessage}</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <button
-                disabled={!parsedRows || parsedRows.filter((r) => r.isValid).length === 0}
-                onClick={handleConfirmImport}
-                className="btn-primary w-full justify-center shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirm Import ({parsedRows ? parsedRows.filter((r) => r.isValid).length : 0} valid users)
-              </button>
-            </div>
-          </div>
+        <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+          <DataTable data={filteredUsers} columns={columns} searchPlaceholder="Search users by name, email or department..." pageSize={10} />
         </div>
       </main>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-xl w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Add User or Bulk Import</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-[var(--on-surface-variant)]">
+                <i className="ti ti-x text-lg"></i>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSingleUser} className="space-y-3 pb-3 border-b border-[var(--outline-variant)]">
+              <p className="text-xs font-bold text-[var(--on-surface)]">Single User Registration:</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                  required
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                >
+                  {VALID_ROLES.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Department"
+                  value={newDept}
+                  onChange={(e) => setNewDept(e.target.value)}
+                  className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                />
+              </div>
+
+              <button type="submit" className="btn-primary text-xs w-full justify-center shadow-sm">
+                Add Single User
+              </button>
+            </form>
+
+            <div className="space-y-3 pt-1">
+              <p className="text-xs font-bold text-[var(--on-surface)]">CSV Bulk Importer:</p>
+              <FileDropzone accept=".csv" maxSizeMB={5} multiple={false} onFilesSelected={handleCsvFilesSelected} />
+
+              {parsedRows && (
+                <div className="space-y-2 border-t border-[var(--outline-variant)] pt-3">
+                  <p className="text-xs font-bold text-[var(--on-surface)]">CSV Validation Preview ({parsedRows.length} Rows):</p>
+                  <div className="max-h-44 overflow-y-auto border border-[var(--outline-variant)] rounded-xl text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] sticky top-0">
+                        <tr>
+                          <th className="p-2">Row</th>
+                          <th className="p-2">Name / Email</th>
+                          <th className="p-2">Role</th>
+                          <th className="p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--outline-variant)]">
+                        {parsedRows.map((r) => (
+                          <tr key={r.rowNumber} className="hover:bg-[var(--surface-container-low)]/50">
+                            <td className="p-2 font-mono">{r.rowNumber}</td>
+                            <td className="p-2">
+                              <p className="font-bold">{r.fullName || "—"}</p>
+                              <p className="text-[10px] text-[var(--on-surface-variant)]">{r.email}</p>
+                            </td>
+                            <td className="p-2">{r.role}</td>
+                            <td className="p-2">
+                              {r.isValid ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600">Valid</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-600">{r.errorMessage}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button onClick={handleConfirmBulkImport} disabled={parsedRows.filter((r) => r.isValid).length === 0} className="btn-primary text-xs w-full justify-center disabled:opacity-40">
+                    Confirm Import ({parsedRows.filter((r) => r.isValid).length} Valid Users)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[var(--outline-variant)]">
+              <button onClick={() => setShowAddModal(false)} className="btn-secondary text-xs">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Edit User Account</h3>
+              <button onClick={() => setEditingUser(null)} className="text-[var(--on-surface-variant)]">
+                <i className="ti ti-x text-lg"></i>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Full Name</label>
+                <input
+                  type="text"
+                  value={editingUser.fullName}
+                  onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
+                  className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Reassign Role</label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                  className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                >
+                  {VALID_ROLES.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]">
+                <div>
+                  <p className="font-bold text-xs text-[var(--on-surface)]">Account Status Lock</p>
+                  <p className="text-[10px] text-[var(--on-surface-variant)]">Prevent user login access</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingUser({ ...editingUser, status: editingUser.status === "Active" ? "Locked" : "Active" })}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold ${editingUser.status === "Active" ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-red-500/10 text-red-600 border border-red-500/20"}`}
+                >
+                  {editingUser.status}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleTriggerPasswordReset}
+                className="btn-secondary text-xs w-full justify-center !py-2"
+              >
+                <i className="ti ti-key mr-1"></i> Trigger Password Reset Email
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
+              <button onClick={() => setEditingUser(null)} className="btn-secondary text-xs">Cancel</button>
+              <button onClick={handleSaveEdit} className="btn-primary text-xs shadow-md">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

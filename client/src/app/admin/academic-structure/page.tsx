@@ -38,10 +38,10 @@ export default function Page() {
   useInteractive();
   const { offerings, slots, addOffering, assignLecturer, removeLecturer, addSlot } = useAcademicData();
 
-  /* Local Form States */
+  
   const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
 
-  // New Course Form State
+  
   const [newCourseCode, setNewCourseCode] = useState("");
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [newCourseCredits, setNewCourseCredits] = useState("4");
@@ -50,7 +50,7 @@ export default function Page() {
   const [editingCourseCode, setEditingCourseCode] = useState<string | null>(null);
   const [editCourseDept, setEditCourseDept] = useState("Software Engineering");
 
-  // Dynamic Academic Calendar States
+  
   const [academicYears, setAcademicYears] = useState([
     { id: "ay-1", year: "2025/2026", isCurrent: true },
     { id: "ay-2", year: "2026/2027", isCurrent: false },
@@ -65,7 +65,7 @@ export default function Page() {
     { id: "b-3", name: "SE2024-A", department: "Software Engineering", intakeYear: 2024, studentCount: 45 },
   ]);
 
-  // Offering creation form state
+  
   const [newOffCourseCode, setNewOffCourseCode] = useState(INITIAL_COURSES[0].code);
   const [newOffBatch, setNewOffBatch] = useState("CS2023-A");
   const [newOffSemester, setNewOffSemester] = useState("Semester 1");
@@ -73,11 +73,11 @@ export default function Page() {
   const [newOffCapacity, setNewOffCapacity] = useState("50");
   const [showAllDeptsForOffering, setShowAllDeptsForOffering] = useState(false);
 
-  // Managing Lecturers panel
+  
   const [managingOfferingId, setManagingOfferingId] = useState<number | null>(null);
   const [selectedLecturerToAdd, setSelectedLecturerToAdd] = useState(LECTURERS[0].fullName);
 
-  // Timetable creation form state
+  
   const [newSlotOfferingId, setNewSlotOfferingId] = useState<number>(offerings[0]?.offeringId || 1);
   const [newSlotDay, setNewSlotDay] = useState<string>("Monday");
   const [newSlotStartTime, setNewSlotStartTime] = useState("09:00 AM");
@@ -85,11 +85,11 @@ export default function Page() {
   const [newSlotVenue, setNewSlotVenue] = useState("Main Hall A");
   const [newSlotType, setNewSlotType] = useState<string>("Lecture");
 
-  // Timetable filter
+  
   const [timetableBatchFilter, setTimetableBatchFilter] = useState("All batches");
   const [selectedDayMobile, setSelectedDayMobile] = useState<string>("Monday");
 
-  // Offering batch filtering by course department
+  
   const selectedCourseForOffering = courses.find((c) => c.code === newOffCourseCode) || courses[0];
   const filteredBatchesForOffering = showAllDeptsForOffering
     ? batches
@@ -103,7 +103,7 @@ export default function Page() {
     }
   }, [newOffCourseCode, showAllDeptsForOffering, batches]);
 
-  /* Course Handlers */
+  
   const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseCode.trim() || !newCourseTitle.trim()) return;
@@ -129,7 +129,7 @@ export default function Page() {
     setEditingCourseCode(null);
   };
 
-  /* Current Flag Handlers */
+  
   const handleSetCurrentYear = (id: string) => {
     setAcademicYears((prev) => prev.map((ay) => ({ ...ay, isCurrent: ay.id === id })));
   };
@@ -138,7 +138,7 @@ export default function Page() {
     setSemesters((prev) => prev.map((s) => ({ ...s, isCurrent: s.id === id })));
   };
 
-  /* Academic Years Config & Handlers */
+  
   const yearFields: FieldConfig[] = [
     { key: "startYear", label: "Start Year", type: "number", required: true, placeholder: "e.g. 2025" },
     { key: "endYear", label: "End Year", type: "number", required: true, placeholder: "e.g. 2026" },
@@ -174,7 +174,7 @@ export default function Page() {
     });
   };
 
-  /* Semesters Config & Handlers */
+  
   const semFields: FieldConfig[] = [
     { key: "name", label: "Semester Name", type: "text", required: true, placeholder: "e.g. Semester 3" },
     {
@@ -238,7 +238,7 @@ export default function Page() {
     });
   };
 
-  /* Batches Config & Handlers */
+  
   const batchFields: FieldConfig[] = [
     { key: "name", label: "Batch Name", type: "text", required: true, placeholder: "e.g. CS2026-A" },
     {
@@ -293,7 +293,7 @@ export default function Page() {
     setBatches((prev) => prev.filter((b) => b.id !== id));
   };
 
-  /* Handlers */
+  
   const selectedOffering = offerings.find((o) => o.offeringId === Number(newSlotOfferingId)) || offerings[0];
   const distinctBatches = Array.from(new Set(offerings.map((o) => o.batchName)));
 
@@ -364,7 +364,7 @@ export default function Page() {
           </p>
         </div>
 
-        {/* Tab Group */}
+        
         <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)] overflow-x-auto" data-tabgroup="acs">
           <span className="tab-btn active" data-tab="fac">Faculties & departments</span>
           <span className="tab-btn" data-tab="courses">Courses</span>
@@ -373,7 +373,7 @@ export default function Page() {
           <span className="tab-btn" data-tab="timetable">Timetable</span>
         </div>
 
-        {/* Panel 1: Faculties */}
+        
         <div id="acs-fac" data-tabpanel="acs">
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="card p-6">
@@ -415,7 +415,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Panel 2: Courses */}
+        
         <div id="acs-courses" data-tabpanel="acs" className="hidden">
           <div className="card p-6">
             <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
@@ -524,10 +524,10 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Panel 3: Academic Calendar */}
+        
         <div id="acs-cal" data-tabpanel="acs" className="hidden">
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Academic Years Panel */}
+            
             <CalendarEntityPanel
               title="Academic Years"
               label="year"
@@ -587,7 +587,7 @@ export default function Page() {
               )}
             />
 
-            {/* Semesters Panel */}
+            
             <CalendarEntityPanel
               title="Semesters"
               label="semester"
@@ -656,7 +656,7 @@ export default function Page() {
               )}
             />
 
-            {/* Batches Panel */}
+            
             <CalendarEntityPanel
               title="Batches"
               label="batch"
@@ -710,10 +710,10 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Panel 4: Course Offerings */}
+        
         <div id="acs-offerings" data-tabpanel="acs" className="hidden">
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Create Offering Form */}
+            
             <div className="card p-6 lg:col-span-1">
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Create Course Offering
@@ -805,7 +805,7 @@ export default function Page() {
               </form>
             </div>
 
-            {/* Offerings Table & Lecturer Management */}
+            
             <div className="card p-6 lg:col-span-2">
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Active Course Offerings ({offerings.length})
@@ -881,7 +881,7 @@ export default function Page() {
                 </table>
               </div>
 
-              {/* Manage Lecturers Expanded Panel */}
+              
               {managingOfferingId && (
                 <div className="mt-4 p-4 rounded-xl border border-[var(--tertiary)] bg-[var(--surface-container-low)] animate-fadeIn">
                   <div className="flex items-center justify-between mb-3">
@@ -916,10 +916,10 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Panel 5: Timetable */}
+        
         <div id="acs-timetable" data-tabpanel="acs" className="hidden">
           <div className="grid lg:grid-cols-3 gap-6 mb-6">
-            {/* Create Slot Form */}
+            
             <div className="card p-6 lg:col-span-1">
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Schedule Timetable Slot
@@ -1013,7 +1013,7 @@ export default function Page() {
               </form>
             </div>
 
-            {/* Weekly Timetable Grid & Batch Filter */}
+            
             <div className="card p-6 lg:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
@@ -1033,7 +1033,7 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Mobile Day Selector (Small Screens) */}
+              
               <div className="block sm:hidden mb-4">
                 <div className="flex gap-1 overflow-x-auto pb-2 border-b border-[var(--outline-variant)]">
                   {DAYS.map((d) => (
@@ -1066,7 +1066,7 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Desktop 5-Column Grid View */}
+              
               <div className="hidden sm:grid grid-cols-5 gap-3">
                 {DAYS.map((d) => {
                   const daySlots = filteredSlots.filter((s) => s.dayOfWeek === d);

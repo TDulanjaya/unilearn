@@ -1,0 +1,79 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+interface VideoPlayerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  url: string;
+  moduleName?: string;
+}
+
+export default function VideoPlayerModal({
+  isOpen,
+  onClose,
+  title,
+  url,
+  moduleName,
+}: VideoPlayerModalProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="glass w-full max-w-4xl rounded-3xl border border-[var(--glass-border)] shadow-2xl flex flex-col overflow-hidden bg-[var(--surface-container-lowest)]">
+        
+        <div className="p-4 sm:px-6 border-b border-[var(--outline-variant)] bg-[var(--surface-container-low)] flex items-center justify-between">
+          <div className="flex items-center gap-3 pr-4 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold shrink-0">
+              <i className="ti ti-video text-xl"></i>
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)] truncate">
+                {title}
+              </h3>
+              {moduleName && (
+                <p className="text-xs text-[var(--on-surface-variant)]">{moduleName}</p>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] transition-colors"
+          >
+            <i className="ti ti-x text-xl"></i>
+          </button>
+        </div>
+
+        <div className="relative bg-black aspect-video flex items-center justify-center">
+          <video
+            ref={videoRef}
+            src={url}
+            controls
+            autoPlay
+            className="w-full h-full rounded-b-2xl object-contain"
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      </div>
+    </div>
+  );
+}

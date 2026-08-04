@@ -19,7 +19,6 @@ export default function StudentNavbar() {
     { href: "/student/timetable", label: "Timetable" },
     { href: "/student/attendance", label: "Attendance" },
     { href: "/student/records", label: "Records" },
-    { href: "/student/ai-assistant", label: "AI Assistant" },
   ];
 
   useEffect(() => {

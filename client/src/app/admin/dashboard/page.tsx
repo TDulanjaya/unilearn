@@ -17,7 +17,7 @@ export default function Page() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <div className="card p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
             <div className="w-11 h-11 rounded-2xl bg-[var(--surface-container)] text-[var(--tertiary)] flex items-center justify-center font-bold">
               <i className="ti ti-users text-xl"></i>
@@ -50,11 +50,21 @@ export default function Page() {
 
           <div className="card p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
             <div className="w-11 h-11 rounded-2xl bg-[var(--warning-container)] text-[var(--on-warning-container)] flex items-center justify-center font-bold">
+              <i className="ti ti-calendar-time text-xl"></i>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-0.5">Upcoming Finals</p>
+              <p className="font-display font-extrabold text-2xl text-[var(--warning)]">12</p>
+            </div>
+          </div>
+
+          <div className="card p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+            <div className="w-11 h-11 rounded-2xl bg-[var(--surface-container)] text-[var(--on-surface-variant)] flex items-center justify-center font-bold">
               <i className="ti ti-calendar-event text-xl"></i>
             </div>
             <div>
               <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-0.5">Upcoming Events</p>
-              <p className="font-display font-extrabold text-2xl text-[var(--warning)]">7</p>
+              <p className="font-display font-extrabold text-2xl text-[var(--on-surface)]">7</p>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 interface Message {
   sender: "user" | "ai";
@@ -9,8 +9,10 @@ interface Message {
 
 export default function AiAssistantLauncher() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [isAiTabActive, setIsAiTabActive] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "ai",
@@ -18,7 +20,24 @@ export default function AiAssistantLauncher() {
     },
   ]);
 
-  if (pathname === "/student/ai-assistant") {
+  useEffect(() => {
+    const checkAiTab = () => {
+      const isAiPage = pathname === "/student/ai-assistant";
+      const isTabAi = searchParams?.get("tab") === "ai" || (typeof window !== "undefined" && window.location.search.includes("tab=ai"));
+      setIsAiTabActive(isAiPage || isTabAi);
+    };
+
+    checkAiTab();
+    window.addEventListener("popstate", checkAiTab);
+    const interval = setInterval(checkAiTab, 250); 
+    return () => {
+      window.removeEventListener("popstate", checkAiTab);
+      clearInterval(interval);
+    };
+  }, [pathname, searchParams]);
+
+  
+  if (isAiTabActive) {
     return null;
   }
 
@@ -98,7 +117,7 @@ export default function AiAssistantLauncher() {
                   className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
                     msg.sender === "user"
                       ? "bg-[var(--primary)] text-[var(--on-primary)] shadow-sm"
-                      : "bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--outline-variant)]"
+                      : "bg-[var(--surface-container-lowest)] text-[var(--on-surface)] border border-[var(--outline-variant)] shadow-sm"
                   }`}
                 >
                   {msg.text}
@@ -107,23 +126,20 @@ export default function AiAssistantLauncher() {
             ))}
           </div>
 
-          <form
-            onSubmit={handleSend}
-            className="p-3 border-t border-[var(--outline-variant)] bg-[var(--surface-container-low)] flex items-center gap-2"
-          >
+          <form onSubmit={handleSend} className="p-3 border-t border-[var(--outline-variant)] bg-[var(--surface-container-low)] flex gap-2">
             <input
               type="text"
+              placeholder="Ask a question..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about your courses..."
-              className="flex-1 text-xs !py-2 !px-3 rounded-xl bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] focus:outline-none"
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)]"
             />
             <button
               type="submit"
-              className="btn-primary !p-2 rounded-xl text-xs shrink-0 shadow-sm"
-              aria-label="Send message"
+              disabled={!input.trim()}
+              className="btn-primary text-xs !py-2 !px-3.5 disabled:opacity-40"
             >
-              <i className="ti ti-send text-sm"></i>
+              Send
             </button>
           </form>
         </div>

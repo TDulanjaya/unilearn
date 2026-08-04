@@ -1,7 +1,65 @@
 "use client";
-import { useState } from "react";
 
-interface Exam {
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import McqQuestion from "@/components/exam/McqQuestion";
+import TrueFalseQuestion from "@/components/exam/TrueFalseQuestion";
+import ShortTextQuestion from "@/components/exam/ShortTextQuestion";
+import EssayQuestion from "@/components/exam/EssayQuestion";
+
+export type QuestionType = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "ESSAY";
+
+export interface QuestionData {
+  id: number;
+  text: string;
+  type: QuestionType;
+  points: number;
+  options?: string[];
+}
+
+export interface MockExam {
+  id: number;
+  courseCode: string;
+  courseTitle: string;
+  durationMinutes: number;
+  questions: QuestionData[];
+}
+
+const MOCK_ONLINE_EXAM: MockExam = {
+  id: 101,
+  courseCode: "SE308.3",
+  courseTitle: "Software Process Management Final Assessment",
+  durationMinutes: 45,
+  questions: [
+    {
+      id: 1,
+      text: "Which process model emphasizes early risk assessment in every iteration cycle?",
+      type: "MCQ",
+      points: 5,
+      options: ["Waterfall Model", "Spiral Model", "V-Model", "Big Bang Model"],
+    },
+    {
+      id: 2,
+      text: "Code coverage measurements guarantee that software is 100% bug-free.",
+      type: "TRUE_FALSE",
+      points: 5,
+    },
+    {
+      id: 3,
+      text: "Define CMMI Level 3 in one concise sentence.",
+      type: "SHORT_TEXT",
+      points: 10,
+    },
+    {
+      id: 4,
+      text: "Discuss the trade-offs between Scrum and Kanban in high-velocity startup teams.",
+      type: "ESSAY",
+      points: 20,
+    },
+  ],
+};
+
+interface ExamListEntry {
   id: number;
   courseCode: string;
   courseTitle: string;
@@ -11,18 +69,20 @@ interface Exam {
   type: "Final Exam" | "Midterm Quiz" | "In-Class Assessment";
   status: "Upcoming" | "Completed";
   grade?: string;
+  isOnlineAvailable?: boolean;
 }
 
-const EXAMS: Exam[] = [
+const EXAMS: ExamListEntry[] = [
   {
     id: 1,
     courseCode: "SE308.3",
     courseTitle: "Software Process Management",
-    dateTime: "Dec 12, 2026 · 09:00 AM - 12:00 PM",
-    venue: "Main Examination Hall A",
-    seatNo: "A-042",
+    dateTime: "Aug 05, 2026 · Live Online Exam",
+    venue: "Online Exam Portal",
+    seatNo: "ONLINE-01",
     type: "Final Exam",
     status: "Upcoming",
+    isOnlineAvailable: true,
   },
   {
     id: 2,
@@ -36,16 +96,6 @@ const EXAMS: Exam[] = [
   },
   {
     id: 3,
-    courseCode: "SE202.2",
-    courseTitle: "Database Systems",
-    dateTime: "Dec 18, 2026 · 09:00 AM - 11:00 AM",
-    venue: "Auditorium B",
-    seatNo: "AUD-09",
-    type: "Final Exam",
-    status: "Upcoming",
-  },
-  {
-    id: 4,
     courseCode: "SE309.3",
     courseTitle: "Software Verification & Validation",
     dateTime: "Jul 15, 2026 · 10:00 AM - 11:30 AM",
@@ -59,11 +109,90 @@ const EXAMS: Exam[] = [
 
 export default function StudentExamsPage() {
   const [filter, setFilter] = useState<"Upcoming" | "Completed">("Upcoming");
-  const [selectedExamForSlip, setSelectedExamForSlip] = useState<Exam | null>(null);
+  const [activeExam, setActiveExam] = useState<MockExam | null>(null);
 
-  const filteredExams = EXAMS.filter((e) => e.status === filter);
+  
+  const [currentQIndex, setCurrentQIndex] = useState<number>(0);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [flagged, setFlagged] = useState<Record<number, boolean>>({});
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(
+    MOCK_ONLINE_EXAM.durationMinutes * 60
+  );
+  const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
-  const handleDownloadSlipFile = (exam: Exam) => {
+  
+  useEffect(() => {
+    if (!activeExam || isSubmitted) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount((prev) => prev + 1);
+      }
+    };
+
+    const handleWindowBlur = () => {
+      setTabSwitchCount((prev) => prev + 1);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [activeExam, isSubmitted]);
+
+  
+  useEffect(() => {
+    if (!activeExam || isSubmitted) return;
+
+    const timer = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsSubmitted(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [activeExam, isSubmitted]);
+
+  const formatTimer = (totalSec: number) => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const handleAnswerChange = (questionId: number, value: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
+  };
+
+  const toggleFlag = (questionId: number) => {
+    setFlagged((prev) => ({ ...prev, [questionId]: !prev[questionId] }));
+  };
+
+  const startExam = (exam: MockExam) => {
+    setActiveExam(exam);
+    setSecondsRemaining(exam.durationMinutes * 60);
+    setCurrentQIndex(0);
+    setAnswers({});
+    setFlagged({});
+    setTabSwitchCount(0);
+    setIsSubmitted(false);
+  };
+
+  const handleManualSubmit = () => {
+    if (confirm("Are you sure you want to submit your exam now?")) {
+      setIsSubmitted(true);
+    }
+  };
+
+  const handleDownloadSlipFile = (exam: ExamListEntry) => {
     const slipContent = `
 ============================================================
            UNILEARN OFFICIAL ADMISSION SLIP
@@ -79,12 +208,6 @@ Date & Time : ${exam.dateTime}
 Venue       : ${exam.venue}
 Seat Number : ${exam.seatNo}
 
-EXAMINATION RULES & GUIDELINES:
-1. Present this admission slip alongside your University ID Card.
-2. Arrive at the examination hall at least 15 minutes prior to start time.
-3. Electronic gadgets and smart watches are strictly prohibited in the hall.
-4. Verify your seat number on the door seating chart before entry.
-
 Generated on: ${new Date().toLocaleDateString("en-US")}
 ============================================================
 `;
@@ -97,211 +220,333 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
-          Exams & Admission Slips
-        </h1>
-        <p className="text-[var(--on-surface-variant)] text-sm">
-          Official examination schedule, hall allocations, and downloadable admission slips.
-        </p>
-      </div>
+  
+  if (activeExam) {
+    const currentQ = activeExam.questions[currentQIndex];
+    const answeredCount = Object.keys(answers).filter(
+      (k) => answers[Number(k)]?.trim()
+    ).length;
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)]">
-        <button
-          onClick={() => setFilter("Upcoming")}
-          className={`tab-btn flex items-center gap-2 ${filter === "Upcoming" ? "active" : ""}`}
-        >
-          <i className="ti ti-calendar-event text-sm"></i>
-          <span>Upcoming Final Exams ({EXAMS.filter((e) => e.status === "Upcoming").length})</span>
-        </button>
-        <button
-          onClick={() => setFilter("Completed")}
-          className={`tab-btn flex items-center gap-2 ${filter === "Completed" ? "active" : ""}`}
-        >
-          <i className="ti ti-circle-check text-sm"></i>
-          <span>Past Assessments ({EXAMS.filter((e) => e.status === "Completed").length})</span>
-        </button>
-      </div>
+    return (
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
+        
+        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span className="badge badge-accent mb-1 font-bold">
+              {activeExam.courseCode}
+            </span>
+            <h1 className="font-display font-extrabold text-xl sm:text-2xl text-[var(--on-surface)]">
+              {activeExam.courseTitle}
+            </h1>
+            <p className="text-xs text-[var(--on-surface-variant)]">
+              Questions: {activeExam.questions.length} · Answered: {answeredCount}/{activeExam.questions.length}
+            </p>
+          </div>
 
-      {/* Exams List Card */}
-      <div className="card p-6">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[var(--outline-variant)]">
-          <i className="ti ti-clipboard-check text-xl text-[var(--tertiary)]"></i>
-          <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-            {filter === "Upcoming" ? "Scheduled Examinations" : "Past Assessment History"}
-          </h3>
-        </div>
-
-        {/* Mobile View */}
-        <div className="block sm:hidden space-y-4">
-          {filteredExams.map((exam) => (
-            <div key={exam.id} className="glass p-4 rounded-xl border border-[var(--outline-variant)] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="badge badge-accent">{exam.courseCode}</span>
-                <span className="badge badge-warning text-[10px]">{exam.type}</span>
-              </div>
-              <div className="font-bold text-[var(--on-surface)] text-sm">
-                {exam.courseTitle}
-              </div>
-              <div className="space-y-1.5 text-xs text-[var(--on-surface-variant)]">
-                <div className="flex items-center gap-2">
-                  <i className="ti ti-calendar text-[var(--tertiary)]"></i>
-                  <span>{exam.dateTime}</span>
-                </div>
-                <div className="flex items-center gap-2 font-medium text-[var(--on-surface)]">
-                  <i className="ti ti-map-pin text-[var(--tertiary)]"></i>
-                  <span>{exam.venue} (Seat: {exam.seatNo})</span>
-                </div>
-              </div>
-              {filter === "Upcoming" ? (
-                <button
-                  onClick={() => setSelectedExamForSlip(exam)}
-                  className="w-full btn-primary text-xs !py-2 justify-center shadow-sm"
-                >
-                  <i className="ti ti-ticket mr-1.5"></i> View & Download Slip
-                </button>
-              ) : (
-                <div className="text-xs text-[var(--on-surface-variant)] flex justify-between items-center pt-2 border-t border-[var(--outline-variant)]">
-                  <span>Grade Achieved:</span>
-                  <span className="badge badge-success font-bold">{exam.grade}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop Table View */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm text-left min-w-[640px]">
-            <thead>
-              <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] text-xs uppercase tracking-wider">
-                <th className="pb-3 px-3 font-semibold">Course Code & Name</th>
-                <th className="pb-3 px-3 font-semibold">Assessment Type</th>
-                <th className="pb-3 px-3 font-semibold">Date & Time</th>
-                <th className="pb-3 px-3 font-semibold">Venue & Seat</th>
-                <th className="pb-3 px-3 font-semibold text-right">Action / Result</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--outline-variant)]">
-              {filteredExams.map((exam) => (
-                <tr key={exam.id} className="table-row transition-colors">
-                  <td className="py-3.5 px-3">
-                    <span className="badge badge-accent text-[10px] mb-1 block w-fit">{exam.courseCode}</span>
-                    <span className="font-semibold text-[var(--on-surface)] text-sm">{exam.courseTitle}</span>
-                  </td>
-                  <td className="py-3.5 px-3 text-[var(--on-surface-variant)] text-xs font-medium">
-                    {exam.type}
-                  </td>
-                  <td className="py-3.5 px-3 text-[var(--on-surface-variant)] text-xs">
-                    {exam.dateTime}
-                  </td>
-                  <td className="py-3.5 px-3 text-[var(--on-surface)] text-xs font-medium">
-                    {exam.venue} <br />
-                    <span className="text-[var(--tertiary)] text-[11px]">Seat: {exam.seatNo}</span>
-                  </td>
-                  <td className="py-3.5 px-3 text-right">
-                    {filter === "Upcoming" ? (
-                      <button
-                        onClick={() => setSelectedExamForSlip(exam)}
-                        className="btn-primary text-xs !py-1.5 shadow-sm"
-                      >
-                        <i className="ti ti-ticket mr-1"></i> Admission Slip
-                      </button>
-                    ) : (
-                      <span className="badge badge-success text-xs font-bold">{exam.grade}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Admission Slip Preview Modal */}
-      {selectedExamForSlip && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-lg w-full p-6 animate-scaleIn space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
-              <div className="flex items-center gap-2">
-                <i className="ti ti-ticket text-xl text-[var(--tertiary)]"></i>
-                <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
-                  Examination Admission Slip
-                </h3>
-              </div>
-              <button onClick={() => setSelectedExamForSlip(null)} className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
-                <i className="ti ti-x text-lg"></i>
-              </button>
+          <div className="flex items-center gap-3">
+            
+            <div className="px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5 font-semibold">
+              <i className="ti ti-[alert-triangle] text-base"></i>
+              <span>Focus Alerts: {tabSwitchCount}</span>
             </div>
 
-            {/* Official Slip Content */}
-            <div className="border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] rounded-xl p-4 text-xs space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
-                <div>
-                  <h4 className="font-bold text-[var(--on-surface)] text-sm">UniLearn University</h4>
-                  <p className="text-[10px] text-[var(--on-surface-variant)]">Official Hall Ticket — Semester Final Examinations</p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-[var(--surface-container)] flex items-center justify-center font-bold text-[var(--tertiary)]">
-                  UL
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div>
-                  <span className="text-[var(--on-surface-variant)] block">Student Name:</span>
-                  <span className="font-bold text-[var(--on-surface)]">Nadeesha Silva</span>
-                </div>
-                <div>
-                  <span className="text-[var(--on-surface-variant)] block">Index Number:</span>
-                  <span className="font-bold text-[var(--on-surface)]">SE-2023-042</span>
-                </div>
-              </div>
-
-              <div className="bg-[var(--surface-container-low)] p-3 rounded-lg border border-[var(--outline-variant)] space-y-1.5">
-                <div>
-                  <span className="text-[10px] text-[var(--on-surface-variant)] block">Course Module:</span>
-                  <span className="font-bold text-[var(--on-surface)] text-xs">{selectedExamForSlip.courseCode} — {selectedExamForSlip.courseTitle}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[var(--on-surface-variant)] block">Scheduled Date & Time:</span>
-                  <span className="font-semibold text-[var(--on-surface)]">{selectedExamForSlip.dateTime}</span>
-                </div>
-                <div className="flex justify-between text-[11px] pt-1">
-                  <span>Venue: <b>{selectedExamForSlip.venue}</b></span>
-                  <span>Seat No: <b className="text-[var(--tertiary)]">{selectedExamForSlip.seatNo}</b></span>
-                </div>
-              </div>
-
-              {/* Barcode simulation */}
-              <div className="pt-2 text-center">
-                <div className="inline-block px-6 py-2 bg-black text-white font-mono tracking-[0.3em] text-[10px] rounded">
-                  ||| | ||||| || ||| |||| ||||
-                </div>
-                <p className="text-[9px] text-[var(--on-surface-variant)] mt-1">SE-2023-042-EXAM-{selectedExamForSlip.courseCode}</p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
-              <button onClick={() => setSelectedExamForSlip(null)} className="btn-secondary text-xs">
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  handleDownloadSlipFile(selectedExamForSlip);
-                  setSelectedExamForSlip(null);
-                }}
-                className="btn-primary text-xs shadow-md"
-              >
-                <i className="ti ti-download mr-1"></i> Download PDF Slip
-              </button>
+            
+            <div className="px-4 py-2 rounded-2xl bg-[var(--primary)] text-[var(--on-primary)] font-mono font-bold text-lg flex items-center gap-2 shadow-md">
+              <i className="ti ti-clock text-xl text-[var(--tertiary)]"></i>
+              <span>{formatTimer(secondsRemaining)}</span>
             </div>
           </div>
         </div>
+
+        
+        {isSubmitted ? (
+          <div className="card p-8 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-2xl">
+            <div className="w-16 h-16 rounded-3xl bg-[var(--secondary-container)] text-[var(--on-secondary-container)] flex items-center justify-center mx-auto">
+              <i className="ti ti-check-circle text-4xl"></i>
+            </div>
+            <h2 className="font-display font-extrabold text-2xl text-[var(--on-surface)]">
+              Assessment Submitted Successfully
+            </h2>
+            <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+              Your responses for <b>{activeExam.courseTitle}</b> have been saved. You answered {answeredCount} out of {activeExam.questions.length} questions.
+            </p>
+
+            <button
+              onClick={() => setActiveExam(null)}
+              className="btn-primary text-xs !py-2.5 !px-6 justify-center shadow-md mx-auto"
+            >
+              Return to Exams Dashboard
+            </button>
+          </div>
+        ) : (
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div className="lg:col-span-2 card p-6 sm:p-8 space-y-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex flex-col justify-between">
+              <div>
+                
+                <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-4 mb-6">
+                  <span className="font-display font-bold text-sm text-[var(--tertiary)]">
+                    Question {currentQIndex + 1} of {activeExam.questions.length}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] text-xs">
+                      {currentQ.points} Points
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleFlag(currentQ.id)}
+                      className={`text-xs px-3 py-1.5 rounded-xl font-semibold border transition-all flex items-center gap-1.5 ${
+                        flagged[currentQ.id]
+                          ? "bg-amber-500 text-white border-amber-500 shadow-sm"
+                          : "border-[var(--outline-variant)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]"
+                      }`}
+                    >
+                      <i className="ti ti-flag text-sm"></i>
+                      {flagged[currentQ.id] ? "Flagged" : "Flag for Review"}
+                    </button>
+                  </div>
+                </div>
+
+                
+                <h3 className="font-display font-bold text-base sm:text-lg text-[var(--on-surface)] mb-6 leading-relaxed">
+                  {currentQ.text}
+                </h3>
+
+                
+                {currentQ.type === "MCQ" && currentQ.options && (
+                  <McqQuestion
+                    questionId={currentQ.id}
+                    options={currentQ.options}
+                    selectedAnswer={answers[currentQ.id]}
+                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val)}
+                  />
+                )}
+                {currentQ.type === "TRUE_FALSE" && (
+                  <TrueFalseQuestion
+                    questionId={currentQ.id}
+                    selectedAnswer={answers[currentQ.id]}
+                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val)}
+                  />
+                )}
+                {currentQ.type === "SHORT_TEXT" && (
+                  <ShortTextQuestion
+                    questionId={currentQ.id}
+                    selectedAnswer={answers[currentQ.id]}
+                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val)}
+                  />
+                )}
+                {currentQ.type === "ESSAY" && (
+                  <EssayQuestion
+                    questionId={currentQ.id}
+                    selectedAnswer={answers[currentQ.id]}
+                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val)}
+                  />
+                )}
+              </div>
+
+              
+              <div className="flex items-center justify-between border-t border-[var(--outline-variant)] pt-6 mt-8">
+                <button
+                  type="button"
+                  disabled={currentQIndex === 0}
+                  onClick={() => setCurrentQIndex((p) => p - 1)}
+                  className="btn-secondary text-xs !py-2.5 !px-5 disabled:opacity-40"
+                >
+                  <i className="ti ti-arrow-left mr-1"></i> Previous
+                </button>
+
+                {currentQIndex < activeExam.questions.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentQIndex((p) => p + 1)}
+                    className="btn-primary text-xs !py-2.5 !px-5 shadow-sm"
+                  >
+                    Next Question <i className="ti ti-arrow-right ml-1"></i>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    className="btn-primary text-xs !py-2.5 !px-6 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    Finish & Submit Exam <i className="ti ti-check ml-1"></i>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            
+            <div className="card p-6 space-y-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] h-fit">
+              <h4 className="font-display font-bold text-sm text-[var(--on-surface)] border-b border-[var(--outline-variant)] pb-3">
+                Question Navigator
+              </h4>
+
+              <div className="grid grid-cols-4 gap-2.5">
+                {activeExam.questions.map((q, idx) => {
+                  const isCurrent = idx === currentQIndex;
+                  const isAnswered = Boolean(answers[q.id]?.trim());
+                  const isFlagged = Boolean(flagged[q.id]);
+
+                  let btnStyle = "bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] border-[var(--outline-variant)]";
+                  if (isAnswered) btnStyle = "bg-[var(--tertiary)] text-white border-[var(--tertiary)]";
+                  if (isFlagged) btnStyle = "bg-amber-500 text-white border-amber-500";
+                  if (isCurrent) btnStyle += " ring-2 ring-offset-2 ring-[var(--primary)] font-bold";
+
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => setCurrentQIndex(idx)}
+                      className={`h-11 rounded-xl border text-xs flex items-center justify-center relative transition-all ${btnStyle}`}
+                    >
+                      {idx + 1}
+                      {isFlagged && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-white"></span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              
+              <div className="space-y-2 text-xs border-t border-[var(--outline-variant)] pt-4 text-[var(--on-surface-variant)]">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-md bg-[var(--tertiary)]"></div>
+                  <span>Answered</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-md bg-amber-500"></div>
+                  <span>Flagged for Review</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-md bg-[var(--surface-container-low)] border border-[var(--outline-variant)]"></div>
+                  <span>Unanswered</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleManualSubmit}
+                className="btn-outline w-full text-xs justify-center !py-2.5 mt-2"
+              >
+                Submit Exam Early
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    );
+  }
+
+  
+  const filteredExams = EXAMS.filter((e) => e.status === filter);
+
+  return (
+    <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
+      
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
+            Examinations & Assessments
+          </h1>
+          <p className="text-[var(--on-surface-variant)] text-sm">
+            View upcoming hall exam schedules, download admission slips, or launch online exam assessments.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1.5 bg-[var(--surface-container-low)] border border-[var(--outline-variant)] rounded-2xl self-start sm:self-auto">
+          {(["Upcoming", "Completed"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setFilter(tab)}
+              className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                filter === tab
+                  ? "bg-[var(--primary)] text-[var(--on-primary)] shadow-sm"
+                  : "text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      
+      {filter === "Upcoming" && (
+        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl bg-gradient-to-r from-[var(--surface-container-low)] via-[var(--surface-container)] to-[var(--surface-container-low)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="badge badge-accent font-bold">Live Portal Ready</span>
+            <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
+              SE308.3 Online Exam Runner Wizard
+            </h3>
+            <p className="text-xs text-[var(--on-surface-variant)]">
+              Practice test runner with countdown timer, draft auto-save, question navigator, and focus monitoring.
+            </p>
+          </div>
+          <button
+            onClick={() => startExam(MOCK_ONLINE_EXAM)}
+            className="btn-primary text-xs !py-3 !px-6 shadow-md shrink-0 justify-center"
+          >
+            <i className="ti ti-player-play"></i> Launch Exam Wizard
+          </button>
+        </div>
       )}
+
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {filteredExams.map((exam) => (
+          <div
+            key={exam.id}
+            className="card p-6 flex flex-col justify-between space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:shadow-lg transition-all"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="badge badge-accent font-bold">{exam.courseCode}</span>
+                <span className="text-xs font-semibold text-[var(--tertiary)]">{exam.type}</span>
+              </div>
+
+              <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
+                {exam.courseTitle}
+              </h3>
+
+              <div className="space-y-1.5 text-xs text-[var(--on-surface-variant)]">
+                <p className="flex items-center gap-2">
+                  <i className="ti ti-calendar-event text-sm text-[var(--tertiary)]"></i> {exam.dateTime}
+                </p>
+                <p className="flex items-center gap-2">
+                  <i className="ti ti-building text-sm text-[var(--tertiary)]"></i> Venue: {exam.venue}
+                </p>
+                <p className="flex items-center gap-2">
+                  <i className="ti ti-[#chair] ti-ticket text-sm text-[var(--tertiary)]"></i> Seat No: {exam.seatNo}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between">
+              {exam.status === "Upcoming" ? (
+                <button
+                  onClick={() => handleDownloadSlipFile(exam)}
+                  className="btn-outline text-xs !py-2 !px-4 flex items-center gap-1.5"
+                >
+                  <i className="ti ti-download"></i> Admission Slip
+                </button>
+              ) : (
+                <span className="text-xs font-semibold text-emerald-600">Grade: {exam.grade}</span>
+              )}
+
+              {exam.isOnlineAvailable && (
+                <button
+                  onClick={() => startExam(MOCK_ONLINE_EXAM)}
+                  className="btn-primary text-xs !py-2 !px-4"
+                >
+                  Start Exam
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

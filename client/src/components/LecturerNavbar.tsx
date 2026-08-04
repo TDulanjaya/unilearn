@@ -13,6 +13,7 @@ export default function LecturerNavbar() {
     { href: "/lecturer/dashboard", label: "Dashboard" },
     { href: "/lecturer/courses", label: "Courses" },
     { href: "/lecturer/grading", label: "Grading" },
+    { href: "/lecturer/exams", label: "Exams" },
     { href: "/lecturer/schedule", label: "Schedule" },
     { href: "/lecturer/announcement", label: "Announcement" },
     { href: "/lecturer/analytics", label: "Analytics" },

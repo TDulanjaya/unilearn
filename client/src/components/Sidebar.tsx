@@ -6,7 +6,7 @@ import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface SidebarProps {
-  role: "admin" | "examiner" | "hod";
+  role: "admin" | "hod";
   name: string;
   sub: string;
 }
@@ -21,13 +21,8 @@ export default function Sidebar({ role, name, sub }: SidebarProps) {
       { href: "/admin/user-management", label: "User management", icon: "ti-users" },
       { href: "/admin/academic-structure", label: "Academic structure", icon: "ti-building-bank" },
       { href: "/admin/events-enrollment", label: "Events & Announcements", icon: "ti-calendar-event" },
+      { href: "/admin/exam-scheduling", label: "Exam scheduling", icon: "ti-calendar-time" },
       { href: "/admin/reports-settings", label: "Reports & settings", icon: "ti-settings" },
-    ],
-    examiner: [
-      { href: "/examiner/dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },
-      { href: "/examiner/exam-workspace", label: "Exam workspace", icon: "ti-file-pencil" },
-      { href: "/examiner/grading-results", label: "Grading & results", icon: "ti-certificate" },
-      { href: "/examiner/proctoring-stats", label: "Proctoring & stats", icon: "ti-shield-check" },
     ],
     hod: [
       { href: "/hod/dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },
