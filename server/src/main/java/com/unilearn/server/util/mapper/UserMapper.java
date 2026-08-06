@@ -18,9 +18,8 @@ public class UserMapper {
                 .email(request.getEmail())
                 .passwordHash(passwordHash)
                 .phone(request.getPhone())
-                .photoUrl(request.getPhotoUrl())
-                .role(request.getRole())
-                .status(request.getStatus() != null ? request.getStatus() : "active")
+                .role(request.getRole() != null ? request.getRole().toLowerCase() : "student")
+                .status(request.getStatus() != null ? request.getStatus().toLowerCase() : "active")
                 .build();
     }
 

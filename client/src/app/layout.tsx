@@ -22,6 +22,8 @@ export const viewport: Viewport = {
 
 import { NotificationProvider } from "@/lib/NotificationContext";
 import { AcademicDataProvider } from "@/context/AcademicDataContext";
+import { AuthProvider } from "@/context/AuthContext";
+import QueryProvider from "@/lib/QueryProvider";
 
 export default function RootLayout({
   children,
@@ -47,9 +49,13 @@ export default function RootLayout({
       <body className="bg-[var(--background)] text-[var(--on-background)] min-h-screen font-sans antialiased">
         <ThemeProvider>
           <GlobalErrorBoundary>
-            <NotificationProvider>
-              <AcademicDataProvider>{children}</AcademicDataProvider>
-            </NotificationProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <NotificationProvider>
+                  <AcademicDataProvider>{children}</AcademicDataProvider>
+                </NotificationProvider>
+              </AuthProvider>
+            </QueryProvider>
           </GlobalErrorBoundary>
         </ThemeProvider>
       </body>

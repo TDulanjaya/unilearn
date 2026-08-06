@@ -19,45 +19,43 @@ interface ChatThread {
   messages: Message[];
 }
 
-const INITIAL_THREADS: ChatThread[] = [
-  {
-    id: "th-1",
-    name: "Dr. K. Perera",
-    role: "Senior Lecturer · Software Engineering",
-    avatar: "K",
-    unreadCount: 2,
-    messages: [
-      { id: "m-1", sender: "them", text: "Hello Nadeesha, please make sure to submit your test plan document before Friday.", timestamp: "10:14 AM" },
-      { id: "m-2", sender: "me", text: "Thank you Dr. Perera, I will submit it tomorrow morning!", timestamp: "10:18 AM" },
-      { id: "m-3", sender: "them", text: "Excellent. Let me know if you run into issues with the rubric.", timestamp: "10:20 AM" },
-    ],
-  },
-  {
-    id: "th-2",
-    name: "Ishara Fonseka",
-    role: "Peer Student · CS2023-A",
-    avatar: "I",
-    unreadCount: 0,
-    messages: [
-      { id: "m-4", sender: "them", text: "Hey! Are you working on the Database Systems lab assignment?", timestamp: "Yesterday" },
-      { id: "m-5", sender: "me", text: "Yes! Just finished section 3.", timestamp: "Yesterday" },
-    ],
-  },
-  {
-    id: "th-3",
-    name: "Prof. A. Fernando",
-    role: "Senior Lecturer · Computing",
-    avatar: "A",
-    unreadCount: 1,
-    messages: [
-      { id: "m-6", sender: "them", text: "Your regrade request for V&V Paper has been received.", timestamp: "Aug 02" },
-    ],
-  },
-];
+const INITIAL_THREADS: ChatThread[] = [];
+
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useEffect } from "react";
 
 export default function MessagesPage() {
-  const [threads, setThreads] = useState<ChatThread[]>(INITIAL_THREADS);
+  const { data: rawMessages } = useQuery({
+    queryKey: ["unreadMessages"],
+    queryFn: () => api.get<any>("/api/v1/messages/me/unread"),
+  });
+
+  const apiThreads: ChatThread[] = Array.isArray(rawMessages) && rawMessages.length > 0
+    ? [
+        {
+          id: "th-1",
+          name: "Dr. K. Perera",
+          role: "Senior Lecturer · Software Engineering",
+          avatar: "K",
+          unreadCount: rawMessages.length,
+          messages: rawMessages.map((m: any) => ({
+            id: String(m.messageId),
+            sender: "them",
+            text: m.content || m.body || "Message",
+            timestamp: m.sentAt ? new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+          })),
+        },
+        ...INITIAL_THREADS.slice(1),
+      ]
+    : INITIAL_THREADS;
+
+  const [threads, setThreads] = useState<ChatThread[]>(apiThreads);
   const [activeThreadId, setActiveThreadId] = useState("th-1");
+
+  useEffect(() => {
+    if (rawMessages) setThreads(apiThreads);
+  }, [rawMessages]);
   const [inputText, setInputText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -160,45 +158,50 @@ export default function MessagesPage() {
           </div>
 
           
-          <div className="flex flex-col justify-between p-6 bg-[var(--surface-container-lowest)]">
-            
-            <div className="border-b border-[var(--outline-variant)] pb-4 flex items-center gap-3">
-              <div className="avatar w-9 h-9 text-xs">{activeThread.avatar}</div>
-              <div>
-                <h3 className="font-display font-bold text-sm text-[var(--on-surface)]">{activeThread.name}</h3>
-                <p className="text-[11px] text-[var(--on-surface-variant)]">{activeThread.role}</p>
-              </div>
-            </div>
-
-            
-            <div className="space-y-4 my-6 text-xs flex-1 overflow-y-auto pr-2">
-              {activeThread.messages.map((m) => (
-                <div key={m.id} className={`flex items-start gap-2.5 ${m.sender === "me" ? "justify-end" : "justify-start"}`}>
-                  {m.sender === "them" && <div className="avatar w-7 h-7 text-[10px] shrink-0 mt-0.5">{activeThread.avatar}</div>}
-                  <div className={`p-3.5 rounded-2xl max-w-md ${m.sender === "me" ? "bg-[var(--tertiary)] text-white shadow-sm" : "bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)]"}`}>
-                    <p className="leading-relaxed">{m.text}</p>
-                    <span className={`block text-[9px] mt-1 text-right ${m.sender === "me" ? "text-white/80" : "text-[var(--on-surface-variant)]"}`}>
-                      {m.timestamp}
-                    </span>
-                  </div>
+          {activeThread ? (
+            <div className="flex flex-col justify-between p-6 bg-[var(--surface-container-lowest)] flex-1">
+              <div className="border-b border-[var(--outline-variant)] pb-4 flex items-center gap-3">
+                <div className="avatar w-9 h-9 text-xs">{activeThread.avatar}</div>
+                <div>
+                  <h3 className="font-display font-bold text-sm text-[var(--on-surface)]">{activeThread.name}</h3>
+                  <p className="text-[11px] text-[var(--on-surface-variant)]">{activeThread.role}</p>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-4 border-t border-[var(--outline-variant)]">
-              <input
-                type="text"
-                placeholder="Write a message..."
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-              />
-              <button type="submit" className="btn-primary text-xs shadow-md">
-                <i className="ti ti-send"></i> Send
-              </button>
-            </form>
-          </div>
+              <div className="space-y-4 my-6 text-xs flex-1 overflow-y-auto pr-2">
+                {activeThread.messages.map((m) => (
+                  <div key={m.id} className={`flex items-start gap-2.5 ${m.sender === "me" ? "justify-end" : "justify-start"}`}>
+                    {m.sender === "them" && <div className="avatar w-7 h-7 text-[10px] shrink-0 mt-0.5">{activeThread.avatar}</div>}
+                    <div className={`p-3.5 rounded-2xl max-w-md ${m.sender === "me" ? "bg-[var(--tertiary)] text-white shadow-sm" : "bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)]"}`}>
+                      <p className="leading-relaxed">{m.text}</p>
+                      <span className={`block text-[9px] mt-1 text-right ${m.sender === "me" ? "text-white/80" : "text-[var(--on-surface-variant)]"}`}>
+                        {m.timestamp}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <form onSubmit={handleSendMessage} className="flex gap-2 pt-3 border-t border-[var(--outline-variant)]">
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  className="w-full text-xs p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] focus:outline-none focus:border-[var(--tertiary)]"
+                />
+                <button type="submit" className="btn-primary shrink-0 px-4 text-xs">
+                  <i className="ti ti-send text-sm"></i> Send
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center text-xs text-[var(--on-surface-variant)] flex-1">
+              <i className="ti ti-messages text-4xl mb-2 text-[var(--outline)]"></i>
+              <p className="font-semibold text-sm mb-1">No Conversations Available</p>
+              <p>When you receive or send messages, your chat threads will appear here.</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

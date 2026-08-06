@@ -13,11 +13,7 @@ interface SecuritySession {
   isCurrent: boolean;
 }
 
-const INITIAL_SESSIONS: SecuritySession[] = [
-  { id: "sess-1", device: "Chrome 127.0 · Windows 11 (Desktop)", location: "Colombo, Sri Lanka", ipAddress: "192.168.1.45", lastActive: "Active now", isCurrent: true },
-  { id: "sess-2", device: "UniLearn Mobile App · iOS 17.5", location: "Kandy, Sri Lanka", ipAddress: "175.157.22.8", lastActive: "2 hours ago", isCurrent: false },
-  { id: "sess-3", device: "Safari 17.2 · macOS Sonoma", location: "Galle, Sri Lanka", ipAddress: "112.134.19.4", lastActive: "Yesterday 04:15 PM", isCurrent: false },
-];
+const INITIAL_SESSIONS: SecuritySession[] = [];
 
 export default function ProfilePage() {
   const [firstName, setFirstName] = useState("Nadeesha");

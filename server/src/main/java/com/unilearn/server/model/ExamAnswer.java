@@ -49,5 +49,5 @@ public class ExamAnswer {
 
     @ManyToOne
     @JoinColumn(name = "graded_by")
-    private Examiner gradedBy;
+    private User gradedBy;
 }

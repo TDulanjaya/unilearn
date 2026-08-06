@@ -30,4 +30,6 @@ public interface CourseOfferingService {
     List<CourseOfferingListItemDTO> getOfferingListItemsByBatch(Long batchId);
 
     long getEnrollmentCount(Long offeringId);
+
+    List<CourseOfferingResponse> getAllCourseOfferings();
 }

@@ -122,4 +122,12 @@ public class SemesterServiceImpl implements SemesterService {
                 .map(semesterMapper::toSemesterOptionDTO)
                 .toList();
     }
+
+    @Override
+    public List<SemesterResponse> getAllSemesters() {
+        return semesterRepository.findAll()
+                .stream()
+                .map(semesterMapper::toSemesterResponse)
+                .toList();
+    }
 }

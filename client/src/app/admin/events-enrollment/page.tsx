@@ -29,29 +29,9 @@ interface AnnouncementItem {
   publishedAt: string;
 }
 
-const INITIAL_EVENTS: EventItem[] = [
-  {
-    id: "ev-1",
-    title: "Career Fair 2026",
-    date: "2026-08-25",
-    venue: "Main Gymnasium & Exhibition Center",
-    scope: "Institution-wide",
-    rsvps: [
-      { id: "r-1", studentName: "Nadeesha Silva", batchName: "CS2023-A", status: "Attending" },
-      { id: "r-2", studentName: "Kasun Perera", batchName: "CS2023-A", status: "Attending" },
-      { id: "r-3", studentName: "Dilan Fernando", batchName: "CS2023-B", status: "Declined" },
-    ],
-  },
-];
+const INITIAL_EVENTS: EventItem[] = [];
 
-const INITIAL_ANNOUNCEMENTS: AnnouncementItem[] = [
-  {
-    id: "ann-1",
-    title: "Semester 1 Final Examination Schedule Released",
-    message: "The finalized examination timetable for all undergraduate programs is now available on the student portal.",
-    publishedAt: "2026-08-01 10:30 AM",
-  },
-];
+const INITIAL_ANNOUNCEMENTS: AnnouncementItem[] = [];
 
 const BATCHES = ["Batch CS2023-A", "Batch CS2023-B", "Batch SE2024-A"];
 const COURSES = [
@@ -60,11 +40,51 @@ const COURSES = [
   { code: "SE309.3", title: "Software Verification & Validation", credits: 3 },
 ];
 
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useEffect } from "react";
+
 export default function Page() {
   useInteractive();
 
-  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
+  const { data: eventsResponse } = useQuery({
+    queryKey: ["upcomingEvents"],
+    queryFn: () => api.get<any>("/api/v1/events/upcoming"),
+  });
+
+  const { data: announcementsResponse } = useQuery({
+    queryKey: ["announcements"],
+    queryFn: () => api.get<any>("/api/v1/announcements/me?scope=INSTITUTION&scopeId=1"),
+  });
+
+  const apiEvents: EventItem[] = eventsResponse?.dataList
+    ? eventsResponse.dataList.map((e: any) => ({
+        id: String(e.eventId),
+        title: e.title || "",
+        date: e.startTime ? new Date(e.startTime).toISOString().split("T")[0] : "2026-08-25",
+        venue: e.location || e.venue || "Main Auditorium",
+        scope: e.scope || "Institution-wide",
+        rsvps: [],
+      }))
+    : INITIAL_EVENTS;
+
+  const apiAnnouncements: AnnouncementItem[] = announcementsResponse?.dataList
+    ? announcementsResponse.dataList.map((a: any) => ({
+        id: String(a.announcementId),
+        title: a.title || "",
+        message: a.content || a.message || "",
+        publishedAt: a.createdAt ? new Date(a.createdAt).toLocaleString() : "Recently",
+      }))
+    : INITIAL_ANNOUNCEMENTS;
+
+  const [events, setEvents] = useState<EventItem[]>(apiEvents);
   const [selectedEventId, setSelectedEventId] = useState<string | null>("ev-1");
+
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(apiAnnouncements);
+
+  useEffect(() => {
+    if (apiEvents) setEvents(apiEvents);
+  }, [eventsResponse]);
 
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -72,7 +92,6 @@ export default function Page() {
   const [newVenue, setNewVenue] = useState("");
   const [newScope, setNewScope] = useState("Institution-wide");
 
-  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);
   const [annTitle, setAnnTitle] = useState("");
   const [annMessage, setAnnMessage] = useState("");
 

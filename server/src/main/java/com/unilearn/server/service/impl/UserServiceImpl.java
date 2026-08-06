@@ -6,6 +6,11 @@ import com.unilearn.server.dto.response.UserResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.User;
+import com.unilearn.server.repository.BatchRepository;
+import com.unilearn.server.repository.DepartmentRepository;
+import com.unilearn.server.repository.LecturerRepository;
+import com.unilearn.server.repository.StaffAdminRepository;
+import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.UserService;
 import com.unilearn.server.util.mapper.UserMapper;
@@ -24,6 +29,11 @@ import java.util.List;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
+    private final LecturerRepository lecturerRepository;
+    private final StaffAdminRepository staffAdminRepository;
+    private final DepartmentRepository departmentRepository;
+    private final BatchRepository batchRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -41,6 +51,38 @@ public class UserServiceImpl implements UserService {
         String passwordHash = passwordEncoder.encode(request.getPassword() != null ? request.getPassword() : "defaultPass123");
         User user = userMapper.toUser(request, passwordHash);
         User saved = userRepository.save(user);
+
+        String roleName = saved.getRole() != null ? saved.getRole().toUpperCase() : "STUDENT";
+        var defaultDept = departmentRepository.findAll().stream().findFirst().orElse(null);
+        var defaultBatch = batchRepository.findAll().stream().findFirst().orElse(null);
+
+        if ("STUDENT".equals(roleName)) {
+            com.unilearn.server.model.Student student = com.unilearn.server.model.Student.builder()
+                    .user(saved)
+                    .studentNo("STU-" + saved.getUserId())
+                    .department(defaultDept)
+                    .batch(defaultBatch)
+                    .enrollmentYear(2026)
+                    .feeStatus("active")
+                    .build();
+            studentRepository.save(student);
+        } else if ("LECTURER".equals(roleName) || "GUEST_LECTURER".equals(roleName)) {
+            com.unilearn.server.model.Lecturer lecturer = com.unilearn.server.model.Lecturer.builder()
+                    .user(saved)
+                    .department(defaultDept)
+                    .designation("Lecturer")
+                    .isGuest("GUEST_LECTURER".equals(roleName))
+                    .build();
+            lecturerRepository.save(lecturer);
+        } else if ("STAFF_ADMIN".equals(roleName)) {
+            com.unilearn.server.model.StaffAdmin staffAdmin = com.unilearn.server.model.StaffAdmin.builder()
+                    .user(saved)
+                    .scopeLevel("INSTITUTION")
+                    .department(defaultDept)
+                    .build();
+            staffAdminRepository.save(staffAdmin);
+        }
+
         return userMapper.toUserResponse(saved);
     }
 
@@ -65,7 +107,12 @@ public class UserServiceImpl implements UserService {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setPhotoUrl(request.getPhotoUrl());
-        user.setRole(request.getRole());
+        if (request.getRole() != null) {
+            user.setRole(request.getRole().toLowerCase());
+        }
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus().toLowerCase());
+        }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
@@ -83,8 +130,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
 
-        user.setStatus("inactive");
-        userRepository.save(user);
+        userRepository.delete(user);
     }
 
     @Override

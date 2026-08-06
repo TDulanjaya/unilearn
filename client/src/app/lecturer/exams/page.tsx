@@ -22,17 +22,9 @@ interface FlagEvent {
   status: "Active" | "Warned" | "Paused" | "Terminated";
 }
 
-const INITIAL_QUESTIONS: Question[] = [
-  { id: "q-1", text: "What is the primary goal of black-box testing?", type: "MCQ", marks: 2, difficulty: "Medium" },
-  { id: "q-2", text: "Explain the V-model of software development.", type: "Essay", marks: 10, difficulty: "Hard" },
-  { id: "q-3", text: "Define code coverage.", type: "Short answer", marks: 3, difficulty: "Easy" },
-];
+const INITIAL_QUESTIONS: Question[] = [];
 
-const INITIAL_FLAGS: FlagEvent[] = [
-  { id: "flag-1", studentName: "Ishara Fonseka", indexNo: "SE/2023/018", flagType: "Tab switch detected", timestamp: "10:14:22 AM", severity: "High", status: "Active" },
-  { id: "flag-2", studentName: "Tharindu Jayasuriya", indexNo: "SE/2023/055", flagType: "Window focus lost", timestamp: "10:15:04 AM", severity: "Medium", status: "Active" },
-  { id: "flag-3", studentName: "Nipuna Mendis", indexNo: "SE/2023/102", flagType: "Copy-paste detected", timestamp: "10:16:11 AM", severity: "High", status: "Active" },
-];
+const INITIAL_FLAGS: FlagEvent[] = [];
 
 const STUDENT_NAMES = ["Bhanuka Mendis", "Sachini Ratnayake", "Amaya Jayawardena", "Ruwan Munaweera", "Dilan Wickrama"];
 const FLAG_TYPES: FlagEvent["flagType"][] = ["Tab switch detected", "Copy-paste detected", "Window focus lost", "Secondary window open"];

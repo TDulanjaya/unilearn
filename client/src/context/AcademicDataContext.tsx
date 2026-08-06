@@ -1,5 +1,7 @@
 "use client";
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 export interface CourseOffering {
   offeringId: number;
@@ -8,7 +10,7 @@ export interface CourseOffering {
   departmentName?: string;
   batchName: string;
   semesterName: string;
-  lecturerIds: number[]; 
+  lecturerIds: number[];
   lecturerNames: string[];
   enrollmentCount: number;
   capacity?: number;
@@ -30,6 +32,14 @@ export interface TimetableSlot {
 interface AcademicDataContextType {
   offerings: CourseOffering[];
   slots: TimetableSlot[];
+  isLoadingOfferings: boolean;
+  isLoadingSlots: boolean;
+  isErrorOfferings: boolean;
+  isErrorSlots: boolean;
+  offeringsError: Error | null;
+  slotsError: Error | null;
+  refetchOfferings: () => void;
+  refetchSlots: () => void;
   addOffering: (offering: Omit<CourseOffering, "offeringId">) => void;
   assignLecturer: (offeringId: number, lecturerId: number, lecturerName: string) => void;
   removeLecturer: (offeringId: number, lecturerName: string) => void;
@@ -38,153 +48,134 @@ interface AcademicDataContextType {
   deleteSlot: (slotId: number) => void;
 }
 
-const INITIAL_OFFERINGS: CourseOffering[] = [
-  {
-    offeringId: 1,
-    courseCode: "SE308.3",
-    courseTitle: "Software Process Management",
-    departmentName: "Software Engineering",
-    batchName: "CS2023-A",
-    semesterName: "Semester 1",
-    lecturerIds: [1, 3],
-    lecturerNames: ["Dr. K. Perera", "Prof. A. Fernando"],
-    enrollmentCount: 42,
-    capacity: 50,
-  },
-  {
-    offeringId: 2,
-    courseCode: "SE202.2",
-    courseTitle: "Database Systems",
-    departmentName: "Computer Science",
-    batchName: "CS2023-B",
-    semesterName: "Semester 1",
-    lecturerIds: [2],
-    lecturerNames: ["Dr. M. Rathnayake"],
-    enrollmentCount: 38,
-    capacity: 45,
-  },
-  {
-    offeringId: 3,
-    courseCode: "SE309.3",
-    courseTitle: "Software Verification & Validation",
-    departmentName: "Software Engineering",
-    batchName: "CS2023-A",
-    semesterName: "Semester 2",
-    lecturerIds: [3, 1],
-    lecturerNames: ["Prof. A. Fernando", "Dr. K. Perera"],
-    enrollmentCount: 45,
-    capacity: 50,
-  },
-];
-
-const INITIAL_SLOTS: TimetableSlot[] = [
-  {
-    slotId: 1,
-    offeringId: 1,
-    courseCode: "SE308.3",
-    courseName: "Software Process Management",
-    batchName: "CS2023-A",
-    dayOfWeek: "Monday",
-    startTime: "09:00 AM",
-    endTime: "11:00 AM",
-    venue: "Main Hall A",
-    slotType: "Lecture",
-  },
-  {
-    slotId: 2,
-    offeringId: 2,
-    courseCode: "SE202.2",
-    courseName: "Database Systems",
-    batchName: "CS2023-B",
-    dayOfWeek: "Tuesday",
-    startTime: "01:30 PM",
-    endTime: "03:30 PM",
-    venue: "Computing Lab 04",
-    slotType: "Lab",
-  },
-  {
-    slotId: 3,
-    offeringId: 3,
-    courseCode: "SE309.3",
-    courseName: "Software Verification & Validation",
-    batchName: "CS2023-A",
-    dayOfWeek: "Wednesday",
-    startTime: "10:00 AM",
-    endTime: "12:00 PM",
-    venue: "Auditorium B",
-    slotType: "Lecture",
-  },
-  {
-    slotId: 4,
-    offeringId: 1,
-    courseCode: "SE308.3",
-    courseName: "Software Process Management",
-    batchName: "CS2023-A",
-    dayOfWeek: "Thursday",
-    startTime: "02:00 PM",
-    endTime: "04:00 PM",
-    venue: "Tutorial Room 02",
-    slotType: "Tutorial",
-  },
-];
-
 const AcademicDataContext = createContext<AcademicDataContextType | undefined>(undefined);
 
+function mapOfferingDto(dto: any): CourseOffering {
+  const lecturerNames = dto.lecturerNames || (dto.primaryLecturerName ? [dto.primaryLecturerName] : []);
+  const lecturerIds = dto.lecturerIds || (dto.primaryLecturerId ? [dto.primaryLecturerId] : []);
+  return {
+    offeringId: dto.offeringId,
+    courseCode: dto.courseCode || "",
+    courseTitle: dto.courseName || dto.courseTitle || "",
+    departmentName: dto.departmentName || dto.department || "",
+    batchName: dto.batchName || "",
+    semesterName: dto.semesterName || dto.semesterLabel || "",
+    lecturerIds: lecturerIds,
+    lecturerNames: lecturerNames,
+    enrollmentCount: dto.enrollmentCount ?? (dto.enrollments ? dto.enrollments.length : 0),
+    capacity: dto.capacity ?? 50,
+  };
+}
+
+function mapSlotDto(dto: any): TimetableSlot {
+  return {
+    slotId: dto.slotId,
+    offeringId: dto.offeringId,
+    courseCode: dto.courseCode || "",
+    courseName: dto.courseName || "",
+    dayOfWeek: dto.dayOfWeek || "",
+    startTime: typeof dto.startTime === "string" ? dto.startTime : String(dto.startTime || ""),
+    endTime: typeof dto.endTime === "string" ? dto.endTime : String(dto.endTime || ""),
+    venue: dto.venue || "",
+    slotType: dto.slotType || "Lecture",
+    batchName: dto.batchName || "",
+  };
+}
+
 export function AcademicDataProvider({ children }: { children: React.ReactNode }) {
-  const [offerings, setOfferings] = useState<CourseOffering[]>(INITIAL_OFFERINGS);
-  const [slots, setSlots] = useState<TimetableSlot[]>(INITIAL_SLOTS);
+  const queryClient = useQueryClient();
+
+  const {
+    data: rawOfferings = [],
+    isLoading: isLoadingOfferings,
+    isError: isErrorOfferings,
+    error: offeringsError,
+    refetch: refetchOfferings,
+  } = useQuery({
+    queryKey: ["courseOfferings"],
+    queryFn: () => api.get<any[]>("/api/v1/course-offerings"),
+  });
+
+  const {
+    data: rawSlots = [],
+    isLoading: isLoadingSlots,
+    isError: isErrorSlots,
+    error: slotsError,
+    refetch: refetchSlots,
+  } = useQuery({
+    queryKey: ["timetableSlots"],
+    queryFn: () => api.get<any[]>("/api/v1/timetable-slots"),
+  });
+
+  const offerings: CourseOffering[] = Array.isArray(rawOfferings)
+    ? rawOfferings.map(mapOfferingDto)
+    : [];
+
+  const slots: TimetableSlot[] = Array.isArray(rawSlots)
+    ? rawSlots.map(mapSlotDto)
+    : [];
+
+  const addOfferingMutation = useMutation({
+    mutationFn: (offeringData: Omit<CourseOffering, "offeringId">) =>
+      api.post("/api/v1/course-offerings", offeringData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
+    },
+  });
+
+  const addSlotMutation = useMutation({
+    mutationFn: (slotData: Omit<TimetableSlot, "slotId">) =>
+      api.post("/api/v1/timetable-slots", slotData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timetableSlots"] });
+    },
+  });
+
+  const updateSlotMutation = useMutation({
+    mutationFn: ({ slotId, updated }: { slotId: number; updated: Partial<TimetableSlot> }) =>
+      api.put(`/api/v1/timetable-slots/${slotId}`, updated),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timetableSlots"] });
+    },
+  });
+
+  const deleteSlotMutation = useMutation({
+    mutationFn: (slotId: number) => api.delete(`/api/v1/timetable-slots/${slotId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timetableSlots"] });
+    },
+  });
 
   const addOffering = (offeringData: Omit<CourseOffering, "offeringId">) => {
-    const newOffering: CourseOffering = {
-      ...offeringData,
-      offeringId: Date.now(),
-    };
-    setOfferings((prev) => [newOffering, ...prev]);
+    addOfferingMutation.mutate(offeringData);
   };
 
   const assignLecturer = (offeringId: number, lecturerId: number, lecturerName: string) => {
-    setOfferings((prev) =>
-      prev.map((off) => {
-        if (off.offeringId !== offeringId) return off;
-        if (off.lecturerNames.includes(lecturerName)) return off;
-        return {
-          ...off,
-          lecturerIds: [...off.lecturerIds, lecturerId],
-          lecturerNames: [...off.lecturerNames, lecturerName],
-        };
-      })
-    );
+    api.post(`/api/v1/course-offerings/${offeringId}/lecturers`, { lecturerId, lecturerName })
+      .catch(() => {})
+      .finally(() => {
+        queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
+      });
   };
 
   const removeLecturer = (offeringId: number, lecturerName: string) => {
-    setOfferings((prev) =>
-      prev.map((off) => {
-        if (off.offeringId !== offeringId) return off;
-        const idx = off.lecturerNames.indexOf(lecturerName);
-        if (idx === -1) return off;
-        const newNames = [...off.lecturerNames];
-        const newIds = [...off.lecturerIds];
-        newNames.splice(idx, 1);
-        newIds.splice(idx, 1);
-        return { ...off, lecturerNames: newNames, lecturerIds: newIds };
-      })
-    );
+    api.delete(`/api/v1/course-offerings/${offeringId}/lecturers/${encodeURIComponent(lecturerName)}`)
+      .catch(() => {})
+      .finally(() => {
+        queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
+      });
   };
 
   const addSlot = (slotData: Omit<TimetableSlot, "slotId">) => {
-    const newSlot: TimetableSlot = {
-      ...slotData,
-      slotId: Date.now(),
-    };
-    setSlots((prev) => [...prev, newSlot]);
+    addSlotMutation.mutate(slotData);
   };
 
   const updateSlot = (slotId: number, updated: Partial<TimetableSlot>) => {
-    setSlots((prev) => prev.map((s) => (s.slotId === slotId ? { ...s, ...updated } : s)));
+    updateSlotMutation.mutate({ slotId, updated });
   };
 
   const deleteSlot = (slotId: number) => {
-    setSlots((prev) => prev.filter((s) => s.slotId !== slotId));
+    deleteSlotMutation.mutate(slotId);
   };
 
   return (
@@ -192,6 +183,14 @@ export function AcademicDataProvider({ children }: { children: React.ReactNode }
       value={{
         offerings,
         slots,
+        isLoadingOfferings,
+        isLoadingSlots,
+        isErrorOfferings,
+        isErrorSlots,
+        offeringsError: (offeringsError as Error) || null,
+        slotsError: (slotsError as Error) || null,
+        refetchOfferings: () => { refetchOfferings(); },
+        refetchSlots: () => { refetchSlots(); },
         addOffering,
         assignLecturer,
         removeLecturer,

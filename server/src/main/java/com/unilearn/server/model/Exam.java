@@ -49,8 +49,8 @@ public class Exam {
     private User scheduledBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "examiner_id")
-    private Examiner examiner;
+    @JoinColumn(name = "examiner_id", columnDefinition = "int")
+    private User examiner;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "linked_slot_id")

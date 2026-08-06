@@ -70,4 +70,9 @@ public class CourseOfferingController {
     public ResponseEntity<Long> getEnrollmentCount(@PathVariable Long id) {
         return ResponseEntity.ok(courseOfferingService.getEnrollmentCount(id));
     }
+
+    @GetMapping
+    public ResponseEntity<List<CourseOfferingResponse>> getAllCourseOfferings() {
+        return ResponseEntity.ok(courseOfferingService.getAllCourseOfferings());
+    }
 }

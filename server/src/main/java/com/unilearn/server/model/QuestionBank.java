@@ -33,5 +33,5 @@ public class QuestionBank {
 
     @ManyToOne
     @JoinColumn(name = "created_by", nullable = false)
-    private Examiner createdBy;
+    private User createdBy;
 }

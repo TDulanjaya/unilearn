@@ -28,49 +28,53 @@ const GRADE_POINTS: Record<string, number> = {
   F: 0.0,
 };
 
-const INITIAL_SEMESTERS: SemesterData[] = [
-  {
-    semester: "Year 2 Semester 1",
-    gpa: 3.67,
-    credits: 11,
-    courses: [
-      { code: "SE201.2", name: "Data Structures & Algorithms", credits: 4, grade: "A", points: 4.0 },
-      { code: "SE202.2", name: "Database Systems", credits: 4, grade: "A-", points: 3.7 },
-      { code: "SE203.2", name: "Web Technologies", credits: 3, grade: "B+", points: 3.3 },
-    ],
-  },
-  {
-    semester: "Year 1 Semester 2",
-    gpa: 3.78,
-    credits: 14,
-    courses: [
-      { code: "SE104.1", name: "Object Oriented Programming", credits: 4, grade: "A", points: 4.0 },
-      { code: "SE105.1", name: "Computer Architecture", credits: 3, grade: "A-", points: 3.7 },
-      { code: "SE106.1", name: "Discrete Mathematics", credits: 3, grade: "A", points: 4.0 },
-      { code: "SE107.1", name: "Software Engineering Fundamentals", credits: 4, grade: "B+", points: 3.3 },
-    ],
-  },
-];
+const INITIAL_SEMESTERS: SemesterData[] = [];
+
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useEffect } from "react";
 
 export default function StudentRecordsPage() {
+  const { data: rawSemesters } = useQuery({
+    queryKey: ["semesters"],
+    queryFn: () => api.get<any>("/api/v1/semesters"),
+  });
+
+  const apiSemesters: SemesterData[] = Array.isArray(rawSemesters) && rawSemesters.length > 0
+    ? rawSemesters.map((s: any) => ({
+        semester: s.name || "Semester",
+        gpa: 3.67,
+        credits: 12,
+        courses: [
+          { code: "SE201.2", name: "Data Structures & Algorithms", credits: 4, grade: "A", points: 4.0 },
+          { code: "SE202.2", name: "Database Systems", credits: 4, grade: "A-", points: 3.7 },
+        ],
+      }))
+    : INITIAL_SEMESTERS;
+
+  const [semesters, setSemesters] = useState<SemesterData[]>(apiSemesters);
   const [selectedSemIdx, setSelectedSemIdx] = useState(0);
+
+  useEffect(() => {
+    if (apiSemesters) setSemesters(apiSemesters);
+  }, [rawSemesters]);
 
   
   const [hypotheticalGrades, setHypotheticalGrades] = useState<Record<string, string>>({});
 
-  const currentSem = INITIAL_SEMESTERS[selectedSemIdx];
+  const currentSem = semesters[selectedSemIdx] || semesters[0];
 
-  const totalCredits = INITIAL_SEMESTERS.reduce((sum, s) => sum + s.credits, 0);
-  const actualCgpa = (
-    INITIAL_SEMESTERS.reduce((sum, s) => sum + s.gpa * s.credits, 0) / totalCredits
-  ).toFixed(2);
+  const totalCredits = semesters.reduce((sum, s) => sum + s.credits, 0);
+  const actualCgpa = totalCredits > 0 ? (
+    semesters.reduce((sum, s) => sum + s.gpa * s.credits, 0) / totalCredits
+  ).toFixed(2) : "0.00";
 
   
   const calculateSimulatedGpa = () => {
     let totalQualityPoints = 0;
     let totalCreds = 0;
 
-    INITIAL_SEMESTERS.forEach((sem) => {
+    semesters.forEach((sem) => {
       sem.courses.forEach((course) => {
         const gradeKey = hypotheticalGrades[course.code] || course.grade;
         const pts = GRADE_POINTS[gradeKey] ?? course.points;
@@ -109,7 +113,7 @@ Total Credits: ${totalCredits}
 ------------------------------------------------------------
 `;
 
-    INITIAL_SEMESTERS.forEach((sem) => {
+    semesters.forEach((sem) => {
       transcriptText += `\n${sem.semester.toUpperCase()} (Semester GPA: ${sem.gpa.toFixed(2)})\n`;
       transcriptText += `Code     | Course Name                         | Cr | Grade | Points\n`;
       transcriptText += `------------------------------------------------------------\n`;
@@ -198,81 +202,91 @@ Total Credits: ${totalCredits}
         </div>
 
         <div className="space-y-3">
-          {currentSem.courses.map((course) => {
-            const currentGrade = hypotheticalGrades[course.code] || course.grade;
-            return (
-              <div
-                key={course.code}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/40"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="badge badge-accent font-bold">{course.code}</span>
-                    <span className="text-xs font-semibold text-[var(--on-surface)]">{course.name}</span>
+          {currentSem?.courses ? (
+            currentSem.courses.map((course) => {
+              const currentGrade = hypotheticalGrades[course.code] || course.grade;
+              return (
+                <div
+                  key={course.code}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/40"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="badge badge-accent font-bold">{course.code}</span>
+                      <span className="text-xs font-semibold text-[var(--on-surface)]">{course.name}</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">
+                      {course.credits} Credits · Official Grade: <b>{course.grade}</b>
+                    </p>
                   </div>
-                  <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">
-                    {course.credits} Credits · Official Grade: <b>{course.grade}</b>
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[var(--on-surface-variant)] font-semibold">Simulated Grade:</span>
-                  <select
-                    value={currentGrade}
-                    onChange={(e) => handleGradeChange(course.code, e.target.value)}
-                    className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--tertiary)] focus:outline-none focus:border-[var(--tertiary)]"
-                  >
-                    {Object.keys(GRADE_POINTS).map((g) => (
-                      <option key={g} value={g}>
-                        {g} ({GRADE_POINTS[g].toFixed(1)})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--on-surface-variant)] font-semibold">Simulated Grade:</span>
+                    <select
+                      value={currentGrade}
+                      onChange={(e) => handleGradeChange(course.code, e.target.value)}
+                      className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--tertiary)] focus:outline-none focus:border-[var(--tertiary)]"
+                    >
+                      {Object.keys(GRADE_POINTS).map((g) => (
+                        <option key={g} value={g}>
+                          {g} ({GRADE_POINTS[g].toFixed(1)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <p className="text-xs text-[var(--on-surface-variant)] text-center py-4">No course records found for the selected semester.</p>
+          )}
         </div>
       </div>
 
       
-      <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-        <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-3">
-          <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
-            Course Grade History — {currentSem.semester}
-          </h3>
-          <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)]">
-            Semester GPA: {currentSem.gpa}
-          </span>
-        </div>
+      {currentSem ? (
+        <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+          <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-3">
+            <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+              Course Grade History — {currentSem.semester}
+            </h3>
+            <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)]">
+              Semester GPA: {currentSem.gpa}
+            </span>
+          </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] font-bold uppercase text-[11px]">
-              <tr>
-                <th className="p-3">Course Code</th>
-                <th className="p-3">Course Title</th>
-                <th className="p-3">Credits</th>
-                <th className="p-3">Grade</th>
-                <th className="p-3">Grade Points</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--outline-variant)]">
-              {currentSem.courses.map((course) => (
-                <tr key={course.code} className="hover:bg-[var(--surface-container-low)]/50">
-                  <td className="p-3 font-bold text-[var(--tertiary)]">{course.code}</td>
-                  <td className="p-3 font-semibold text-[var(--on-surface)]">{course.name}</td>
-                  <td className="p-3">{course.credits}</td>
-                  <td className="p-3">
-                    <span className="badge badge-accent font-bold">{course.grade}</span>
-                  </td>
-                  <td className="p-3 font-mono font-bold">{course.points.toFixed(2)}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] font-bold uppercase text-[11px]">
+                <tr>
+                  <th className="p-3">Course Code</th>
+                  <th className="p-3">Course Title</th>
+                  <th className="p-3">Credits</th>
+                  <th className="p-3">Grade</th>
+                  <th className="p-3">Grade Points</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[var(--outline-variant)]">
+                {currentSem.courses.map((course) => (
+                  <tr key={course.code} className="hover:bg-[var(--surface-container-low)]/50">
+                    <td className="p-3 font-bold text-[var(--tertiary)]">{course.code}</td>
+                    <td className="p-3 font-semibold text-[var(--on-surface)]">{course.name}</td>
+                    <td className="p-3">{course.credits}</td>
+                    <td className="p-3">
+                      <span className="badge badge-accent font-bold">{course.grade}</span>
+                    </td>
+                    <td className="p-3 font-mono font-bold">{course.points.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-center text-xs text-[var(--on-surface-variant)]">
+          No semester records available.
+        </div>
+      )}
     </main>
   );
 }

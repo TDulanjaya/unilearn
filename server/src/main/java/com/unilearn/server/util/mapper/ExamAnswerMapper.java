@@ -36,8 +36,8 @@ public class ExamAnswerMapper {
                 .selectedOption(answer.getAnswerText())
                 .isCorrect(answer.getIsCorrect())
                 .marksAwarded(answer.getMarksAwarded())
-                .gradedById(answer.getGradedBy() != null ? answer.getGradedBy().getExaminerId() : null)
-                .gradedByName(answer.getGradedBy() != null && answer.getGradedBy().getUser() != null ? answer.getGradedBy().getUser().getFullName() : null)
+                .gradedById(answer.getGradedBy() != null ? answer.getGradedBy().getUserId() : null)
+                .gradedByName(answer.getGradedBy() != null ? answer.getGradedBy().getFullName() : null)
                 .build();
     }
 }

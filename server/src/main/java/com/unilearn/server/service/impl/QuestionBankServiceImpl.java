@@ -5,11 +5,12 @@ import com.unilearn.server.dto.response.QuestionBankResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.Course;
-import com.unilearn.server.model.Examiner;
+import com.unilearn.server.model.Course;
 import com.unilearn.server.model.QuestionBank;
+import com.unilearn.server.model.User;
 import com.unilearn.server.repository.CourseRepository;
-import com.unilearn.server.repository.ExaminerRepository;
 import com.unilearn.server.repository.QuestionBankRepository;
+import com.unilearn.server.repository.UserRepository;
 import com.unilearn.server.service.QuestionBankService;
 import com.unilearn.server.util.mapper.QuestionBankMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
 
     private final QuestionBankRepository questionBankRepository;
     private final CourseRepository courseRepository;
-    private final ExaminerRepository examinerRepository;
+    private final UserRepository userRepository;
     private final QuestionBankMapper questionBankMapper;
 
     @Override
@@ -38,10 +39,10 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
 
-        Examiner examiner = examinerRepository.findById(request.getCreatedByExaminerId())
-                .orElseThrow(() -> new EntryNotFoundException("Examiner not found with ID: " + request.getCreatedByExaminerId()));
+        User user = userRepository.findById(request.getCreatedByExaminerId())
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByExaminerId()));
 
-        QuestionBank bank = questionBankMapper.toQuestionBank(request, course, examiner);
+        QuestionBank bank = questionBankMapper.toQuestionBank(request, course, user);
         QuestionBank saved = questionBankRepository.save(bank);
         return questionBankMapper.toQuestionBankResponse(saved);
     }
@@ -62,11 +63,11 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
 
-        Examiner examiner = examinerRepository.findById(request.getCreatedByExaminerId())
-                .orElseThrow(() -> new EntryNotFoundException("Examiner not found with ID: " + request.getCreatedByExaminerId()));
+        User user = userRepository.findById(request.getCreatedByExaminerId())
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByExaminerId()));
 
         bank.setCourse(course);
-        bank.setCreatedBy(examiner);
+        bank.setCreatedBy(user);
 
         QuestionBank updated = questionBankRepository.save(bank);
         return questionBankMapper.toQuestionBankResponse(updated);

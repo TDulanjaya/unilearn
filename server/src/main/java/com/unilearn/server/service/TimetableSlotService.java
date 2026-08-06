@@ -19,4 +19,6 @@ public interface TimetableSlotService {
     TimetableSlotResponse getSlotById(Long slotId);
 
     List<TimetableSlotResponse> getSlotsByOffering(Long offeringId);
+
+    List<TimetableSlotResponse> getAllSlots();
 }

@@ -208,4 +208,12 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
                 })
                 .toList();
     }
+
+    @Override
+    public List<CourseOfferingResponse> getAllCourseOfferings() {
+        return courseOfferingRepository.findAll()
+                .stream()
+                .map(courseOfferingMapper::toCourseOfferingResponse)
+                .toList();
+    }
 }

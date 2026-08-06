@@ -22,4 +22,6 @@ public interface SemesterService {
     List<SemesterResponse> getSemestersByAcademicYear(Long academicYearId);
 
     List<SemesterOptionDTO> getSemesterOptions(Long academicYearId, String searchText);
+
+    List<SemesterResponse> getAllSemesters();
 }

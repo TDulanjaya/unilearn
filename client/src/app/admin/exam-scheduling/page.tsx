@@ -15,33 +15,37 @@ interface ScheduledExam {
   supervisor: string;
 }
 
-const INITIAL_SCHEDULED_EXAMS: ScheduledExam[] = [
-  {
-    id: "exam-1",
-    courseCode: "SE308.3",
-    courseTitle: "Software Process Management",
-    batch: "CS2023-A",
-    date: "2026-08-15",
-    startTime: "09:00",
-    endTime: "11:00",
-    venue: "Main Exam Hall A",
-    supervisor: "Dr. K. Perera",
-  },
-  {
-    id: "exam-2",
-    courseCode: "SE202.2",
-    courseTitle: "Database Systems",
-    batch: "CS2023-B",
-    date: "2026-08-16",
-    startTime: "13:00",
-    endTime: "15:00",
-    venue: "Auditorium 2",
-    supervisor: "Dr. M. Rathnayake",
-  },
-];
+const INITIAL_SCHEDULED_EXAMS: ScheduledExam[] = [];
+
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useEffect } from "react";
 
 export default function AdminExamSchedulingPage() {
-  const [exams, setExams] = useState<ScheduledExam[]>(INITIAL_SCHEDULED_EXAMS);
+  const { data: rawExams } = useQuery({
+    queryKey: ["exams"],
+    queryFn: () => api.get<any>("/api/v1/exams/offering/1"),
+  });
+
+  const apiExams: ScheduledExam[] = Array.isArray(rawExams) && rawExams.length > 0
+    ? rawExams.map((e: any) => ({
+        id: String(e.examId),
+        courseCode: e.courseCode || "SE308.3",
+        courseTitle: e.title || e.courseName || "Scheduled Exam",
+        batch: "CS2023-A",
+        date: e.startTime ? new Date(e.startTime).toISOString().split("T")[0] : "2026-08-15",
+        startTime: e.startTime ? new Date(e.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "09:00",
+        endTime: e.endTime ? new Date(e.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "11:00",
+        venue: e.location || "Main Exam Hall A",
+        supervisor: "Dr. K. Perera",
+      }))
+    : INITIAL_SCHEDULED_EXAMS;
+
+  const [exams, setExams] = useState<ScheduledExam[]>(apiExams);
+
+  useEffect(() => {
+    if (rawExams) setExams(apiExams);
+  }, [rawExams]);
 
   
   const [courseCode, setCourseCode] = useState("SE309.3");

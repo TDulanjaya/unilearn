@@ -17,16 +17,7 @@ interface TeachingSlot {
   enrolledStudents: { id: string; name: string; indexNo: string }[];
 }
 
-const MOCK_STUDENTS = [
-  { id: "st-1", name: "Nadeesha Silva", indexNo: "SE/2023/042" },
-  { id: "st-2", name: "Kasun Perera", indexNo: "SE/2023/018" },
-  { id: "st-3", name: "Dilan Fernando", indexNo: "SE/2023/089" },
-  { id: "st-4", name: "Ruwan Munaweera", indexNo: "SE/2023/005" },
-  { id: "st-5", name: "Tharushi Wickrama", indexNo: "SE/2023/112" },
-  { id: "st-6", name: "Amaya Jayawardena", indexNo: "SE/2023/076" },
-  { id: "st-7", name: "Bhanuka Mendis", indexNo: "SE/2023/031" },
-  { id: "st-8", name: "Sachini Ratnayake", indexNo: "SE/2023/094" },
-];
+const MOCK_STUDENTS: any[] = [];
 
 interface InClassExam {
   id: string;
@@ -75,7 +66,13 @@ function checkSlotLiveStatus(slotTimeStr: string, dayOfWeek: string) {
 
 export default function LecturerSchedulePage() {
   const { addNotification } = useNotifications();
-  const { slots } = useAcademicData();
+  const {
+    slots,
+    isLoadingSlots,
+    isErrorSlots,
+    slotsError,
+    refetchSlots,
+  } = useAcademicData();
 
   const teachingSlots: TeachingSlot[] = slots.map((s) => ({
     id: String(s.slotId),
@@ -178,7 +175,6 @@ export default function LecturerSchedulePage() {
       ...prev,
       [selectedAttendanceSlot.id]: currentAttendance,
     }));
-    setSavedSlotIds((prev) => ({ ...prev, [selectedAttendanceSlot.id]: true }));
     setSelectedAttendanceSlot(null);
   };
 
@@ -190,6 +186,119 @@ export default function LecturerSchedulePage() {
     }));
     setSavedSlotIds((prev) => ({ ...prev, [activeQrSlot.id]: true }));
     setActiveQrSlot(null);
+  };
+
+  const renderScheduleContent = () => {
+    if (isLoadingSlots) {
+      return (
+        <div className="p-8 text-center text-xs text-[var(--on-surface-variant)] flex flex-col items-center justify-center gap-2">
+          <div className="w-6 h-6 border-2 border-[var(--tertiary)] border-t-transparent rounded-full animate-spin"></div>
+          Loading weekly teaching schedule...
+        </div>
+      );
+    }
+    if (isErrorSlots) {
+      return (
+        <div className="p-4 bg-[var(--error-container)]/30 border border-[var(--error)]/30 rounded-xl text-xs text-[var(--error)] flex items-center justify-between gap-3">
+          <span>Failed to load schedule: {slotsError?.message || "Server Error"}</span>
+          <button onClick={refetchSlots} className="btn-secondary text-[11px] !py-1 !px-2 shrink-0">
+            Retry
+          </button>
+        </div>
+      );
+    }
+    if (teachingSlots.length === 0) {
+      return (
+        <p className="p-6 text-center text-xs text-[var(--on-surface-variant)] italic">No teaching slots scheduled.</p>
+      );
+    }
+
+    return teachingSlots.map((slot) => {
+      const examCount = inClassExams.filter((e) => e.slotId === slot.id).length;
+      const isAttendanceSaved = savedSlotIds[slot.id];
+      const isQrActive = activeQrSlot?.id === slot.id;
+
+      const liveStatus = checkSlotLiveStatus(slot.time, slot.day);
+      const canGenerateQr = previewMode || liveStatus.isLive;
+
+      return (
+        <div
+          key={slot.id}
+          className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
+            isQrActive
+              ? "border-[var(--tertiary)] bg-[var(--surface-container-low)]"
+              : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)]/50"
+          }`}
+        >
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="badge badge-accent font-bold">{slot.courseCode}</span>
+              <span className="badge badge-gray">{slot.type}</span>
+              {isQrActive && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-600 border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> QR Live
+                </span>
+              )}
+              {isAttendanceSaved && (
+                <span className="badge badge-success text-[10px] font-bold">
+                  <i className="ti ti-check"></i> Attendance Marked
+                </span>
+              )}
+              {examCount > 0 && (
+                <span className="badge badge-warning text-[10px] font-bold">
+                  <i className="ti ti-file-pencil"></i> {examCount} In-Class Exam
+                </span>
+              )}
+            </div>
+
+            <p className="font-bold text-sm text-[var(--on-surface)]">
+              {slot.courseTitle}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--on-surface-variant)] mt-0.5">
+              <span>
+                <i className="ti ti-clock text-[var(--tertiary)] mr-1"></i>
+                {slot.day}s · {slot.time}
+              </span>
+              <span>
+                <i className="ti ti-map-pin text-[var(--tertiary)] mr-1"></i>
+                {slot.venue}
+              </span>
+              {!canGenerateQr && liveStatus.note && (
+                <span className="text-[11px] text-[var(--outline)] italic">
+                  ({liveStatus.note})
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setActiveQrSlot(slot)}
+              disabled={!canGenerateQr}
+              className="btn-primary text-xs !py-1.5 shadow-sm disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1"
+              title={canGenerateQr ? "Display Live Rotating QR Code" : liveStatus.note}
+            >
+              <i className="ti ti-qrcode text-sm"></i> Generate QR
+            </button>
+
+            <button
+              onClick={() => handleOpenAttendance(slot)}
+              className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
+            >
+              <i className="ti ti-user-check text-sm"></i> Roster
+            </button>
+
+            <button
+              onClick={() => handleOpenExamModal(slot)}
+              className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
+            >
+              <i className="ti ti-plus text-sm"></i> Exam
+            </button>
+          </div>
+        </div>
+      );
+    });
   };
 
   return (
@@ -243,92 +352,7 @@ export default function LecturerSchedulePage() {
           </div>
 
           <div className="space-y-4">
-            {teachingSlots.map((slot) => {
-              const examCount = inClassExams.filter((e) => e.slotId === slot.id).length;
-              const isAttendanceSaved = savedSlotIds[slot.id];
-              const isQrActive = activeQrSlot?.id === slot.id;
-
-              const liveStatus = checkSlotLiveStatus(slot.time, slot.day);
-              const canGenerateQr = previewMode || liveStatus.isLive;
-
-              return (
-                <div
-                  key={slot.id}
-                  className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
-                    isQrActive
-                      ? "border-[var(--tertiary)] bg-[var(--surface-container-low)]"
-                      : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)]/50"
-                  }`}
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="badge badge-accent font-bold">{slot.courseCode}</span>
-                      <span className="badge badge-gray">{slot.type}</span>
-                      {isQrActive && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-600 border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> QR Live
-                        </span>
-                      )}
-                      {isAttendanceSaved && (
-                        <span className="badge badge-success text-[10px] font-bold">
-                          <i className="ti ti-check"></i> Attendance Marked
-                        </span>
-                      )}
-                      {examCount > 0 && (
-                        <span className="badge badge-warning text-[10px] font-bold">
-                          <i className="ti ti-file-pencil"></i> {examCount} In-Class Exam
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="font-bold text-sm text-[var(--on-surface)]">
-                      {slot.courseTitle}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--on-surface-variant)] mt-0.5">
-                      <span>
-                        <i className="ti ti-clock text-[var(--tertiary)] mr-1"></i>
-                        {slot.day}s · {slot.time}
-                      </span>
-                      <span>
-                        <i className="ti ti-map-pin text-[var(--tertiary)] mr-1"></i>
-                        {slot.venue}
-                      </span>
-                      {!canGenerateQr && liveStatus.note && (
-                        <span className="text-[11px] text-[var(--outline)] italic">
-                          ({liveStatus.note})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setActiveQrSlot(slot)}
-                      disabled={!canGenerateQr}
-                      className="btn-primary text-xs !py-1.5 shadow-sm disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1"
-                      title={canGenerateQr ? "Display Live Rotating QR Code" : liveStatus.note}
-                    >
-                      <i className="ti ti-qrcode text-sm"></i> Generate QR
-                    </button>
-
-                    <button
-                      onClick={() => handleOpenAttendance(slot)}
-                      className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
-                    >
-                      <i className="ti ti-user-check text-sm"></i> Roster
-                    </button>
-
-                    <button
-                      onClick={() => handleOpenExamModal(slot)}
-                      className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
-                    >
-                      <i className="ti ti-plus text-sm"></i> Exam
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {renderScheduleContent()}
           </div>
         </div>
 

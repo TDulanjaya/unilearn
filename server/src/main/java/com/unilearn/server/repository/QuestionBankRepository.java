@@ -12,5 +12,5 @@ public interface QuestionBankRepository extends JpaRepository<QuestionBank, Long
 
     List<QuestionBank> findByCourse_CourseId(Long courseId);
 
-    List<QuestionBank> findByCreatedBy_ExaminerId(Long examinerId);
+    List<QuestionBank> findByCreatedBy_UserId(Long userId);
 }

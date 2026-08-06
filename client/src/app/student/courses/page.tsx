@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 interface CourseItem {
   id: string;
@@ -15,63 +17,7 @@ interface CourseItem {
   isRemovedFromView: boolean;
 }
 
-const INITIAL_COURSES: CourseItem[] = [
-  {
-    id: "1",
-    code: "SE308.3",
-    title: "Software Process Management",
-    lecturer: "Dr. K. Perera · Software Eng. Department",
-    progress: 75,
-    assignmentsPending: 1,
-    status: "In progress",
-    isStarred: true,
-    isRemovedFromView: false,
-  },
-  {
-    id: "2",
-    code: "SE202.2",
-    title: "Database Systems",
-    lecturer: "Dr. M. Rathnayake · Computer Science",
-    progress: 90,
-    assignmentsPending: 0,
-    status: "In progress",
-    isStarred: false,
-    isRemovedFromView: false,
-  },
-  {
-    id: "3",
-    code: "SE309.3",
-    title: "Software Verification & Validation",
-    lecturer: "Prof. A. Fernando · Software Eng.",
-    progress: 50,
-    assignmentsPending: 2,
-    status: "In progress",
-    isStarred: true,
-    isRemovedFromView: false,
-  },
-  {
-    id: "4",
-    code: "SE401.3",
-    title: "Advanced Cloud Architecture",
-    lecturer: "Dr. K. Perera · Software Eng. Department",
-    progress: 0,
-    assignmentsPending: 0,
-    status: "Future",
-    isStarred: false,
-    isRemovedFromView: false,
-  },
-  {
-    id: "5",
-    code: "SE101.1",
-    title: "Introduction to Computer Science",
-    lecturer: "Dr. S. Wickramasinghe · Computing",
-    progress: 100,
-    assignmentsPending: 0,
-    status: "Past",
-    isStarred: false,
-    isRemovedFromView: false,
-  },
-];
+const INITIAL_COURSES: CourseItem[] = [];
 
 type FilterType =
   | "All (except removed from view)"
@@ -80,9 +26,32 @@ type FilterType =
   | "Removed from view";
 
 export default function StudentCoursesPage() {
-  const [courses, setCourses] = useState<CourseItem[]>(INITIAL_COURSES);
+  const { data: offeringsData, isLoading, isError } = useQuery({
+    queryKey: ["courseOfferings"],
+    queryFn: () => api.get<any>("/api/v1/course-offerings"),
+  });
+
+  const apiCourses: CourseItem[] = Array.isArray(offeringsData) && offeringsData.length > 0
+    ? offeringsData.map((o: any, idx: number) => ({
+        id: String(o.offeringId || idx + 1),
+        code: o.courseCode || "SE308.3",
+        title: o.courseName || o.courseTitle || "Software Course",
+        lecturer: `${o.primaryLecturerName || o.lecturerName || "Lecturer"} · ${o.departmentName || "Department"}`,
+        progress: 75,
+        assignmentsPending: 1,
+        status: "In progress",
+        isStarred: false,
+        isRemovedFromView: false,
+      }))
+    : INITIAL_COURSES;
+
+  const [courses, setCourses] = useState<CourseItem[]>(apiCourses);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("All (except removed from view)");
+
+  useEffect(() => {
+    if (offeringsData) setCourses(apiCourses);
+  }, [offeringsData]);
 
   const toggleRemoveFromView = (id: string, e: React.MouseEvent) => {
     e.preventDefault();

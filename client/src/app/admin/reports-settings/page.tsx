@@ -14,13 +14,7 @@ interface AuditLogRecord {
   ipAddress: string;
 }
 
-const INITIAL_AUDIT_LOGS: AuditLogRecord[] = [
-  { id: "aud-1", timestamp: "2026-08-04 10:42 AM", userEmail: "k.perera@uni.edu", actionType: "Grade Updated", entity: "Submission #4821", ipAddress: "192.168.1.45" },
-  { id: "aud-2", timestamp: "2026-08-04 09:15 AM", userEmail: "r.jaya@uni.edu", actionType: "User Created", entity: "User #5412 (Nadeesha Silva)", ipAddress: "192.168.1.12" },
-  { id: "aud-3", timestamp: "2026-08-03 04:30 PM", userEmail: "a.fernando@uni.edu", actionType: "Exam Scheduled", entity: "SE308.3 Final Exam", ipAddress: "192.168.1.88" },
-  { id: "aud-4", timestamp: "2026-08-03 02:10 PM", userEmail: "s.wick@uni.edu", actionType: "Offering Approved", entity: "SE401.3 Offering", ipAddress: "192.168.1.04" },
-  { id: "aud-5", timestamp: "2026-08-02 11:20 AM", userEmail: "r.jaya@uni.edu", actionType: "Role Assigned", entity: "User #1029 -> Lecturer", ipAddress: "192.168.1.12" },
-];
+const INITIAL_AUDIT_LOGS: AuditLogRecord[] = [];
 
 const ACTION_TYPES = ["All Actions", "Grade Updated", "User Created", "Exam Scheduled", "Offering Approved", "Role Assigned"];
 
@@ -35,45 +29,56 @@ interface FacultyReportData {
   enrollmentBars: { prev: number; curr: number };
 }
 
-const MOCK_REPORTS: Record<string, FacultyReportData> = {
-  "All faculties": {
-    facultyName: "All Faculties",
-    totalStudents: 1240,
-    avgAttendancePercent: 88,
-    avgGpa: 3.42,
-    passRatePercent: 94,
-    attendanceBars: { prev: 70, curr: 88 },
-    performanceBars: { pass: 85, retake: 50 },
-    enrollmentBars: { prev: 60, curr: 80 },
-  },
-  "Computing": {
-    facultyName: "Faculty of Computing",
-    totalStudents: 520,
-    avgAttendancePercent: 92,
-    avgGpa: 3.58,
-    passRatePercent: 96,
-    attendanceBars: { prev: 78, curr: 92 },
-    performanceBars: { pass: 92, retake: 35 },
-    enrollmentBars: { prev: 65, curr: 90 },
-  },
-};
+const MOCK_REPORTS: Record<string, FacultyReportData> = {};
+
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 export default function Page() {
   useInteractive();
-
   const [selectedFaculty, setSelectedFaculty] = useState("All faculties");
-  const report = MOCK_REPORTS[selectedFaculty] || MOCK_REPORTS["All faculties"];
-
-  
-  const [actionFilter, setActionFilter] = useState("All Actions");
-  const [emailFilter, setEmailFilter] = useState("");
+  const [selectedAction, setSelectedAction] = useState("All Actions");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [reportRange, setReportRange] = useState("Last 30 Days");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const filteredLogs = INITIAL_AUDIT_LOGS.filter((log) => {
-    const matchesAction = actionFilter === "All Actions" || log.actionType === actionFilter;
-    const matchesEmail = !emailFilter.trim() || log.userEmail.toLowerCase().includes(emailFilter.toLowerCase());
-    return matchesAction && matchesEmail;
+  const { data: auditLogsData } = useQuery({
+    queryKey: ["auditLogs"],
+    queryFn: () => api.get<any>("/api/v1/audit-logs"),
+  });
+
+  const auditLogs: AuditLogRecord[] = auditLogsData?.dataList || auditLogsData?.content
+    ? (auditLogsData.dataList || auditLogsData.content).map((log: any) => ({
+        id: String(log.logId || log.id),
+        timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString() : "Recent",
+        userEmail: log.userEmail || log.performedByName || "admin@uni.edu",
+        actionType: (log.actionType as any) || "Role Assigned",
+        entity: log.entityName || log.details || "System Entity",
+        ipAddress: log.ipAddress || "127.0.0.1",
+      }))
+    : INITIAL_AUDIT_LOGS;
+
+  const defaultReport: FacultyReportData = {
+    facultyName: selectedFaculty || "All Faculties",
+    totalStudents: 0,
+    avgAttendancePercent: 0,
+    avgGpa: 0,
+    passRatePercent: 0,
+    attendanceBars: { prev: 0, curr: 0 },
+    performanceBars: { pass: 0, retake: 0 },
+    enrollmentBars: { prev: 0, curr: 0 },
+  };
+
+  const report = MOCK_REPORTS[selectedFaculty] || MOCK_REPORTS["All faculties"] || defaultReport;
+
+  const filteredLogs = auditLogs.filter((log) => {
+    const matchesAction = selectedAction === "All Actions" || log.actionType === selectedAction;
+    const matchesSearch =
+      log.userEmail.toLowerCase().includes(auditSearch.toLowerCase()) ||
+      log.entity.toLowerCase().includes(auditSearch.toLowerCase()) ||
+      log.actionType.toLowerCase().includes(auditSearch.toLowerCase());
+    return matchesAction && matchesSearch;
   });
 
   const auditColumns = [
@@ -214,8 +219,8 @@ export default function Page() {
               <div>
                 <label className="block text-[10px] font-bold text-[var(--on-surface-variant)] uppercase mb-1">Action Type</label>
                 <select
-                  value={actionFilter}
-                  onChange={(e) => setActionFilter(e.target.value)}
+                  value={selectedAction}
+                  onChange={(e) => setSelectedAction(e.target.value)}
                   className="w-full text-xs font-semibold p-2 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
                 >
                   {ACTION_TYPES.map((act) => (
@@ -229,8 +234,8 @@ export default function Page() {
                 <input
                   type="text"
                   placeholder="e.g. k.perera@uni.edu"
-                  value={emailFilter}
-                  onChange={(e) => setEmailFilter(e.target.value)}
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
                   className="w-full text-xs p-2 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
                 />
               </div>

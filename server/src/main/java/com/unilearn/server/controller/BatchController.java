@@ -62,4 +62,10 @@ public class BatchController {
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(batchService.getStudentsInBatch(id, pageable));
     }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    public ResponseEntity<List<BatchResponse>> getAllBatches() {
+        return ResponseEntity.ok(batchService.getAllBatches());
+    }
 }

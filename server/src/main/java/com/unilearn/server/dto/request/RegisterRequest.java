@@ -37,12 +37,9 @@ public class RegisterRequest {
     @Pattern(regexp = "^(STUDENT|LECTURER|EXAMINER|HOD_DEAN|STAFF_ADMIN|GUEST_LECTURER)$", message = "Role must be one of: STUDENT, LECTURER, EXAMINER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER")
     private String role;
 
-    @NotBlank(message = "Batch ID is required")
     private Long batchId;
 
-    @NotBlank(message = "Department ID is required")
     private Long departmentId;
 
-    @NotBlank(message = "Designation is required")
     private String designation;
 }

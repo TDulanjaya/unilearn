@@ -48,4 +48,9 @@ public class SemesterController {
     public ResponseEntity<List<SemesterResponse>> getSemestersByAcademicYear(@PathVariable Long academicYearId) {
         return ResponseEntity.ok(semesterService.getSemestersByAcademicYear(academicYearId));
     }
+
+    @GetMapping
+    public ResponseEntity<List<SemesterResponse>> getAllSemesters() {
+        return ResponseEntity.ok(semesterService.getAllSemesters());
+    }
 }

@@ -14,11 +14,7 @@ interface CourseOfferingApproval {
   status: "Pending" | "Approved" | "Rejected";
 }
 
-const INITIAL_OFFERINGS: CourseOfferingApproval[] = [
-  { id: "off-1", courseCode: "SE401.3", courseTitle: "Advanced Software Architecture", semester: "Semester 7", batch: "Batch CS2023-A", assignedLecturer: "Dr. K. Perera", credits: 3, status: "Pending" },
-  { id: "off-2", courseCode: "SE402.2", courseTitle: "Cloud Computing & DevOps", semester: "Semester 7", batch: "Batch CS2023-A", assignedLecturer: "Prof. A. Fernando", credits: 3, status: "Pending" },
-  { id: "off-3", courseCode: "SE403.3", courseTitle: "Human Computer Interaction", semester: "Semester 7", batch: "Batch CS2023-B", assignedLecturer: "Dr. M. Rathnayake", credits: 2, status: "Pending" },
-];
+const INITIAL_OFFERINGS: CourseOfferingApproval[] = [];
 
 const LECTURERS = ["Dr. K. Perera", "Prof. A. Fernando", "Dr. M. Rathnayake", "Dr. S. Wickramasinghe", "Unassigned"];
 

@@ -18,28 +18,55 @@ interface Course {
   department: string;
 }
 
-const LECTURERS: LecturerOption[] = [
-  { lecturerId: 1, fullName: "Dr. K. Perera" },
-  { lecturerId: 2, fullName: "Dr. M. Rathnayake" },
-  { lecturerId: 3, fullName: "Prof. A. Fernando" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
-const INITIAL_COURSES: Course[] = [
-  { code: "SE308.3", title: "Software Process Management", credits: 4, version: "v2", department: "Software Engineering" },
-  { code: "SE202.2", title: "Database Systems", credits: 4, version: "v3", department: "Computer Science" },
-  { code: "SE309.3", title: "Software Verification & Validation", credits: 4, version: "v3", department: "Software Engineering" },
-  { code: "SE201.2", title: "Data Structures & Algorithms", credits: 4, version: "v1", department: "Software Engineering" },
-];
+const LECTURERS: LecturerOption[] = [];
+
+const INITIAL_COURSES: Course[] = [];
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const DEPARTMENTS = ["Software Engineering", "Computer Science", "Information Technology"];
 
 export default function Page() {
   useInteractive();
-  const { offerings, slots, addOffering, assignLecturer, removeLecturer, addSlot } = useAcademicData();
+  const {
+    offerings,
+    slots,
+    addOffering,
+    assignLecturer,
+    removeLecturer,
+    addSlot,
+    isLoadingOfferings,
+    isLoadingSlots,
+    isErrorOfferings,
+    isErrorSlots,
+    offeringsError,
+    slotsError,
+    refetchOfferings,
+    refetchSlots,
+  } = useAcademicData();
 
-  
-  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
+  const { data: rawCoursesData } = useQuery({
+    queryKey: ["courses"],
+    queryFn: () => api.get<any>("/api/v1/courses"),
+  });
+
+  const apiCourses: Course[] = rawCoursesData?.content || rawCoursesData?.dataList
+    ? (rawCoursesData.content || rawCoursesData.dataList).map((c: any) => ({
+        code: c.code || c.courseCode || "SE101",
+        title: c.name || c.title || c.courseName || "Untitled Course",
+        credits: c.credits || 4,
+        version: "v1",
+        department: c.departmentName || "Software Engineering",
+      }))
+    : INITIAL_COURSES;
+
+  const [courses, setCourses] = useState<Course[]>(apiCourses);
+
+  useEffect(() => {
+    if (apiCourses) setCourses(apiCourses);
+  }, [rawCoursesData]);
 
   
   const [newCourseCode, setNewCourseCode] = useState("");
@@ -66,16 +93,16 @@ export default function Page() {
   ]);
 
   
-  const [newOffCourseCode, setNewOffCourseCode] = useState(INITIAL_COURSES[0].code);
+  const [newOffCourseCode, setNewOffCourseCode] = useState(INITIAL_COURSES[0]?.code || "");
   const [newOffBatch, setNewOffBatch] = useState("CS2023-A");
   const [newOffSemester, setNewOffSemester] = useState("Semester 1");
-  const [newOffLecturer, setNewOffLecturer] = useState(LECTURERS[0].fullName);
+  const [newOffLecturer, setNewOffLecturer] = useState(LECTURERS[0]?.fullName || "");
   const [newOffCapacity, setNewOffCapacity] = useState("50");
   const [showAllDeptsForOffering, setShowAllDeptsForOffering] = useState(false);
 
   
   const [managingOfferingId, setManagingOfferingId] = useState<number | null>(null);
-  const [selectedLecturerToAdd, setSelectedLecturerToAdd] = useState(LECTURERS[0].fullName);
+  const [selectedLecturerToAdd, setSelectedLecturerToAdd] = useState(LECTURERS[0]?.fullName || "");
 
   
   const [newSlotOfferingId, setNewSlotOfferingId] = useState<number>(offerings[0]?.offeringId || 1);
@@ -90,7 +117,7 @@ export default function Page() {
   const [selectedDayMobile, setSelectedDayMobile] = useState<string>("Monday");
 
   
-  const selectedCourseForOffering = courses.find((c) => c.code === newOffCourseCode) || courses[0];
+  const selectedCourseForOffering = courses.find((c) => c.code === newOffCourseCode) || courses[0] || null;
   const filteredBatchesForOffering = showAllDeptsForOffering
     ? batches
     : batches.filter((b) => b.department === selectedCourseForOffering?.department);
@@ -294,7 +321,7 @@ export default function Page() {
   };
 
   
-  const selectedOffering = offerings.find((o) => o.offeringId === Number(newSlotOfferingId)) || offerings[0];
+  const selectedOffering = offerings.find((o) => o.offeringId === Number(newSlotOfferingId)) || offerings[0] || null;
   const distinctBatches = Array.from(new Set(offerings.map((o) => o.batchName)));
 
   const handleCreateOffering = (e: React.FormEvent) => {
@@ -302,7 +329,7 @@ export default function Page() {
     const course = courses.find((c) => c.code === newOffCourseCode);
     if (!course) return;
 
-    const lecObj = LECTURERS.find((l) => l.fullName === newOffLecturer) || LECTURERS[0];
+    const lecObj = LECTURERS.find((l) => l.fullName === newOffLecturer) || LECTURERS[0] || null;
 
     addOffering({
       courseCode: course.code,
@@ -310,8 +337,8 @@ export default function Page() {
       departmentName: course.department,
       batchName: newOffBatch,
       semesterName: newOffSemester,
-      lecturerIds: [lecObj.lecturerId],
-      lecturerNames: [lecObj.fullName],
+      lecturerIds: lecObj ? [lecObj.lecturerId] : [],
+      lecturerNames: lecObj ? [lecObj.fullName] : [newOffLecturer || "Unassigned"],
       enrollmentCount: 0,
       capacity: parseInt(newOffCapacity) || 50,
     });
@@ -319,8 +346,10 @@ export default function Page() {
 
   const handleAddLecturerToOffering = (offeringId: number) => {
     if (!selectedLecturerToAdd) return;
-    const lecObj = LECTURERS.find((l) => l.fullName === selectedLecturerToAdd) || LECTURERS[0];
-    assignLecturer(offeringId, lecObj.lecturerId, lecObj.fullName);
+    const lecObj = LECTURERS.find((l) => l.fullName === selectedLecturerToAdd) || LECTURERS[0] || null;
+    if (lecObj) {
+      assignLecturer(offeringId, lecObj.lecturerId, lecObj.fullName);
+    }
   };
 
   const handleRemoveLecturerFromOffering = (offeringId: number, lecturerName: string) => {
@@ -810,7 +839,21 @@ export default function Page() {
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Active Course Offerings ({offerings.length})
               </h3>
-              <div className="overflow-x-auto">
+              {isLoadingOfferings ? (
+                <div className="p-8 text-center text-xs text-[var(--on-surface-variant)] flex flex-col items-center justify-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[var(--tertiary)] border-t-transparent rounded-full animate-spin"></div>
+                  Loading course offerings from backend...
+                </div>
+              ) : isErrorOfferings ? (
+                <div className="p-4 bg-[var(--error-container)]/30 border border-[var(--error)]/30 rounded-xl text-xs text-[var(--error)] flex items-center justify-between gap-3">
+                  <span>Failed to load offerings: {offeringsError?.message || "Server Error"}</span>
+                  <button onClick={refetchOfferings} className="btn-secondary text-[11px] !py-1 !px-2 shrink-0">
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left min-w-[550px]">
                   <thead>
                     <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] text-xs uppercase tracking-wider">
@@ -911,6 +954,8 @@ export default function Page() {
                     </button>
                   </div>
                 </div>
+              )}
+                </>
               )}
             </div>
           </div>
@@ -1033,19 +1078,32 @@ export default function Page() {
                 </div>
               </div>
 
-              
-              <div className="block sm:hidden mb-4">
-                <div className="flex gap-1 overflow-x-auto pb-2 border-b border-[var(--outline-variant)]">
-                  {DAYS.map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => setSelectedDayMobile(d)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-colors ${selectedDayMobile === d ? "bg-[var(--tertiary)] text-white" : "bg-[var(--surface-container)] text-[var(--on-surface)]"}`}
-                    >
-                      {d.slice(0, 3)}
-                    </button>
-                  ))}
+              {isLoadingSlots ? (
+                <div className="p-8 text-center text-xs text-[var(--on-surface-variant)] flex flex-col items-center justify-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[var(--tertiary)] border-t-transparent rounded-full animate-spin"></div>
+                  Loading timetable slots from backend...
                 </div>
+              ) : isErrorSlots ? (
+                <div className="p-4 bg-[var(--error-container)]/30 border border-[var(--error)]/30 rounded-xl text-xs text-[var(--error)] flex items-center justify-between gap-3">
+                  <span>Failed to load slots: {slotsError?.message || "Server Error"}</span>
+                  <button onClick={refetchSlots} className="btn-secondary text-[11px] !py-1 !px-2 shrink-0">
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="block sm:hidden mb-4">
+                    <div className="flex gap-1 overflow-x-auto pb-2 border-b border-[var(--outline-variant)]">
+                      {DAYS.map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setSelectedDayMobile(d)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-colors ${selectedDayMobile === d ? "bg-[var(--tertiary)] text-white" : "bg-[var(--surface-container)] text-[var(--on-surface)]"}`}
+                        >
+                          {d.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
                 <div className="space-y-3 mt-3">
                   {filteredSlots.filter((s) => s.dayOfWeek === selectedDayMobile).length === 0 ? (
                     <p className="text-xs text-[var(--on-surface-variant)] italic text-center py-4">No slots scheduled for {selectedDayMobile}.</p>
@@ -1099,6 +1157,8 @@ export default function Page() {
                   );
                 })}
               </div>
+              </>
+              )}
             </div>
           </div>
         </div>

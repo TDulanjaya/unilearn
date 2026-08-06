@@ -155,4 +155,12 @@ public class BatchServiceImpl implements BatchService {
                 .map(batchMapper::toBatchOptionDTO)
                 .toList();
     }
+
+    @Override
+    public List<BatchResponse> getAllBatches() {
+        return batchRepository.findAll()
+                .stream()
+                .map(batchMapper::toBatchResponse)
+                .toList();
+    }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/DataTable";
 import FileDropzone from "@/components/FileDropzone";
@@ -32,18 +32,39 @@ interface CsvValidationRow {
   errorMessage?: string;
 }
 
-const INITIAL_USERS: UserRecord[] = [
-  { id: "u-1", fullName: "Nadeesha Silva", email: "nadeesha.s@uni.edu", phone: "0771234567", role: "Student", department: "Software Eng.", batch: "CS2023-A", studentNumber: "SE/2023/042", status: "Active" },
-  { id: "u-2", fullName: "Dr. K. Perera", email: "k.perera@uni.edu", phone: "0719876543", role: "Lecturer", department: "Software Eng.", designation: "Senior Lecturer", assignedCourses: ["SE308.3", "SE309.3"], status: "Active" },
-  { id: "u-4", fullName: "Dr. S. Wickramasinghe", email: "s.wick@uni.edu", phone: "0755544332", role: "HOD/Dean", department: "Software Eng.", scopeLevel: "Department", status: "Active" },
-  { id: "u-5", fullName: "T. Bandara", email: "t.guest@uni.edu", phone: "0723344556", role: "Guest Lecturer", department: "Computing", assignedCourses: ["SE202.2"], engagementEndDate: "2026-12-31", status: "Active" },
-  { id: "u-6", fullName: "R. Jayawardena", email: "r.jaya@uni.edu", phone: "0788877665", role: "Staff/Admin", scopeLevel: "Institution-wide", status: "Active" },
-];
+const INITIAL_USERS: UserRecord[] = [];
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 const VALID_ROLES = ["Student", "Lecturer", "Guest Lecturer", "HOD/Dean", "Staff/Admin"];
 
 export default function UserManagementPage() {
-  const [users, setUsers] = useState<UserRecord[]>(INITIAL_USERS);
+  const queryClient = useQueryClient();
+
+  const { data: usersResponse, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => api.get<any>("/api/v1/users"),
+  });
+
+  const apiUsers: UserRecord[] = usersResponse?.dataList
+    ? usersResponse.dataList.map((u: any) => ({
+        id: String(u.userId),
+        fullName: u.fullName || "",
+        email: u.email || "",
+        phone: u.phone || "N/A",
+        role: u.role || "Student",
+        department: u.departmentName || "Software Eng.",
+        status: u.active ? "Active" : "Locked",
+      }))
+    : INITIAL_USERS;
+
+  const [users, setUsers] = useState<UserRecord[]>(apiUsers);
+
+  useEffect(() => {
+    if (apiUsers) setUsers(apiUsers);
+  }, [usersResponse]);
+
   const [roleFilter, setRoleFilter] = useState("All roles");
   const [toastMessage, setToastMessage] = useState("");
 
@@ -52,10 +73,37 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
 
   
+function generateSmartPassword(name: string, role: string): string {
+  const cleanName = name.trim().replace(/[^a-zA-Z]/g, "");
+  const baseName = cleanName.length > 0
+    ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1, 6).toLowerCase()
+    : "User";
+  const roleCode = (role || "Student").replace(/[^a-zA-Z]/g, "").substring(0, 3).toUpperCase();
+  const randomDigits = Math.floor(100 + Math.random() * 900);
+  const symbols = ["@", "#", "!", "$", "%"];
+  const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+  return `${baseName}${symbol}${roleCode}${randomDigits}`;
+}
+
+  
   const [newFullName, setNewFullName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showPasswordText, setShowPasswordText] = useState(false);
   const [newRole, setNewRole] = useState("Student");
   const [newDept, setNewDept] = useState("Software Eng.");
+
+  
+  const [studentNo, setStudentNo] = useState("");
+  const [enrollmentYear, setEnrollmentYear] = useState("2026");
+  const [batchName, setBatchName] = useState("2026-SE-A");
+  const [designation, setDesignation] = useState("Senior Lecturer");
+  const [scopeLevel, setScopeLevel] = useState("INSTITUTION");
+
+  const handleGeneratePassword = (name = newFullName, role = newRole) => {
+    const generated = generateSmartPassword(name, role);
+    setNewPassword(generated);
+  };
 
   
   const [parsedRows, setParsedRows] = useState<CsvValidationRow[] | null>(null);
@@ -65,24 +113,79 @@ export default function UserManagementPage() {
     setTimeout(() => setToastMessage(""), 3000);
   };
 
-  const handleAddSingleUser = (e: React.FormEvent) => {
+  const mapRoleToBackend = (r: string) => {
+    switch (r) {
+      case "Student": return "STUDENT";
+      case "Lecturer": return "LECTURER";
+      case "Guest Lecturer": return "GUEST_LECTURER";
+      case "HOD/Dean": return "HOD_DEAN";
+      case "Staff/Admin": return "STAFF_ADMIN";
+      default: return r.toUpperCase();
+    }
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: number) => api.delete(`/api/v1/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { fullName: string; email: string; password: string; role: string; phone?: string }) =>
+      api.post("/api/v1/users", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: number; fullName: string; email: string; role: string; phone?: string; active: boolean }) =>
+      api.put(`/api/v1/users/${data.id}`, {
+        fullName: data.fullName,
+        email: data.email,
+        role: data.role,
+        phone: data.phone,
+        active: data.active,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  const handleAddSingleUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFullName.trim() || !newEmail.trim()) return;
 
-    const newUser: UserRecord = {
-      id: `u-${Date.now()}`,
-      fullName: newFullName.trim(),
-      email: newEmail.trim(),
-      role: newRole,
-      department: newDept,
-      status: "Active",
-    };
+    const finalPassword = newPassword.trim() || generateSmartPassword(newFullName, newRole);
 
-    setUsers([newUser, ...users]);
-    setNewFullName("");
-    setNewEmail("");
-    setShowAddModal(false);
-    showToast(`User ${newUser.fullName} added successfully.`);
+    try {
+      const createdRes: any = await createMutation.mutateAsync({
+        fullName: newFullName.trim(),
+        email: newEmail.trim(),
+        password: finalPassword,
+        role: mapRoleToBackend(newRole),
+      });
+
+      const newUser: UserRecord = {
+        id: String(createdRes?.userId || Date.now()),
+        fullName: createdRes?.fullName || newFullName.trim(),
+        email: createdRes?.email || newEmail.trim(),
+        role: newRole,
+        department: newDept,
+        status: "Active",
+      };
+
+      setUsers([newUser, ...users]);
+      setNewFullName("");
+      setNewEmail("");
+      setNewPassword("");
+      setShowAddModal(false);
+      showToast(`User ${newUser.fullName} created! Password: ${finalPassword}`);
+    } catch (err: any) {
+      console.error("Backend register user error:", err);
+      showToast(`Registration failed: ${err.message || "Server error"}`);
+    }
   };
 
   const handleCsvFilesSelected = (files: File[]) => {
@@ -149,11 +252,42 @@ export default function UserManagementPage() {
     showToast(`Bulk imported ${newUsers.length} valid users.`);
   };
 
-  const handleSaveEdit = () => {
+  const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
+
+  const handleSaveEdit = async () => {
     if (!editingUser) return;
+    const numericId = Number(editingUser.id);
+    if (!isNaN(numericId)) {
+      try {
+        await updateMutation.mutateAsync({
+          id: numericId,
+          fullName: editingUser.fullName,
+          email: editingUser.email,
+          role: mapRoleToBackend(editingUser.role),
+          phone: editingUser.phone,
+          active: editingUser.status === "Active",
+        });
+      } catch (err: any) {
+        console.error("Backend update user error:", err);
+      }
+    }
     setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? editingUser : u)));
     setEditingUser(null);
     showToast(`Updated user settings for ${editingUser.fullName}.`);
+  };
+
+  const handleDeleteUser = async (user: UserRecord) => {
+    const numericId = Number(user.id);
+    if (!isNaN(numericId)) {
+      try {
+        await deleteMutation.mutateAsync(numericId);
+      } catch (err: any) {
+        console.error("Failed to delete user in backend:", err);
+      }
+    }
+    setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    setDeletingUser(null);
+    showToast(`User ${user.fullName} deleted successfully from database.`);
   };
 
   const handleTriggerPasswordReset = () => {
@@ -206,12 +340,21 @@ export default function UserManagementPage() {
     {
       header: "Actions",
       accessor: (row: UserRecord) => (
-        <button
-          onClick={() => setEditingUser(row)}
-          className="btn-secondary text-xs !py-1 flex items-center gap-1"
-        >
-          <i className="ti ti-edit"></i> Edit Profile & Role
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEditingUser(row)}
+            className="btn-secondary text-xs !py-1 flex items-center gap-1"
+          >
+            <i className="ti ti-edit"></i> Edit Profile & Role
+          </button>
+          <button
+            onClick={() => setDeletingUser(row)}
+            className="px-2.5 py-1 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-bold transition-colors flex items-center gap-1"
+            title="Delete User"
+          >
+            <i className="ti ti-trash"></i> Delete
+          </button>
+        </div>
       ),
     },
   ];
@@ -291,22 +434,137 @@ export default function UserManagementPage() {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
-                >
-                  {VALID_ROLES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  placeholder="Department"
-                  value={newDept}
-                  onChange={(e) => setNewDept(e.target.value)}
-                  className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                />
+                <div>
+                  <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">System Role</label>
+                  <select
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                  >
+                    {VALID_ROLES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Department</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Software Eng."
+                    value={newDept}
+                    onChange={(e) => setNewDept(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                  />
+                </div>
+              </div>
+
+              
+              {newRole === "Student" && (
+                <div className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50 space-y-2">
+                  <p className="text-[11px] font-bold text-[var(--tertiary)] flex items-center gap-1">
+                    <i className="ti ti-id"></i> Student Specific Profile Information
+                  </p>
+                  <div className="grid sm:grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Student Reg No. (e.g. SE/2026/041)"
+                      value={studentNo}
+                      onChange={(e) => setStudentNo(e.target.value)}
+                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Enrollment Year"
+                      value={enrollmentYear}
+                      onChange={(e) => setEnrollmentYear(e.target.value)}
+                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Batch (e.g. 2026-SE-A)"
+                      value={batchName}
+                      onChange={(e) => setBatchName(e.target.value)}
+                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(newRole === "Lecturer" || newRole === "Guest Lecturer") && (
+                <div className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50 space-y-2">
+                  <p className="text-[11px] font-bold text-[var(--tertiary)] flex items-center gap-1">
+                    <i className="ti ti-school"></i> Academic Staff Profile Information
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Academic Designation (e.g. Senior Lecturer)"
+                      value={designation}
+                      onChange={(e) => setDesignation(e.target.value)}
+                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                    />
+                    <div className="flex items-center gap-2 p-2">
+                      <input
+                        type="checkbox"
+                        id="isGuestCb"
+                        checked={newRole === "Guest Lecturer"}
+                        onChange={(e) => setNewRole(e.target.checked ? "Guest Lecturer" : "Lecturer")}
+                        className="rounded"
+                      />
+                      <label htmlFor="isGuestCb" className="text-xs text-[var(--on-surface)]">Contract / Guest Visiting Status</label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(newRole === "Staff/Admin" || newRole === "HOD/Dean") && (
+                <div className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50 space-y-2">
+                  <p className="text-[11px] font-bold text-[var(--tertiary)] flex items-center gap-1">
+                    <i className="ti ti-shield-check"></i> Administrative Scope Level
+                  </p>
+                  <select
+                    value={scopeLevel}
+                    onChange={(e) => setScopeLevel(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                  >
+                    <option value="INSTITUTION">INSTITUTION (Full Administrative Scope)</option>
+                    <option value="FACULTY">FACULTY (Faculty Level Scope)</option>
+                    <option value="DEPARTMENT">DEPARTMENT (Departmental Scope)</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-[var(--on-surface-variant)]">
+                    User Password (derived from details or custom):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleGeneratePassword()}
+                    className="text-[11px] text-[var(--tertiary)] font-bold hover:underline flex items-center gap-1"
+                  >
+                    <i className="ti ti-wand"></i> Auto-Generate Unique Password
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPasswordText ? "text" : "password"}
+                    placeholder="Enter or generate password..."
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full text-xs p-2.5 pr-10 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-mono"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordText(!showPasswordText)}
+                    className="absolute right-3 top-2.5 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+                  >
+                    <i className={`ti ${showPasswordText ? "ti-eye-off" : "ti-eye"}`}></i>
+                  </button>
+                </div>
               </div>
 
               <button type="submit" className="btn-primary text-xs w-full justify-center shadow-sm">
@@ -368,31 +626,62 @@ export default function UserManagementPage() {
 
       {editingUser && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
-              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Edit User Account</h3>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Edit User Details</h3>
               <button onClick={() => setEditingUser(null)} className="text-[var(--on-surface-variant)]">
                 <i className="ti ti-x text-lg"></i>
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Full Name</label>
+                <label className="block font-semibold mb-1 text-[var(--on-surface)]">Full Name</label>
                 <input
                   type="text"
                   value={editingUser.fullName}
                   onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
-                  className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                  className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Reassign Role</label>
+                <label className="block font-semibold mb-1 text-[var(--on-surface)]">Email Address</label>
+                <input
+                  type="email"
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-[var(--on-surface)]">Phone</label>
+                  <input
+                    type="text"
+                    value={editingUser.phone || ""}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-[var(--on-surface)]">Department</label>
+                  <input
+                    type="text"
+                    value={editingUser.department || ""}
+                    onChange={(e) => setEditingUser({ ...editingUser, department: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-[var(--on-surface)]">System Role</label>
                 <select
                   value={editingUser.role}
                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                  className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                  className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
                 >
                   {VALID_ROLES.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -402,8 +691,8 @@ export default function UserManagementPage() {
 
               <div className="flex items-center justify-between p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]">
                 <div>
-                  <p className="font-bold text-xs text-[var(--on-surface)]">Account Status Lock</p>
-                  <p className="text-[10px] text-[var(--on-surface-variant)]">Prevent user login access</p>
+                  <p className="font-bold text-[var(--on-surface)]">Account Access Status</p>
+                  <p className="text-[10px] text-[var(--on-surface-variant)]">Toggle active or locked access</p>
                 </div>
                 <button
                   type="button"
@@ -419,13 +708,33 @@ export default function UserManagementPage() {
                 onClick={handleTriggerPasswordReset}
                 className="btn-secondary text-xs w-full justify-center !py-2"
               >
-                <i className="ti ti-key mr-1"></i> Trigger Password Reset Email
+                <i className="ti ti-key mr-1"></i> Send Password Reset Email
               </button>
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
               <button onClick={() => setEditingUser(null)} className="btn-secondary text-xs">Cancel</button>
               <button onClick={handleSaveEdit} className="btn-primary text-xs shadow-md">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-sm w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-red-500/30">
+            <div className="flex items-center gap-3 text-red-500">
+              <i className="ti ti-alert-triangle text-2xl"></i>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Confirm Delete User</h3>
+            </div>
+            <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+              Are you sure you want to permanently delete <b>{deletingUser.fullName}</b> ({deletingUser.email})? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
+              <button onClick={() => setDeletingUser(null)} className="btn-secondary text-xs">Cancel</button>
+              <button onClick={() => handleDeleteUser(deletingUser)} className="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 shadow-md">
+                Delete Account
+              </button>
             </div>
           </div>
         </div>

@@ -44,6 +44,8 @@ public class TimetableSlotController {
         return ResponseEntity.ok(timetableSlotService.getSlotsByOffering(offeringId));
     }
 
-    // Note: getSlotsByBatch is specified in the prompt but not present in TimetableSlotService.
-    // TODO: Add getSlotsByBatch(Long batchId) to TimetableSlotService if needed.
+    @GetMapping
+    public ResponseEntity<List<TimetableSlotResponse>> getAllSlots() {
+        return ResponseEntity.ok(timetableSlotService.getAllSlots());
+    }
 }

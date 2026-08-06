@@ -3,8 +3,10 @@
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
-import { CourseTab, Assignment, Resource } from "@/types/course";
+import { CourseTab, Course, MaterialItem, Assignment, Resource } from "@/types/course";
 import {
   COURSES,
   INITIAL_MATERIALS,
@@ -24,7 +26,43 @@ function CourseHubContent() {
   const searchParams = useSearchParams();
 
   const courseId = (params.id as string) || "1";
-  const course = COURSES[courseId] || COURSES["1"];
+  const numericId = Number(courseId) || 1;
+
+  const { data: offeringResponse, isLoading: isLoadingOffering } = useQuery({
+    queryKey: ["courseOffering", numericId],
+    queryFn: () => api.get<any>(`/api/v1/course-offerings/${numericId}`),
+    enabled: !isNaN(numericId),
+  });
+
+  const { data: rawMaterialsData } = useQuery({
+    queryKey: ["materials", numericId],
+    queryFn: () => api.get<any>(`/api/v1/materials/offering/${numericId}`),
+    enabled: !isNaN(numericId),
+  });
+
+  const { data: rawAssignmentsData } = useQuery({
+    queryKey: ["assignments", numericId],
+    queryFn: () => api.get<any>(`/api/v1/assignments/offering/${numericId}`),
+    enabled: !isNaN(numericId),
+  });
+
+  const { data: rawResourcesData } = useQuery({
+    queryKey: ["personalResources", numericId],
+    queryFn: () => api.get<any>(`/api/v1/personal-resources/offering/${numericId}`),
+    enabled: !isNaN(numericId),
+  });
+
+  const fallbackCourse = COURSES[courseId] || COURSES["1"];
+  const course: Course = offeringResponse
+    ? {
+        code: offeringResponse.courseCode || fallbackCourse.code,
+        title: offeringResponse.courseName || offeringResponse.courseTitle || fallbackCourse.title,
+        lecturer: offeringResponse.primaryLecturerName || offeringResponse.lecturerName || fallbackCourse.lecturer,
+        dept: offeringResponse.departmentName || fallbackCourse.dept,
+        progress: fallbackCourse.progress,
+      }
+    : fallbackCourse;
+
   const mcqBank = MCQ_BANKS[course.code] || MCQ_BANKS["SE308.3"];
   const structuredBank = STRUCTURED_BANKS[course.code] || STRUCTURED_BANKS["SE308.3"];
 
@@ -38,9 +76,51 @@ function CourseHubContent() {
     }
   }, [searchParams]);
 
-  const [assignments, setAssignments] = useState<Assignment[]>(INITIAL_ASSIGNMENTS);
-  const [resources, setResources] = useState<Resource[]>(INITIAL_RESOURCES);
+  const fetchedMaterials: MaterialItem[] = rawMaterialsData?.content
+    ? rawMaterialsData.content.map((m: any) => ({
+        id: m.materialId,
+        title: m.title,
+        type: (m.resourceType as any) || "PDF",
+        module: "Module 1",
+        date: m.uploadedAt ? new Date(m.uploadedAt).toLocaleDateString() : "Recent",
+        size: "2.5 MB",
+        summary: m.title,
+        linkUrl: m.fileUrl || m.linkUrl || m.externalLink,
+      }))
+    : [];
+
+  const fetchedAssignments: Assignment[] = Array.isArray(rawAssignmentsData) && rawAssignmentsData.length > 0
+    ? rawAssignmentsData.map((a: any) => ({
+        id: a.assignmentId,
+        title: a.title,
+        due: a.deadline ? new Date(a.deadline).toLocaleDateString() : "TBD",
+        status: "Draft",
+        grade: null,
+        description: a.description || "",
+        maxScore: Number(a.maxScore) || 100,
+        attempts: [],
+      }))
+    : [];
+
+  const fetchedResources: Resource[] = rawResourcesData?.content
+    ? rawResourcesData.content.map((r: any) => ({
+        id: r.resourceId,
+        fileName: r.fileName || r.title || "Resource File",
+        uploadedAt: r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : "Today",
+      }))
+    : [];
+
+  const [assignments, setAssignments] = useState<Assignment[]>(fetchedAssignments);
+  const [resources, setResources] = useState<Resource[]>(fetchedResources);
   const [toastMessage, setToastMessage] = useState("");
+
+  useEffect(() => {
+    if (fetchedAssignments) setAssignments(fetchedAssignments);
+  }, [rawAssignmentsData]);
+
+  useEffect(() => {
+    if (fetchedResources) setResources(fetchedResources);
+  }, [rawResourcesData]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -83,7 +163,6 @@ function CourseHubContent() {
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
-      
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[var(--surface-container-highest)] border border-[var(--tertiary)] text-[var(--on-surface)] px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 animate-bounce">
           <i className="ti ti-check text-[var(--tertiary)] text-lg"></i>
@@ -91,7 +170,6 @@ function CourseHubContent() {
         </div>
       )}
 
-      
       <div className="flex items-center gap-2 text-xs text-[var(--on-surface-variant)] mb-4 font-medium">
         <Link href="/student/courses" className="hover:text-[var(--tertiary)] transition-colors">
           My Courses
@@ -100,7 +178,6 @@ function CourseHubContent() {
         <span className="text-[var(--on-surface)] font-semibold">{course.code}</span>
       </div>
 
-      
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <span className="badge badge-accent">{course.code}</span>
@@ -109,7 +186,7 @@ function CourseHubContent() {
           </span>
         </div>
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
-          {course.title}
+          {isLoadingOffering ? "Loading course..." : course.title}
         </h1>
         <div className="mt-3 max-w-sm">
           <div className="progress-track mb-1">
@@ -121,7 +198,6 @@ function CourseHubContent() {
         </div>
       </div>
 
-      
       <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)] overflow-x-auto">
         {tabs.map((t) => (
           <button
@@ -136,9 +212,8 @@ function CourseHubContent() {
         ))}
       </div>
 
-      
       {activeTab === "materials" && (
-        <CourseMaterialsTab course={course} materials={INITIAL_MATERIALS} />
+        <CourseMaterialsTab course={course} materials={fetchedMaterials} />
       )}
 
       {activeTab === "assignments" && (

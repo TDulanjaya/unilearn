@@ -111,6 +111,14 @@ public class TimetableSlotServiceImpl implements TimetableSlotService {
                 .toList();
     }
 
+    @Override
+    public List<TimetableSlotResponse> getAllSlots() {
+        return timetableSlotRepository.findAll()
+                .stream()
+                .map(timetableSlotMapper::toTimetableSlotResponse)
+                .toList();
+    }
+
     private void checkVenueOverlap(String venue, String dayOfWeek, LocalTime startTime, LocalTime endTime, Long currentSlotId) {
         if (venue == null || dayOfWeek == null || startTime == null || endTime == null) {
             return;

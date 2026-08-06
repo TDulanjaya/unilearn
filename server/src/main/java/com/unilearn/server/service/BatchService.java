@@ -27,4 +27,6 @@ public interface BatchService {
     PageResponseDTO<StudentResponse> getStudentsInBatch(Long batchId, Pageable pageable);
 
     List<BatchOptionDTO> getBatchOptions(Long departmentId, String searchText);
+
+    List<BatchResponse> getAllBatches();
 }

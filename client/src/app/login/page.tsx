@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Logo from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Please enter a valid email address"),
@@ -16,11 +17,19 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const errorParam = searchParams.get("error");
+  const { login } = useAuth();
+
   const [isForgot, setIsForgot] = useState(false);
-  const [resetEmail, setResetEmail] = useState("nadeesha.s@uni.edu");
+  const [resetEmail, setResetEmail] = useState("admin@uni.edu");
   const [resetSent, setResetSent] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(
+    errorParam === "unauthorized" ? "Please sign in to access this page." : null
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
@@ -29,14 +38,31 @@ export default function LoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "nadeesha.s@uni.edu",
+      email: "user.s@uni.edu",
       password: "password123",
     },
   });
 
-  const onSubmit = (data: LoginFormData) => {
-    
-    router.push("/student/dashboard");
+  const onSubmit = async (data: LoginFormData) => {
+    setServerError(null);
+    setIsSubmitting(true);
+    try {
+      const res = await login(data.email, data.password);
+      const role = res.role?.toUpperCase();
+      if (role === "STUDENT") {
+        router.push("/student/dashboard");
+      } else if (role === "LECTURER") {
+        router.push("/lecturer/dashboard");
+      } else if (role === "HOD_DEAN") {
+        router.push("/hod/dashboard");
+      } else {
+        router.push("/admin/dashboard");
+      }
+    } catch (err: any) {
+      setServerError(err.message || "Login failed. Please check your credentials.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleForgot = (e: React.FormEvent) => {
@@ -70,6 +96,13 @@ export default function LoginPage() {
             </p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {serverError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs flex items-center gap-2 font-medium">
+                  <i className="ti ti-alert-circle text-base shrink-0"></i>
+                  <span>{serverError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                   Email address
@@ -121,25 +154,31 @@ export default function LoginPage() {
                 )}
               </div>
 
-              <button type="submit" className="btn-primary w-full justify-center !py-2.5 text-sm mt-2 shadow-md">
-                Sign in
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn-primary w-full justify-center !py-2.5 text-sm mt-2 shadow-md disabled:opacity-50"
+              >
+                {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
             </form>
 
-            <div className="mt-6 pt-4 border-t border-[var(--outline-variant)] text-center text-xs text-[var(--outline)]">
-              Demo Role Jump:{" "}
-              <Link href="/student/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
-                Student
-              </Link>{" "}
-              ·{" "}
-              <Link href="/lecturer/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
-                Lecturer
-              </Link>{" "}
-              ·{" "}
-              <Link href="/admin/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
-                Admin
-              </Link>
-            </div>
+            {process.env.NODE_ENV === "development" && (
+              <div className="mt-6 pt-4 border-t border-[var(--outline-variant)] text-center text-xs text-[var(--outline)]">
+                Demo Role Jump:{" "}
+                <Link href="/student/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
+                  Student
+                </Link>{" "}
+                ·{" "}
+                <Link href="/lecturer/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
+                  Lecturer
+                </Link>{" "}
+                ·{" "}
+                <Link href="/admin/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
+                  Admin
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           <div>
@@ -189,5 +228,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs">Loading...</div>}>
+      <LoginFormContent />
+    </Suspense>
   );
 }
