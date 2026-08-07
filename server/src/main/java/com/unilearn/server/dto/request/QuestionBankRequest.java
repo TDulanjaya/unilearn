@@ -19,6 +19,6 @@ public class QuestionBankRequest {
     @NotNull(message = "Course ID is required")
     private Long courseId;
 
-    @NotNull(message = "Creator examiner ID is required")
-    private Long createdByExaminerId;
+    @NotNull(message = "Creator lecturer ID is required")
+    private Long createdByLecturerId;
 }

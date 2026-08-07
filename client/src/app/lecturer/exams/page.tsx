@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import DataTable from "@/components/DataTable";
 
@@ -14,77 +17,197 @@ interface Question {
 
 interface FlagEvent {
   id: string;
+  attemptId: number;
   studentName: string;
   indexNo: string;
-  flagType: "Tab switch detected" | "Copy-paste detected" | "Window focus lost" | "Secondary window open";
+  flagType: string;
   timestamp: string;
   severity: "Low" | "Medium" | "High";
   status: "Active" | "Warned" | "Paused" | "Terminated";
 }
 
-const INITIAL_QUESTIONS: Question[] = [];
-
-const INITIAL_FLAGS: FlagEvent[] = [];
-
-const STUDENT_NAMES = ["Bhanuka Mendis", "Sachini Ratnayake", "Amaya Jayawardena", "Ruwan Munaweera", "Dilan Wickrama"];
-const FLAG_TYPES: FlagEvent["flagType"][] = ["Tab switch detected", "Copy-paste detected", "Window focus lost", "Secondary window open"];
-const SEVERITIES: FlagEvent["severity"][] = ["Low", "Medium", "High"];
-
 export default function LecturerExamsPage() {
-  const [selectedOffering, setSelectedOffering] = useState("SE308.3 — Software Process Management (Batch CS2023-A)");
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [activeOfferingId, setActiveOfferingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"qb" | "build" | "proctoring">("qb");
 
-  
-  const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
+  // Form states
   const [qText, setQText] = useState("");
   const [qType, setQType] = useState<"MCQ" | "Essay" | "Short answer">("MCQ");
   const [qMarks, setQMarks] = useState(5);
   const [qDifficulty, setQDifficulty] = useState<"Easy" | "Medium" | "Hard">("Medium");
 
-  
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>(["q-1", "q-2"]);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [examTimer, setExamTimer] = useState(120);
 
-  
-  const [flags, setFlags] = useState<FlagEvent[]>(INITIAL_FLAGS);
+  // 1. Fetch lecturer offerings
+  const { data: offerings, isLoading: offeringsLoading } = useQuery({
+    queryKey: ["lecturerOfferings", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
 
-  
   useEffect(() => {
-    if (activeTab !== "proctoring") return;
-    const interval = setInterval(() => {
-      const name = STUDENT_NAMES[Math.floor(Math.random() * STUDENT_NAMES.length)];
-      const type = FLAG_TYPES[Math.floor(Math.random() * FLAG_TYPES.length)];
-      const severity = SEVERITIES[Math.floor(Math.random() * SEVERITIES.length)];
-      const now = new Date().toLocaleTimeString();
+    if (offerings && offerings.length > 0 && !activeOfferingId) {
+      setActiveOfferingId(offerings[0].offeringId);
+    }
+  }, [offerings]);
 
-      const newFlag: FlagEvent = {
-        id: `flag-${Date.now()}`,
-        studentName: name,
-        indexNo: `SE/2023/0${Math.floor(10 + Math.random() * 80)}`,
-        flagType: type,
-        timestamp: now,
-        severity: severity,
-        status: "Active",
+  const activeOffering = offerings?.find((o: any) => o.offeringId === activeOfferingId);
+  const courseId = activeOffering?.courseId;
+
+  // 2. Fetch question bank for course
+  const { data: qbs } = useQuery({
+    queryKey: ["qbs", courseId],
+    queryFn: () => api.get<any[]>(`/api/v1/question-banks/course/${courseId}`),
+    enabled: !!courseId,
+  });
+
+  const activeBankId = qbs && qbs.length > 0 ? qbs[0].bankId : null;
+
+  // 3. Fetch questions in bank
+  const { data: questionsResponse } = useQuery({
+    queryKey: ["questions", activeBankId],
+    queryFn: () => api.get<any>(`/api/v1/questions/bank/${activeBankId}?size=100`),
+    enabled: !!activeBankId,
+  });
+
+  const questions: Question[] = (questionsResponse?.dataList || []).map((q: any) => ({
+    id: String(q.questionId),
+    text: q.questionText,
+    type: q.questionType as any,
+    marks: Number(q.marks),
+    difficulty: (q.difficulty || "Medium") as any,
+  }));
+
+  // 4. Fetch scheduled exams for selected offering
+  const { data: exams } = useQuery({
+    queryKey: ["exams", activeOfferingId],
+    queryFn: () => api.get<any[]>(`/api/v1/exams/offering/${activeOfferingId}`),
+    enabled: !!activeOfferingId,
+  });
+
+  const activeExamId = exams && exams.length > 0 ? exams[0].examId : null;
+
+  // 5. Fetch attempts for active exam
+  const { data: attempts } = useQuery({
+    queryKey: ["examAttempts", activeExamId],
+    queryFn: () => api.get<any[]>(`/api/v1/exam-attempts/exam/${activeExamId}`),
+    enabled: !!activeExamId,
+  });
+
+  // 6. Fetch proctoring flags for all attempts of the exam
+  const attemptIds = attempts?.map((att: any) => att.attemptId) || [];
+  const flagsQueries = useQueries({
+    queries: attemptIds.map((id: number) => ({
+      queryKey: ["proctoringFlags", id],
+      queryFn: () => api.get<any[]>(`/api/v1/proctoring-flags/attempt/${id}`),
+    })),
+  });
+
+  const flags: FlagEvent[] = flagsQueries
+    .flatMap((q: any) => q.data || [])
+    .map((f: any) => {
+      const attempt = attempts?.find((att: any) => att.attemptId === f.attemptId);
+      return {
+        id: String(f.flagId),
+        attemptId: f.attemptId,
+        studentName: attempt?.studentName || `Student #${attempt?.studentId}`,
+        indexNo: `SE/2023/0${attempt?.studentId}`,
+        flagType: f.flagType,
+        timestamp: new Date(f.createdAt).toLocaleTimeString(),
+        severity: "High",
+        status: f.flagType.includes("Warn")
+          ? "Warned"
+          : f.flagType.includes("Pause")
+          ? "Paused"
+          : f.flagType.includes("Terminate")
+          ? "Terminated"
+          : "Active",
       };
+    });
 
-      setFlags((prev) => [newFlag, ...prev.slice(0, 20)]);
-    }, 5000);
+  // Mutations
+  const createBankMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/question-banks", data),
+  });
 
-    return () => clearInterval(interval);
-  }, [activeTab]);
+  const createQuestionMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/questions", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["questions"] });
+    },
+  });
 
-  const handleAddQuestion = (e: React.FormEvent) => {
+  const scheduleExamMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/exams/inclass", data),
+  });
+
+  const createFlagMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/proctoring-flags", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["proctoringFlags"] });
+    },
+  });
+
+  const handleAddQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!qText.trim()) return;
-    const created: Question = {
-      id: `q-${Date.now()}`,
-      text: qText.trim(),
-      type: qType,
-      marks: qMarks,
-      difficulty: qDifficulty,
-    };
-    setQuestions([...questions, created]);
-    setQText("");
+    if (!qText.trim() || !courseId) return;
+
+    try {
+      let bankId = activeBankId;
+      if (!bankId) {
+        const newBank = await createBankMutation.mutateAsync({
+          courseId,
+          createdByLecturerId: user?.userId,
+        });
+        bankId = newBank.bankId;
+        queryClient.invalidateQueries({ queryKey: ["qbs", courseId] });
+      }
+
+      await createQuestionMutation.mutateAsync({
+        bankId,
+        questionText: qText.trim(),
+        questionType: qType,
+        marks: qMarks,
+        difficulty: qDifficulty,
+        topic: "General",
+      });
+
+      setQText("");
+    } catch (err: any) {
+      alert("Failed to save question: " + err.message);
+    }
+  };
+
+  const handleSaveExamDraft = async () => {
+    if (!activeOfferingId) return;
+    try {
+      await scheduleExamMutation.mutateAsync({
+        offeringId: activeOfferingId,
+        title: `Mid-Term Examination - ${activeOffering?.courseCode}`,
+        durationMinutes: examTimer,
+        scheduledById: user?.userId,
+      });
+      alert("In-class exam scheduled successfully!");
+    } catch (err: any) {
+      alert("Failed to schedule exam: " + err.message);
+    }
+  };
+
+  const handleProctorAction = async (attemptId: number, action: "Warned" | "Paused" | "Terminated") => {
+    try {
+      await createFlagMutation.mutateAsync({
+        attemptId,
+        flagType: `Lecturer action: ${action}`,
+        notes: `Lecturer manually flagged the student: ${action}`,
+      });
+      alert(`Sent ${action} flag notification to the student candidate.`);
+    } catch (err: any) {
+      alert("Failed to perform action: " + err.message);
+    }
   };
 
   const toggleQuestionSelection = (id: string) => {
@@ -93,13 +216,19 @@ export default function LecturerExamsPage() {
     );
   };
 
-  const handleProctorAction = (id: string, action: "Warned" | "Paused" | "Terminated") => {
-    setFlags((prev) => prev.map((f) => (f.id === id ? { ...f, status: action } : f)));
-  };
-
   const totalAssembledMarks = questions
     .filter((q) => selectedQuestionIds.includes(q.id))
     .reduce((acc, q) => acc + q.marks, 0);
+
+  if (offeringsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading Question Banks & Exams...
+        </div>
+      </div>
+    );
+  }
 
   const proctorColumns = [
     {
@@ -127,23 +256,16 @@ export default function LecturerExamsPage() {
     },
     {
       header: "Severity",
-      accessor: (row: FlagEvent) => {
-        const colors = {
-          High: "bg-red-500/10 text-red-600 border-red-500/20",
-          Medium: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-          Low: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-        };
-        return (
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${colors[row.severity]}`}>
-            {row.severity}
-          </span>
-        );
-      },
+      accessor: (row: FlagEvent) => (
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-red-500/10 text-red-600 border-red-500/20">
+          {row.severity}
+        </span>
+      ),
     },
     {
       header: "Status",
       accessor: (row: FlagEvent) => (
-        <span className={`badge ${row.status === "Active" ? "badge-danger" : "badge-gray"}`}>
+        <span className={`badge ${row.status === "Terminated" ? "badge-danger" : "badge-gray"}`}>
           {row.status}
         </span>
       ),
@@ -153,21 +275,21 @@ export default function LecturerExamsPage() {
       accessor: (row: FlagEvent) => (
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => handleProctorAction(row.id, "Warned")}
+            onClick={() => handleProctorAction(row.attemptId, "Warned")}
             disabled={row.status === "Terminated"}
             className="px-2 py-1 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 disabled:opacity-40"
           >
             Warn
           </button>
           <button
-            onClick={() => handleProctorAction(row.id, "Paused")}
+            onClick={() => handleProctorAction(row.attemptId, "Paused")}
             disabled={row.status === "Terminated"}
             className="px-2 py-1 rounded text-[11px] font-semibold bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 disabled:opacity-40"
           >
             Pause
           </button>
           <button
-            onClick={() => handleProctorAction(row.id, "Terminated")}
+            onClick={() => handleProctorAction(row.attemptId, "Terminated")}
             disabled={row.status === "Terminated"}
             className="px-2 py-1 rounded text-[11px] font-semibold bg-red-500/10 text-red-600 hover:bg-red-500/20 disabled:opacity-40"
           >
@@ -196,46 +318,40 @@ export default function LecturerExamsPage() {
           <div className="flex items-center gap-2">
             <label className="text-xs font-bold text-[var(--on-surface-variant)] shrink-0">Course Offering:</label>
             <select
-              value={selectedOffering}
-              onChange={(e) => setSelectedOffering(e.target.value)}
+              value={activeOfferingId || ""}
+              onChange={(e) => setActiveOfferingId(Number(e.target.value))}
               className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
             >
-              <option value="SE308.3 — Software Process Management (Batch CS2023-A)">
-                SE308.3 — Software Process Management (Batch CS2023-A)
-              </option>
-              <option value="SE202.2 — Database Systems (Batch CS2023-A)">
-                SE202.2 — Database Systems (Batch CS2023-A)
-              </option>
-              <option value="SE309.3 — Software Verification & Validation (Batch CS2023-B)">
-                SE309.3 — Software Verification & Validation (Batch CS2023-B)
-              </option>
+              {offerings?.map((o: any) => (
+                <option key={o.offeringId} value={o.offeringId}>
+                  {o.courseCode} — {o.courseName} ({o.batchName})
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
-        
         <div className="flex gap-2 border-b border-[var(--outline-variant)]">
           <button
             onClick={() => setActiveTab("qb")}
-            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "qb" ? "border-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "qb" ? "border-b-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
           >
             <i className="ti ti-database mr-1.5"></i> Question Bank
           </button>
           <button
             onClick={() => setActiveTab("build")}
-            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "build" ? "border-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "build" ? "border-b-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
           >
             <i className="ti ti-file-pencil mr-1.5"></i> Build Exam
           </button>
           <button
             onClick={() => setActiveTab("proctoring")}
-            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "proctoring" ? "border-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "proctoring" ? "border-b-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
           >
             <i className="ti ti-shield-check mr-1.5 text-red-500"></i> Live Exam Proctoring
           </button>
         </div>
 
-        
         {activeTab === "qb" && (
           <div className="grid lg:grid-cols-[1fr_360px] gap-6">
             <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
@@ -253,24 +369,31 @@ export default function LecturerExamsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--outline-variant)]">
-                    {questions.map((q) => (
-                      <tr key={q.id} className="hover:bg-[var(--surface-container-low)]">
-                        <td className="py-3 px-3 font-medium text-[var(--on-surface)]">{q.text}</td>
-                        <td className="py-3 px-3 text-[var(--on-surface-variant)]">{q.type}</td>
-                        <td className="py-3 px-3 font-bold">{q.marks}</td>
-                        <td className="py-3 px-3">
-                          <span className={`badge ${q.difficulty === "Easy" ? "badge-success" : q.difficulty === "Medium" ? "badge-accent" : "badge-danger"}`}>
-                            {q.difficulty}
-                          </span>
+                    {questions.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="text-center p-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                          No questions added to the bank yet.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      questions.map((q) => (
+                        <tr key={q.id} className="hover:bg-[var(--surface-container-low)]">
+                          <td className="py-3 px-3 font-medium text-[var(--on-surface)]">{q.text}</td>
+                          <td className="py-3 px-3 text-[var(--on-surface-variant)]">{q.type}</td>
+                          <td className="py-3 px-3 font-bold">{q.marks}</td>
+                          <td className="py-3 px-3">
+                            <span className={`badge ${q.difficulty === "Easy" ? "badge-success" : q.difficulty === "Medium" ? "badge-accent" : "badge-danger"}`}>
+                              {q.difficulty}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            
             <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] self-start">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)]">
                 Add New Question
@@ -313,7 +436,6 @@ export default function LecturerExamsPage() {
           </div>
         )}
 
-        
         {activeTab === "build" && (
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
@@ -321,18 +443,24 @@ export default function LecturerExamsPage() {
                 Select Questions from Bank
               </h3>
               <div className="space-y-2.5">
-                {questions.map((q) => {
-                  const isChecked = selectedQuestionIds.includes(q.id);
-                  return (
-                    <label key={q.id} className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${isChecked ? "border-[var(--tertiary)] bg-[var(--surface-container-low)]" : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"}`}>
-                      <div className="flex items-center gap-3">
-                        <input type="checkbox" checked={isChecked} onChange={() => toggleQuestionSelection(q.id)} className="rounded text-[var(--tertiary)]" />
-                        <span className="text-xs font-semibold text-[var(--on-surface)]">{q.text}</span>
-                      </div>
-                      <span className="badge badge-accent text-[10px] font-bold">{q.marks} marks</span>
-                    </label>
-                  );
-                })}
+                {questions.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                    No questions available to choose.
+                  </div>
+                ) : (
+                  questions.map((q) => {
+                    const isChecked = selectedQuestionIds.includes(q.id);
+                    return (
+                      <label key={q.id} className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${isChecked ? "border-[var(--tertiary)] bg-[var(--surface-container-low)]" : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"}`}>
+                        <div className="flex items-center gap-3">
+                          <input type="checkbox" checked={isChecked} onChange={() => toggleQuestionSelection(q.id)} className="rounded text-[var(--tertiary)]" />
+                          <span className="text-xs font-semibold text-[var(--on-surface)]">{q.text}</span>
+                        </div>
+                        <span className="badge badge-accent text-[10px] font-bold">{q.marks} marks</span>
+                      </label>
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -354,21 +482,20 @@ export default function LecturerExamsPage() {
                 <input type="number" value={examTimer} onChange={(e) => setExamTimer(Number(e.target.value))} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
               </div>
 
-              <button onClick={() => alert("Exam paper draft saved successfully!")} className="btn-primary w-full justify-center text-xs shadow-md">
-                Save Exam Draft
+              <button onClick={handleSaveExamDraft} className="btn-primary w-full justify-center text-xs shadow-md">
+                Save Exam Draft & Schedule
               </button>
             </div>
           </div>
         )}
 
-        
         {activeTab === "proctoring" && (
           <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
                 <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
-                  Live Exam Integrity Violation Feed ({selectedOffering})
+                  Live Exam Integrity Violation Feed ({activeOffering?.courseCode})
                 </h3>
               </div>
               <span className="text-xs text-[var(--on-surface-variant)]">
@@ -376,7 +503,7 @@ export default function LecturerExamsPage() {
               </span>
             </div>
 
-            <DataTable data={flags} columns={proctorColumns} searchPlaceholder="Search flagged students or event types..." pageSize={10} />
+            <DataTable data={flags} columns={proctorColumns} searchPlaceholder="Search flagged students..." pageSize={10} />
           </div>
         )}
       </main>

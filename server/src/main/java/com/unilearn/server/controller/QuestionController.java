@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/questions")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('EXAMINER')")
+@PreAuthorize("hasRole('LECTURER')")
 public class QuestionController {
 
     private final QuestionService questionService;

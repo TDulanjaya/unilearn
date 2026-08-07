@@ -55,7 +55,7 @@ public class ExamRequest {
     @Size(max = 20, message = "Status must not exceed 20 characters")
     private String status;
 
-    @NotNull(message = "Examiner / scheduled by ID is required")
-    @Positive(message = "Examiner ID must be positive")
+    @NotNull(message = "Scheduled by ID is required")
+    @Positive(message = "Scheduled by ID must be positive")
     private Long scheduledById;
 }

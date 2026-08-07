@@ -1,8 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import StudentNavbar from "@/components/StudentNavbar";
+import LecturerNavbar from "@/components/LecturerNavbar";
 import FileDropzone from "@/components/FileDropzone";
+
+interface UserProfile {
+  userId: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  photoUrl: string;
+  role: string;
+  status: string;
+}
 
 interface SecuritySession {
   id: string;
@@ -13,35 +26,99 @@ interface SecuritySession {
   isCurrent: boolean;
 }
 
-const INITIAL_SESSIONS: SecuritySession[] = [];
-
 export default function ProfilePage() {
-  const [firstName, setFirstName] = useState("Nadeesha");
-  const [lastName, setLastName] = useState("Silva");
-  const [email, setEmail] = useState("nadeesha.s@uni.edu");
-  const [phone, setPhone] = useState("+94 77 123 4567");
+  const { user } = useAuth();
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
-  const [sessions, setSessions] = useState<SecuritySession[]>(INITIAL_SESSIONS);
+  const [sessions, setSessions] = useState<SecuritySession[]>([
+    { id: "1", device: "Chrome / Windows 11", location: "Colombo, Sri Lanka", ipAddress: "192.168.1.15", lastActive: "Just Now", isCurrent: true },
+  ]);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const data = await api.get<UserProfile>("/api/v1/profile/me");
+        setProfile(data);
+        if (data) {
+          const parts = data.fullName ? data.fullName.split(" ") : ["", ""];
+          setFirstName(parts[0] || "");
+          setLastName(parts.slice(1).join(" ") || "");
+          setEmail(data.email || "");
+          setPhone(data.phone || "");
+          if (data.photoUrl) {
+            setAvatarPreview(data.photoUrl);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    }
+    loadProfile();
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3000);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    showToast("Profile details updated successfully!");
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "unilearn";
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "unilearn_preset";
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.secure_url) {
+          return data.secure_url;
+        }
+      }
+    } catch (e) {
+      console.warn("Cloudinary upload failed, falling back to data URL for local dev:", e);
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
-  const handleAvatarSelected = (files: File[]) => {
+  const handleAvatarSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const url = URL.createObjectURL(files[0]);
-    setAvatarPreview(url);
-    setShowAvatarModal(false);
-    showToast("New profile picture uploaded!");
+    setIsUploading(true);
+    try {
+      const secureUrl = await uploadToCloudinary(files[0]);
+      const updatedProfile = await api.patch<UserProfile>("/api/v1/profile/me/photo", {
+        photoUrl: secureUrl,
+      });
+      setProfile(updatedProfile);
+      setAvatarPreview(updatedProfile.photoUrl || secureUrl);
+      setShowAvatarModal(false);
+      showToast("Profile picture updated successfully!");
+    } catch (err: any) {
+      showToast(err.message || "Failed to update profile picture.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleTerminateSession = (id: string) => {
@@ -49,9 +126,16 @@ export default function ProfilePage() {
     showToast("Security session terminated.");
   };
 
+  const isAdmin = user?.role === "staff_admin";
+
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)] pb-12">
-      <StudentNavbar />
+      {user?.role === "student" ? (
+        <StudentNavbar />
+      ) : user?.role === "lecturer" || user?.role === "hod_dean" ? (
+        <LecturerNavbar />
+      ) : null}
+
       <main className="max-w-[1000px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-8">
         {toastMsg && (
           <div className="fixed bottom-6 right-6 z-50 bg-[var(--surface-container-highest)] border border-[var(--tertiary)] text-[var(--on-surface)] px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 animate-bounce">
@@ -70,13 +154,14 @@ export default function ProfilePage() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          
           <div className="card p-6 text-center shadow-md bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] self-start space-y-4">
             <div className="relative w-24 h-24 mx-auto group">
               {avatarPreview ? (
                 <img src={avatarPreview} alt="Avatar" className="w-24 h-24 rounded-full object-cover shadow-md border-2 border-[var(--tertiary)]" />
               ) : (
-                <div className="avatar w-24 h-24 text-3xl mx-auto font-extrabold shadow-sm flex items-center justify-center">N</div>
+                <div className="avatar w-24 h-24 text-3xl mx-auto font-extrabold shadow-sm flex items-center justify-center">
+                  {firstName.charAt(0) || "U"}
+                </div>
               )}
               <button
                 onClick={() => setShowAvatarModal(true)}
@@ -89,61 +174,91 @@ export default function ProfilePage() {
 
             <div>
               <h2 className="font-display font-bold text-xl text-[var(--on-surface)]">{firstName} {lastName}</h2>
-              <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">Student ID: SE/2023/042</p>
-              <span className="badge badge-accent mt-2">Faculty of Computing</span>
+              <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">Role: {profile?.role?.toUpperCase() || user?.role?.toUpperCase()}</p>
+              <span className="badge badge-accent mt-2">UniLearn Member</span>
             </div>
 
             <div className="pt-4 border-t border-[var(--outline-variant)] space-y-2 text-left text-xs text-[var(--on-surface-variant)]">
               <p><b className="text-[var(--on-surface)]">Email:</b> {email}</p>
-              <p><b className="text-[var(--on-surface)]">Batch:</b> CS2023-A</p>
-              <p><b className="text-[var(--on-surface)]">Degree:</b> BSc (Hons) Software Engineering</p>
+              <p><b className="text-[var(--on-surface)]">ID Code:</b> USER-{profile?.userId || user?.userId}</p>
+              <p><b className="text-[var(--on-surface)]">Status:</b> {profile?.status?.toUpperCase() || "ACTIVE"}</p>
             </div>
           </div>
 
-          
           <div className="lg:col-span-2 space-y-6">
-            
             <div className="card p-6 space-y-5 shadow-md bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
-              <h3 className="font-display font-bold text-lg text-[var(--on-surface)] border-b border-[var(--outline-variant)] pb-3">
-                Edit Personal Information
-              </h3>
-              <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-3">
+                <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
+                  Personal Information
+                </h3>
+                {!isAdmin && (
+                  <span className="text-[11px] text-[var(--on-surface-variant)] italic">
+                    Read-only (Managed by Administrator)
+                  </span>
+                )}
+              </div>
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                       First Name
                     </label>
-                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
+                    <input
+                      type="text"
+                      value={firstName}
+                      disabled={!isAdmin}
+                      readOnly={!isAdmin}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] disabled:opacity-75 disabled:cursor-not-allowed"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                       Last Name
                     </label>
-                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
+                    <input
+                      type="text"
+                      value={lastName}
+                      disabled={!isAdmin}
+                      readOnly={!isAdmin}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] disabled:opacity-75 disabled:cursor-not-allowed"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                       Email Address
                     </label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
+                    <input
+                      type="email"
+                      value={email}
+                      disabled={!isAdmin}
+                      readOnly={!isAdmin}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] disabled:opacity-75 disabled:cursor-not-allowed"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                       Contact No.
                     </label>
-                    <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
+                    <input
+                      type="text"
+                      value={phone}
+                      disabled={!isAdmin}
+                      readOnly={!isAdmin}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] disabled:opacity-75 disabled:cursor-not-allowed"
+                    />
                   </div>
                 </div>
 
-                <div className="flex justify-end">
-                  <button type="submit" className="btn-primary text-xs shadow-md">
-                    <i className="ti ti-check mr-1"></i> Save Changes
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex justify-end">
+                    <button type="submit" className="btn-primary text-xs shadow-md">
+                      <i className="ti ti-check mr-1"></i> Save Changes
+                    </button>
+                  </div>
+                )}
               </form>
             </div>
 
-            
             <div className="card p-6 space-y-4 shadow-md bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
                 <div>
@@ -179,10 +294,9 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      
       {showAvatarModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+          <div className="card max-w-md w-full p-6 space-y-4 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] shadow-2xl rounded-3xl">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Upload Profile Picture</h3>
               <button onClick={() => setShowAvatarModal(false)} className="text-[var(--on-surface-variant)]">
@@ -192,8 +306,14 @@ export default function ProfilePage() {
 
             <FileDropzone accept="image/*" maxSizeMB={5} multiple={false} onFilesSelected={handleAvatarSelected} />
 
+            {isUploading && (
+              <p className="text-xs text-[var(--tertiary)] font-semibold text-center animate-pulse">
+                Uploading photo...
+              </p>
+            )}
+
             <div className="flex justify-end pt-2 border-t border-[var(--outline-variant)]">
-              <button onClick={() => setShowAvatarModal(false)} className="btn-secondary text-xs">Cancel</button>
+              <button onClick={() => setShowAvatarModal(false)} disabled={isUploading} className="btn-secondary text-xs">Cancel</button>
             </div>
           </div>
         </div>

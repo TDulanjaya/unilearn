@@ -30,8 +30,8 @@ public class QuestionBankMapper {
                 .courseId(bank.getCourse() != null ? bank.getCourse().getCourseId() : null)
                 .courseName(bank.getCourse() != null ? bank.getCourse().getTitle() : null)
                 .courseCode(bank.getCourse() != null ? bank.getCourse().getCode() : null)
-                .examinerId(bank.getCreatedBy() != null ? bank.getCreatedBy().getUserId() : null)
-                .examinerName(bank.getCreatedBy() != null ? bank.getCreatedBy().getFullName() : null)
+                .lecturerId(bank.getCreatedBy() != null ? bank.getCreatedBy().getUserId() : null)
+                .lecturerName(bank.getCreatedBy() != null ? bank.getCreatedBy().getFullName() : null)
                 .title(bank.getCourse() != null ? bank.getCourse().getCode() + " Question Bank" : "Question Bank")
                 .build();
     }

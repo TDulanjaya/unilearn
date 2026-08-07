@@ -6,6 +6,18 @@ import com.unilearn.server.dto.response.AuthResponse;
 import com.unilearn.server.exception.DuplicateEntryException;
 import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.User;
+import com.unilearn.server.model.Faculty;
+import com.unilearn.server.model.Department;
+import com.unilearn.server.model.Batch;
+import com.unilearn.server.model.Student;
+import com.unilearn.server.model.Lecturer;
+import com.unilearn.server.model.StaffAdmin;
+import com.unilearn.server.model.HodDeanAssignment;
+import com.unilearn.server.repository.FacultyRepository;
+import com.unilearn.server.repository.HodDeanAssignmentRepository;
+import com.unilearn.server.exception.EntryNotFoundException;
+import com.unilearn.server.dto.response.RefreshTokenResponse;
+import com.unilearn.server.dto.request.RefreshTokenRequest;
 import com.unilearn.server.repository.BatchRepository;
 import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.LecturerRepository;
@@ -33,6 +45,8 @@ public class AuthServiceImpl implements AuthService {
     private final StaffAdminRepository staffAdminRepository;
     private final DepartmentRepository departmentRepository;
     private final BatchRepository batchRepository;
+    private final HodDeanAssignmentRepository hodDeanAssignmentRepository;
+    private final FacultyRepository facultyRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -61,31 +75,33 @@ public class AuthServiceImpl implements AuthService {
 
         User saved = userRepository.save(user);
 
-        // Fetch or fallback default Department & Batch
-        var defaultDept = departmentRepository.findAll().stream().findFirst().orElse(null);
-        var defaultBatch = batchRepository.findAll().stream().findFirst().orElse(null);
-
-        var dept = request.getDepartmentId() != null
-                ? departmentRepository.findById(request.getDepartmentId()).orElse(defaultDept)
-                : defaultDept;
-
-        var batch = request.getBatchId() != null
-                ? batchRepository.findById(request.getBatchId()).orElse(defaultBatch)
-                : defaultBatch;
+        Department dept = null;
+        if (request.getDepartmentId() != null) {
+            dept = departmentRepository.findById(request.getDepartmentId())
+                    .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
+        } else {
+            dept = departmentRepository.findAll().stream().findFirst().orElse(null);
+        }
 
         if ("STUDENT".equals(roleName)) {
-            String sNo = "STU-" + saved.getUserId();
-            com.unilearn.server.model.Student student = com.unilearn.server.model.Student.builder()
+            Batch batch = null;
+            if (request.getBatchId() != null) {
+                batch = batchRepository.findById(request.getBatchId())
+                        .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
+            } else {
+                batch = batchRepository.findAll().stream().findFirst().orElse(null);
+            }
+
+            Student student = Student.builder()
                     .user(saved)
-                    .studentNo(sNo)
+                    .studentNo("STU-" + saved.getUserId())
                     .department(dept)
                     .batch(batch)
                     .enrollmentYear(2026)
-                    .feeStatus("active")
                     .build();
             studentRepository.save(student);
         } else if ("LECTURER".equals(roleName) || "GUEST_LECTURER".equals(roleName)) {
-            com.unilearn.server.model.Lecturer lecturer = com.unilearn.server.model.Lecturer.builder()
+            Lecturer lecturer = Lecturer.builder()
                     .user(saved)
                     .department(dept)
                     .designation(request.getDesignation() != null ? request.getDesignation() : "Lecturer")
@@ -93,18 +109,34 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             lecturerRepository.save(lecturer);
         } else if ("STAFF_ADMIN".equals(roleName)) {
-            com.unilearn.server.model.StaffAdmin staffAdmin = com.unilearn.server.model.StaffAdmin.builder()
+            StaffAdmin staffAdmin = StaffAdmin.builder()
                     .user(saved)
                     .scopeLevel("INSTITUTION")
                     .department(dept)
                     .build();
             staffAdminRepository.save(staffAdmin);
+        } else if ("HOD_DEAN".equals(roleName)) {
+            Faculty faculty = null;
+            if ("faculty".equalsIgnoreCase(request.getScopeType()) && request.getFacultyId() != null) {
+                faculty = facultyRepository.findById(request.getFacultyId())
+                        .orElseThrow(() -> new EntryNotFoundException("Faculty not found with ID: " + request.getFacultyId()));
+            }
+            HodDeanAssignment assignment = HodDeanAssignment.builder()
+                .user(saved)
+                .scopeType(request.getScopeType() != null ? request.getScopeType() : "department")
+                .department("department".equalsIgnoreCase(request.getScopeType()) || request.getScopeType() == null ? dept : null)
+                .faculty(faculty)
+                .active(true)
+                .build();
+            hodDeanAssignmentRepository.save(assignment);
         }
 
         String token = jwtService.generateAccessToken(saved.getEmail(), saved.getRole());
+        String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
 
         return AuthResponse.builder()
                 .token(token)
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .userId(saved.getUserId())
                 .fullName(saved.getFullName())
@@ -133,9 +165,11 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ValidationException("User not found with email: " + request.getEmail()));
 
         String token = jwtService.generateAccessToken(user.getEmail(), user.getRole());
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         return AuthResponse.builder()
                 .token(token)
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .userId(user.getUserId())
                 .fullName(user.getFullName())
@@ -143,5 +177,34 @@ public class AuthServiceImpl implements AuthService {
                 .role(user.getRole())
                 .status(user.getStatus())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public RefreshTokenResponse refresh(RefreshTokenRequest request) {
+        if (request == null || request.getRefreshToken() == null) {
+            throw new ValidationException("Refresh token is required");
+        }
+        String refreshToken = request.getRefreshToken();
+        if (!jwtService.validateToken(refreshToken)) {
+            throw new ValidationException("Invalid refresh token");
+        }
+        String email = jwtService.getEmailFromToken(refreshToken);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntryNotFoundException("User not found with email: " + email));
+
+        String newAccessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole());
+        String newRefreshToken = jwtService.generateRefreshToken(user.getEmail());
+
+        return RefreshTokenResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .expiresIn(900000)
+                .build();
+    }
+
+    @Override
+    public void logout(String token) {
+        // Stateless JWT logout is handled on client side by clearing storage.
     }
 }

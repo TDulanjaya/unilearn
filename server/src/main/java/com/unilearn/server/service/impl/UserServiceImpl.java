@@ -7,11 +7,15 @@ import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.User;
 import com.unilearn.server.repository.BatchRepository;
-import com.unilearn.server.repository.DepartmentRepository;
-import com.unilearn.server.repository.LecturerRepository;
-import com.unilearn.server.repository.StaffAdminRepository;
-import com.unilearn.server.repository.StudentRepository;
-import com.unilearn.server.repository.UserRepository;
+import com.unilearn.server.model.Faculty;
+import com.unilearn.server.model.Department;
+import com.unilearn.server.model.Batch;
+import com.unilearn.server.model.Student;
+import com.unilearn.server.model.Lecturer;
+import com.unilearn.server.model.StaffAdmin;
+import com.unilearn.server.model.HodDeanAssignment;
+import com.unilearn.server.repository.*;
+import com.unilearn.server.model.Message;
 import com.unilearn.server.service.UserService;
 import com.unilearn.server.util.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +38,22 @@ public class UserServiceImpl implements UserService {
     private final StaffAdminRepository staffAdminRepository;
     private final DepartmentRepository departmentRepository;
     private final BatchRepository batchRepository;
+    private final HodDeanAssignmentRepository hodDeanAssignmentRepository;
+    private final FacultyRepository facultyRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+
+    private final EnrollmentRepository enrollmentRepository;
+    private final SubmissionRepository submissionRepository;
+    private final ExamAttemptRepository examAttemptRepository;
+    private final AttendanceRecordRepository attendanceRecordRepository;
+    private final CourseOfferingLecturerRepository courseOfferingLecturerRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final MaterialRepository materialRepository;
+    private final GradebookEntryRepository gradebookEntryRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final NotificationRepository notificationRepository;
+    private final MessageRepository messageRepository;
 
     @Override
     @Transactional
@@ -53,34 +71,60 @@ public class UserServiceImpl implements UserService {
         User saved = userRepository.save(user);
 
         String roleName = saved.getRole() != null ? saved.getRole().toUpperCase() : "STUDENT";
-        var defaultDept = departmentRepository.findAll().stream().findFirst().orElse(null);
-        var defaultBatch = batchRepository.findAll().stream().findFirst().orElse(null);
+        Department dept = null;
+        if (request.getDepartmentId() != null) {
+            dept = departmentRepository.findById(request.getDepartmentId())
+                    .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
+        } else {
+            dept = departmentRepository.findAll().stream().findFirst().orElse(null);
+        }
 
         if ("STUDENT".equals(roleName)) {
-            com.unilearn.server.model.Student student = com.unilearn.server.model.Student.builder()
+            Batch batch = null;
+            if (request.getBatchId() != null) {
+                batch = batchRepository.findById(request.getBatchId())
+                        .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
+            } else {
+                batch = batchRepository.findAll().stream().findFirst().orElse(null);
+            }
+
+            Student student = Student.builder()
                     .user(saved)
                     .studentNo("STU-" + saved.getUserId())
-                    .department(defaultDept)
-                    .batch(defaultBatch)
+                    .department(dept)
+                    .batch(batch)
                     .enrollmentYear(2026)
-                    .feeStatus("active")
                     .build();
             studentRepository.save(student);
         } else if ("LECTURER".equals(roleName) || "GUEST_LECTURER".equals(roleName)) {
-            com.unilearn.server.model.Lecturer lecturer = com.unilearn.server.model.Lecturer.builder()
+            Lecturer lecturer = Lecturer.builder()
                     .user(saved)
-                    .department(defaultDept)
-                    .designation("Lecturer")
+                    .department(dept)
+                    .designation(request.getDesignation() != null ? request.getDesignation() : "Lecturer")
                     .isGuest("GUEST_LECTURER".equals(roleName))
                     .build();
             lecturerRepository.save(lecturer);
         } else if ("STAFF_ADMIN".equals(roleName)) {
-            com.unilearn.server.model.StaffAdmin staffAdmin = com.unilearn.server.model.StaffAdmin.builder()
+            StaffAdmin staffAdmin = StaffAdmin.builder()
                     .user(saved)
                     .scopeLevel("INSTITUTION")
-                    .department(defaultDept)
+                    .department(dept)
                     .build();
             staffAdminRepository.save(staffAdmin);
+        } else if ("HOD_DEAN".equals(roleName)) {
+            Faculty faculty = null;
+            if ("faculty".equalsIgnoreCase(request.getScopeType()) && request.getFacultyId() != null) {
+                faculty = facultyRepository.findById(request.getFacultyId())
+                        .orElseThrow(() -> new EntryNotFoundException("Faculty not found with ID: " + request.getFacultyId()));
+            }
+            HodDeanAssignment assignment = HodDeanAssignment.builder()
+                .user(saved)
+                .scopeType(request.getScopeType() != null ? request.getScopeType() : "department")
+                .department("department".equalsIgnoreCase(request.getScopeType()) || request.getScopeType() == null ? dept : null)
+                .faculty(faculty)
+                .active(true)
+                .build();
+            hodDeanAssignmentRepository.save(assignment);
         }
 
         return userMapper.toUserResponse(saved);
@@ -129,6 +173,59 @@ public class UserServiceImpl implements UserService {
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
+
+        String role = user.getRole() != null ? user.getRole().toLowerCase() : "";
+        boolean hasAcademicData = false;
+
+        if ("student".equals(role)) {
+            if (!enrollmentRepository.findByStudent_StudentId(userId).isEmpty() ||
+                !submissionRepository.findByStudent_StudentId(userId).isEmpty() ||
+                !examAttemptRepository.findByStudent_StudentId(userId).isEmpty() ||
+                !attendanceRecordRepository.findByStudent_StudentId(userId).isEmpty()) {
+                hasAcademicData = true;
+            }
+        } else if ("lecturer".equals(role)) {
+            List<com.unilearn.server.model.CourseOfferingLecturer> colList = courseOfferingLecturerRepository.findByLecturer_LecturerId(userId);
+            if (!colList.isEmpty() ||
+                !assignmentRepository.findByCreatedBy_LecturerId(userId).isEmpty() ||
+                !materialRepository.findByUploadedBy_LecturerId(userId).isEmpty()) {
+                hasAcademicData = true;
+            }
+            if (!hasAcademicData && !colList.isEmpty()) {
+                for (com.unilearn.server.model.CourseOfferingLecturer col : colList) {
+                    if (!gradebookEntryRepository.findByCourseOffering_OfferingId(col.getCourseOffering().getOfferingId()).isEmpty()) {
+                        hasAcademicData = true;
+                        break;
+                    }
+                }
+            }
+        } else if ("hod_dean".equals(role) || "staff_admin".equals(role)) {
+            if (!hodDeanAssignmentRepository.findByUser_UserId(userId).isEmpty() ||
+                !auditLogRepository.findByUser_UserId(userId).isEmpty()) {
+                hasAcademicData = true;
+            }
+        }
+
+        if (hasAcademicData) {
+            throw new com.unilearn.server.exception.IllegalStateException(
+                "Cannot permanently delete a user with existing academic records. Deactivate the account instead."
+            );
+        }
+
+        // Genueinely unused account path - perform deletion
+        if ("student".equals(role)) {
+            studentRepository.deleteById(userId);
+        } else if ("lecturer".equals(role)) {
+            lecturerRepository.deleteById(userId);
+        } else if ("staff_admin".equals(role)) {
+            staffAdminRepository.deleteById(userId);
+        } else if ("hod_dean".equals(role)) {
+            hodDeanAssignmentRepository.deleteAll(hodDeanAssignmentRepository.findByUser_UserId(userId));
+        }
+
+        // Delete user's notifications and messages
+        notificationRepository.deleteAll(notificationRepository.findByUser_UserId(userId));
+        messageRepository.deleteAll(messageRepository.findBySender_UserIdOrReceiver_UserId(userId, userId));
 
         userRepository.delete(user);
     }

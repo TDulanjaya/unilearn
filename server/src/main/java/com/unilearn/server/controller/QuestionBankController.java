@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/question-banks")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('EXAMINER')")
+@PreAuthorize("hasRole('LECTURER')")
 public class QuestionBankController {
 
     private final QuestionBankService questionBankService;

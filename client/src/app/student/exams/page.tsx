@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import McqQuestion from "@/components/exam/McqQuestion";
 import TrueFalseQuestion from "@/components/exam/TrueFalseQuestion";
 import ShortTextQuestion from "@/components/exam/ShortTextQuestion";
@@ -72,56 +74,102 @@ interface ExamListEntry {
   isOnlineAvailable?: boolean;
 }
 
-const EXAMS: ExamListEntry[] = [
-  {
-    id: 1,
-    courseCode: "SE308.3",
-    courseTitle: "Software Process Management",
-    dateTime: "Aug 05, 2026 · Live Online Exam",
-    venue: "Online Exam Portal",
-    seatNo: "ONLINE-01",
-    type: "Final Exam",
-    status: "Upcoming",
-    isOnlineAvailable: true,
-  },
-  {
-    id: 2,
-    courseCode: "SE201.2",
-    courseTitle: "Data Structures & Algorithms",
-    dateTime: "Dec 14, 2026 · 01:30 PM - 04:30 PM",
-    venue: "Computing Lab 04",
-    seatNo: "LAB-18",
-    type: "Final Exam",
-    status: "Upcoming",
-  },
-  {
-    id: 3,
-    courseCode: "SE309.3",
-    courseTitle: "Software Verification & Validation",
-    dateTime: "Jul 15, 2026 · 10:00 AM - 11:30 AM",
-    venue: "Online Exam Portal",
-    seatNo: "N/A",
-    type: "In-Class Assessment",
-    status: "Completed",
-    grade: "A-",
-  },
-];
-
 export default function StudentExamsPage() {
+  const { user } = useAuth();
   const [filter, setFilter] = useState<"Upcoming" | "Completed">("Upcoming");
   const [activeExam, setActiveExam] = useState<MockExam | null>(null);
 
-  
+  // Exam wizard states
   const [currentQIndex, setCurrentQIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(
-    MOCK_ONLINE_EXAM.durationMinutes * 60
-  );
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(MOCK_ONLINE_EXAM.durationMinutes * 60);
   const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null);
 
-  
+  // 1. Fetch student's enrollments
+  const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
+    queryKey: ["studentEnrollments", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
+  const enrollmentList = enrollments || [];
+
+  // 2. Fetch scheduled exams for enrolled offerings
+  const examQueries = useQueries({
+    queries: enrollmentList.map((e: any) => ({
+      queryKey: ["exams", e.offeringId],
+      queryFn: () => api.get<any[]>(`/api/v1/exams/offering/${e.offeringId}`),
+    })),
+  });
+
+  const rawExams = examQueries.flatMap((q: any) => q.data || []);
+
+  const exams: ExamListEntry[] = rawExams.map((ex: any, idx: number) => ({
+    id: ex.examId,
+    courseCode: ex.courseCode || "SE",
+    courseTitle: ex.title || "Examination",
+    dateTime: ex.startDateTime ? new Date(ex.startDateTime).toLocaleString() : "Date & Time TBD",
+    venue: "Online Exam Portal",
+    seatNo: `SEAT-${idx + 10}`,
+    type: "In-Class Assessment",
+    status: "Upcoming",
+    isOnlineAvailable: true,
+  }));
+
+  // Mutations
+  const startAttemptMutation = useMutation({
+    mutationFn: (examId: number) =>
+      api.post("/api/v1/exam-attempts", {
+        examId,
+        studentId: user?.userId,
+      }),
+  });
+
+  const completeAttemptMutation = useMutation({
+    mutationFn: (attemptId: number) =>
+      api.patch(`/api/v1/exam-attempts/${attemptId}/complete`, {}),
+  });
+
+  const startExam = async (exam: any) => {
+    try {
+      const res = await startAttemptMutation.mutateAsync(exam.id);
+      setCurrentAttemptId(res.attemptId);
+
+      setActiveExam({
+        id: exam.id,
+        courseCode: exam.courseCode,
+        courseTitle: exam.courseTitle,
+        durationMinutes: exam.durationMinutes || 45,
+        questions: MOCK_ONLINE_EXAM.questions,
+      });
+
+      setSecondsRemaining((exam.durationMinutes || 45) * 60);
+      setCurrentQIndex(0);
+      setAnswers({});
+      setFlagged({});
+      setTabSwitchCount(0);
+      setIsSubmitted(false);
+    } catch (err: any) {
+      alert("Failed to start exam attempt: " + err.message);
+    }
+  };
+
+  const handleManualSubmit = async () => {
+    if (confirm("Are you sure you want to submit your exam now?")) {
+      try {
+        if (currentAttemptId) {
+          await completeAttemptMutation.mutateAsync(currentAttemptId);
+        }
+        setIsSubmitted(true);
+      } catch (err: any) {
+        alert("Submission failed: " + err.message);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!activeExam || isSubmitted) return;
 
@@ -144,7 +192,6 @@ export default function StudentExamsPage() {
     };
   }, [activeExam, isSubmitted]);
 
-  
   useEffect(() => {
     if (!activeExam || isSubmitted) return;
 
@@ -176,28 +223,12 @@ export default function StudentExamsPage() {
     setFlagged((prev) => ({ ...prev, [questionId]: !prev[questionId] }));
   };
 
-  const startExam = (exam: MockExam) => {
-    setActiveExam(exam);
-    setSecondsRemaining(exam.durationMinutes * 60);
-    setCurrentQIndex(0);
-    setAnswers({});
-    setFlagged({});
-    setTabSwitchCount(0);
-    setIsSubmitted(false);
-  };
-
-  const handleManualSubmit = () => {
-    if (confirm("Are you sure you want to submit your exam now?")) {
-      setIsSubmitted(true);
-    }
-  };
-
   const handleDownloadSlipFile = (exam: ExamListEntry) => {
     const slipContent = `
 ============================================================
            UNILEARN OFFICIAL ADMISSION SLIP
 ============================================================
-Student Name: Nadeesha Silva
+Student Name: ${user?.fullName || "Student"}
 Index Number: SE-2023-042
 Degree: B.Sc. (Hons) in Software Engineering
 
@@ -215,12 +246,21 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `AdmissionSlip_${exam.courseCode}_NadeeshaSilva.txt`;
+    a.download = `AdmissionSlip_${exam.courseCode}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  
+  if (enrollmentsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading Examination Data...
+        </div>
+      </div>
+    );
+  }
+
   if (activeExam) {
     const currentQ = activeExam.questions[currentQIndex];
     const answeredCount = Object.keys(answers).filter(
@@ -229,8 +269,7 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
 
     return (
       <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
-        
-        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--surface-container-low)]">
           <div>
             <span className="badge badge-accent mb-1 font-bold">
               {activeExam.courseCode}
@@ -244,13 +283,11 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
           </div>
 
           <div className="flex items-center gap-3">
-            
             <div className="px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5 font-semibold">
-              <i className="ti ti-[alert-triangle] text-base"></i>
+              <i className="ti ti-alert-triangle text-base"></i>
               <span>Focus Alerts: {tabSwitchCount}</span>
             </div>
 
-            
             <div className="px-4 py-2 rounded-2xl bg-[var(--primary)] text-[var(--on-primary)] font-mono font-bold text-lg flex items-center gap-2 shadow-md">
               <i className="ti ti-clock text-xl text-[var(--tertiary)]"></i>
               <span>{formatTimer(secondsRemaining)}</span>
@@ -258,9 +295,8 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
           </div>
         </div>
 
-        
         {isSubmitted ? (
-          <div className="card p-8 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-2xl">
+          <div className="card p-8 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-2xl animate-scaleIn">
             <div className="w-16 h-16 rounded-3xl bg-[var(--secondary-container)] text-[var(--on-secondary-container)] flex items-center justify-center mx-auto">
               <i className="ti ti-check-circle text-4xl"></i>
             </div>
@@ -279,12 +315,9 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
             </button>
           </div>
         ) : (
-          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
             <div className="lg:col-span-2 card p-6 sm:p-8 space-y-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex flex-col justify-between">
               <div>
-                
                 <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-4 mb-6">
                   <span className="font-display font-bold text-sm text-[var(--tertiary)]">
                     Question {currentQIndex + 1} of {activeExam.questions.length}
@@ -308,12 +341,10 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                   </div>
                 </div>
 
-                
                 <h3 className="font-display font-bold text-base sm:text-lg text-[var(--on-surface)] mb-6 leading-relaxed">
                   {currentQ.text}
                 </h3>
 
-                
                 {currentQ.type === "MCQ" && currentQ.options && (
                   <McqQuestion
                     questionId={currentQ.id}
@@ -345,7 +376,6 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                 )}
               </div>
 
-              
               <div className="flex items-center justify-between border-t border-[var(--outline-variant)] pt-6 mt-8">
                 <button
                   type="button"
@@ -376,7 +406,6 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
               </div>
             </div>
 
-            
             <div className="card p-6 space-y-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] h-fit">
               <h4 className="font-display font-bold text-sm text-[var(--on-surface)] border-b border-[var(--outline-variant)] pb-3">
                 Question Navigator
@@ -409,7 +438,6 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                 })}
               </div>
 
-              
               <div className="space-y-2 text-xs border-t border-[var(--outline-variant)] pt-4 text-[var(--on-surface-variant)]">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-md bg-[var(--tertiary)]"></div>
@@ -439,12 +467,10 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
     );
   }
 
-  
-  const filteredExams = EXAMS.filter((e) => e.status === filter);
+  const filteredExams = exams.filter((e) => e.status === filter);
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
-      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
@@ -472,20 +498,19 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
         </div>
       </div>
 
-      
-      {filter === "Upcoming" && (
-        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl bg-gradient-to-r from-[var(--surface-container-low)] via-[var(--surface-container)] to-[var(--surface-container-low)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {filter === "Upcoming" && exams.length > 0 && (
+        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl bg-gradient-to-r from-[var(--surface-container-low)] via-[var(--surface-container)] to-[var(--surface-container-low)] flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--surface-container-low)]">
           <div className="space-y-1">
             <span className="badge badge-accent font-bold">Live Portal Ready</span>
             <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-              SE308.3 Online Exam Runner Wizard
+              {exams[0].courseCode} Online Exam Runner Wizard
             </h3>
             <p className="text-xs text-[var(--on-surface-variant)]">
               Practice test runner with countdown timer, draft auto-save, question navigator, and focus monitoring.
             </p>
           </div>
           <button
-            onClick={() => startExam(MOCK_ONLINE_EXAM)}
+            onClick={() => startExam(exams[0])}
             className="btn-primary text-xs !py-3 !px-6 shadow-md shrink-0 justify-center"
           >
             <i className="ti ti-player-play"></i> Launch Exam Wizard
@@ -493,59 +518,64 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
         </div>
       )}
 
-      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredExams.map((exam) => (
-          <div
-            key={exam.id}
-            className="card p-6 flex flex-col justify-between space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:shadow-lg transition-all"
-          >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="badge badge-accent font-bold">{exam.courseCode}</span>
-                <span className="text-xs font-semibold text-[var(--tertiary)]">{exam.type}</span>
-              </div>
-
-              <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-                {exam.courseTitle}
-              </h3>
-
-              <div className="space-y-1.5 text-xs text-[var(--on-surface-variant)]">
-                <p className="flex items-center gap-2">
-                  <i className="ti ti-calendar-event text-sm text-[var(--tertiary)]"></i> {exam.dateTime}
-                </p>
-                <p className="flex items-center gap-2">
-                  <i className="ti ti-building text-sm text-[var(--tertiary)]"></i> Venue: {exam.venue}
-                </p>
-                <p className="flex items-center gap-2">
-                  <i className="ti ti-[#chair] ti-ticket text-sm text-[var(--tertiary)]"></i> Seat No: {exam.seatNo}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between">
-              {exam.status === "Upcoming" ? (
-                <button
-                  onClick={() => handleDownloadSlipFile(exam)}
-                  className="btn-outline text-xs !py-2 !px-4 flex items-center gap-1.5"
-                >
-                  <i className="ti ti-download"></i> Admission Slip
-                </button>
-              ) : (
-                <span className="text-xs font-semibold text-emerald-600">Grade: {exam.grade}</span>
-              )}
-
-              {exam.isOnlineAvailable && (
-                <button
-                  onClick={() => startExam(MOCK_ONLINE_EXAM)}
-                  className="btn-primary text-xs !py-2 !px-4"
-                >
-                  Start Exam
-                </button>
-              )}
-            </div>
+        {filteredExams.length === 0 ? (
+          <div className="text-center p-6 text-xs text-[var(--on-surface-variant)] col-span-2 font-semibold">
+            No exams scheduled in this category.
           </div>
-        ))}
+        ) : (
+          filteredExams.map((exam) => (
+            <div
+              key={exam.id}
+              className="card p-6 flex flex-col justify-between space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:shadow-lg transition-all"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="badge badge-accent font-bold">{exam.courseCode}</span>
+                  <span className="text-xs font-semibold text-[var(--tertiary)]">{exam.type}</span>
+                </div>
+
+                <h3 className="font-display font-bold text-lg text-[var(--on-surface)] truncate">
+                  {exam.courseTitle}
+                </h3>
+
+                <div className="space-y-1.5 text-xs text-[var(--on-surface-variant)]">
+                  <p className="flex items-center gap-2">
+                    <i className="ti ti-calendar-event text-sm text-[var(--tertiary)]"></i> {exam.dateTime}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <i className="ti ti-building text-sm text-[var(--tertiary)]"></i> Venue: {exam.venue}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <i className="ti ti-ticket text-sm text-[var(--tertiary)]"></i> Seat No: {exam.seatNo}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between">
+                {exam.status === "Upcoming" ? (
+                  <button
+                    onClick={() => handleDownloadSlipFile(exam)}
+                    className="btn-outline text-xs !py-2 !px-4 flex items-center gap-1.5"
+                  >
+                    <i className="ti ti-download"></i> Admission Slip
+                  </button>
+                ) : (
+                  <span className="text-xs font-semibold text-emerald-600">Grade: {exam.grade}</span>
+                )}
+
+                {exam.isOnlineAvailable && (
+                  <button
+                    onClick={() => startExam(exam)}
+                    className="btn-primary text-xs !py-2 !px-4"
+                  >
+                    Start Exam
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </main>
   );

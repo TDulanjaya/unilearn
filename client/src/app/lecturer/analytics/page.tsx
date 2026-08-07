@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import {
   BarChart,
@@ -15,24 +18,6 @@ import {
   Cell,
 } from "recharts";
 
-const gradeDistributionData = [
-  { range: "A+ (90-100)", count: 14, fill: "var(--tertiary)" },
-  { range: "A (80-89)", count: 28, fill: "var(--tertiary)" },
-  { range: "B (70-79)", count: 35, fill: "var(--secondary)" },
-  { range: "C (60-69)", count: 18, fill: "var(--secondary)" },
-  { range: "D (50-59)", count: 8, fill: "#f59e0b" },
-  { range: "F (<50)", count: 4, fill: "#ef4444" },
-];
-
-const submissionTimelineData = [
-  { date: "Day 1", count: 12 },
-  { date: "Day 2", count: 25 },
-  { date: "Day 3", count: 45 },
-  { date: "Day 4", count: 68 },
-  { date: "Day 5 (Due)", count: 102 },
-  { date: "Late (+1d)", count: 5 },
-];
-
 interface AtRiskStudent {
   id: string;
   name: string;
@@ -44,9 +29,45 @@ interface AtRiskStudent {
   reason: string;
 }
 
-export default function LecturerAnalyticsPage() {
-  const [selectedCourse, setSelectedCourse] = useState("SE308.3");
+const submissionTimelineData = [
+  { date: "Day 1", count: 12 },
+  { date: "Day 2", count: 25 },
+  { date: "Day 3", count: 45 },
+  { date: "Day 4", count: 68 },
+  { date: "Day 5 (Due)", count: 102 },
+  { date: "Late (+1d)", count: 5 },
+];
 
+export default function LecturerAnalyticsPage() {
+  const { user } = useAuth();
+  const [activeOfferingId, setActiveOfferingId] = useState<number | null>(null);
+
+  // 1. Fetch lecturer course offerings
+  const { data: offerings, isLoading: offeringsLoading } = useQuery({
+    queryKey: ["lecturerOfferings", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
+  useEffect(() => {
+    if (offerings && offerings.length > 0 && !activeOfferingId) {
+      setActiveOfferingId(offerings[0].offeringId);
+    }
+  }, [offerings]);
+
+  // 2. Fetch performance report for active offering
+  const { data: reportList, isLoading: reportLoading } = useQuery({
+    queryKey: ["performanceReport", activeOfferingId],
+    queryFn: () => api.get<any[]>(`/api/v1/reports/performance?offeringId=${activeOfferingId}`),
+    enabled: !!activeOfferingId,
+  });
+
+  const report = reportList && reportList.length > 0 ? reportList[0] : null;
+
+  const activeOffering = offerings?.find((o: any) => o.offeringId === activeOfferingId);
+  const selectedCourseCode = activeOffering?.courseCode || "SE308.3";
+
+  // Mock at risk list filtered by selected course code
   const atRiskStudents: AtRiskStudent[] = [
     { id: "1", name: "Sahan Jayawardena", indexNo: "SE/2023/088", courseCode: "SE308.3", attendancePct: 52, avgScorePct: 44, riskLevel: "High", reason: "Low Attendance & Failing Midterm" },
     { id: "2", name: "Kavindi Ranasinghe", indexNo: "SE/2023/041", courseCode: "SE308.3", attendancePct: 65, avgScorePct: 58, riskLevel: "Medium", reason: "2 Missing Assignment Submissions" },
@@ -54,7 +75,30 @@ export default function LecturerAnalyticsPage() {
     { id: "4", name: "Chathuri Wickramasinghe", indexNo: "SE/2023/019", courseCode: "SE308.3", attendancePct: 74, avgScorePct: 61, riskLevel: "Low", reason: "Declining Quiz Scores" },
   ];
 
-  const filteredRiskList = atRiskStudents.filter((s) => s.courseCode === selectedCourse);
+  const filteredRiskList = atRiskStudents.filter((s) => s.courseCode === selectedCourseCode);
+
+  const gradeDistributionData = report?.gradeDistribution?.map((item: any) => ({
+    range: item.label,
+    count: Number(item.count),
+    fill: item.label.includes("A") ? "var(--tertiary)" : item.label.includes("B") ? "var(--secondary)" : "#f59e0b",
+  })) || [
+    { range: "A+ (90-100)", count: 14, fill: "var(--tertiary)" },
+    { range: "A (80-89)", count: 28, fill: "var(--tertiary)" },
+    { range: "B (70-79)", count: 35, fill: "var(--secondary)" },
+    { range: "C (60-69)", count: 18, fill: "var(--secondary)" },
+    { range: "D (50-59)", count: 8, fill: "#f59e0b" },
+    { range: "F (<50)", count: 4, fill: "#ef4444" },
+  ];
+
+  if (offeringsLoading || reportLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading Analytics...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)] pb-12">
@@ -72,24 +116,28 @@ export default function LecturerAnalyticsPage() {
           </div>
 
           <select
-            value={selectedCourse}
-            onChange={(e) => setSelectedCourse(e.target.value)}
+            value={activeOfferingId || ""}
+            onChange={(e) => setActiveOfferingId(Number(e.target.value))}
             className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] self-start sm:self-auto"
           >
-            <option value="SE308.3">SE308.3 — Software Process Management</option>
-            <option value="SE202.2">SE202.2 — Database Systems</option>
+            {offerings?.map((o: any) => (
+              <option key={o.offeringId} value={o.offeringId}>
+                {o.courseCode} — {o.courseName} ({o.batchName})
+              </option>
+            ))}
           </select>
         </div>
 
-        
         <div className="grid lg:grid-cols-2 gap-6">
-          
+          {/* Grade distribution */}
           <div className="card p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)] flex items-center gap-2">
                 <i className="ti ti-chart-bar text-[var(--tertiary)]"></i> Grade Distribution Bell Curve
               </h3>
-              <span className="badge badge-accent text-[10px]">Cohort Total: 107</span>
+              <span className="badge badge-accent text-[10px]">
+                Cohort Total: {report?.studentCount || 107}
+              </span>
             </div>
 
             <div className="h-64 w-full text-xs">
@@ -102,7 +150,7 @@ export default function LecturerAnalyticsPage() {
                     contentStyle={{ backgroundColor: "var(--surface-container-lowest)", borderColor: "var(--outline-variant)", borderRadius: "12px", fontSize: "12px" }}
                   />
                   <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                    {gradeDistributionData.map((entry, index) => (
+                    {gradeDistributionData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
@@ -111,13 +159,15 @@ export default function LecturerAnalyticsPage() {
             </div>
           </div>
 
-          
+          {/* Submission pacing */}
           <div className="card p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)] flex items-center gap-2">
                 <i className="ti ti-timeline text-[var(--tertiary)]"></i> Assignment Submission Pacing
               </h3>
-              <span className="badge badge-success text-[10px]">95% On-Time Submission Rate</span>
+              <span className="badge badge-success text-[10px]">
+                Pass Rate: {report?.passRatePercent != null ? Math.round(report.passRatePercent * 100) : 95}%
+              </span>
             </div>
 
             <div className="h-64 w-full text-xs">
@@ -140,7 +190,7 @@ export default function LecturerAnalyticsPage() {
           </div>
         </div>
 
-        
+        {/* At-risk students */}
         <div className="card p-6 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
             <div>

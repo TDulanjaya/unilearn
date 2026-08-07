@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { api } from "@/lib/api";
 
 export interface Student {
   id: string;
@@ -50,21 +51,26 @@ export default function AttendanceQrModal({
   }, [slot.id]);
 
   useEffect(() => {
-    const checkInInterval = setInterval(() => {
-      setAttendance((prev) => {
-        const unchecked = slot.enrolledStudents.filter((st) => prev[st.id] !== "Present");
-        if (unchecked.length === 0) return prev;
+    const fetchAttendance = async () => {
+      try {
+        const records = await api.get<any[]>(`/api/v1/attendance-records/session/${slot.id}`);
+        setAttendance((prev) => {
+          const next = { ...prev };
+          records.forEach((rec: any) => {
+            next[String(rec.studentId)] = "Present";
+          });
+          return next;
+        });
+      } catch (err) {
+        console.error("Error polling attendance:", err);
+      }
+    };
 
-        const randomStudent = unchecked[Math.floor(Math.random() * unchecked.length)];
-        return {
-          ...prev,
-          [randomStudent.id]: "Present",
-        };
-      });
-    }, 3500);
+    fetchAttendance();
+    const checkInInterval = setInterval(fetchAttendance, 3000);
 
     return () => clearInterval(checkInInterval);
-  }, [slot.enrolledStudents]);
+  }, [slot.id]);
 
   useEffect(() => {
     const presentCount = Object.values(attendance).filter((st) => st === "Present").length;

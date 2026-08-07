@@ -18,4 +18,6 @@ public interface AttendanceRecordService {
     List<AttendanceRecordResponse> getAttendanceForSession(Long sessionId);
 
     List<AttendanceRecordResponse> getAttendanceForStudent(Long studentId);
+
+    AttendanceRecordResponse checkIn(String sessionCode, Long studentId);
 }

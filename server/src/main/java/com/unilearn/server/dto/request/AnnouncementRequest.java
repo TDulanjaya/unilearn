@@ -37,4 +37,8 @@ public class AnnouncementRequest {
 
     @NotNull(message = "Posted by user ID is required")
     private Long postedByUserId;
+
+    private java.util.List<String> targetPrograms;
+    private java.util.List<String> targetSemesters;
+    private java.util.List<String> targetBatches;
 }

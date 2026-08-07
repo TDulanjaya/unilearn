@@ -26,7 +26,6 @@ public class StudentMapper {
                 .department(department)
                 .batch(batch)
                 .enrollmentYear(request.getEnrollmentYear())
-                .feeStatus("pending")
                 .build();
     }
 

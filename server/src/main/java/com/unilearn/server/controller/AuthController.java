@@ -10,6 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.dto.request.RefreshTokenRequest;
+import com.unilearn.server.dto.response.RefreshTokenResponse;
+
 /**
  * Authentication controller — all endpoints are public (no @PreAuthorize).
  * These paths must be included in SecurityConfig PUBLIC_PATHS.
@@ -31,22 +34,14 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    // TODO: POST /refresh — AuthService does not have a refresh() method yet.
-    //       Add AuthResponse refresh(RefreshTokenRequest request) to AuthService,
-    //       then uncomment and wire up this endpoint.
-    //
-    // @PostMapping("/refresh")
-    // public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-    //     return ResponseEntity.ok(authService.refresh(request));
-    // }
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(authService.refresh(request));
+    }
 
-    // TODO: POST /logout — AuthService does not have a logout() method yet.
-    //       Add void logout(String token) to AuthService,
-    //       then uncomment and wire up this endpoint.
-    //
-    // @PostMapping("/logout")
-    // public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
-    //     authService.logout(authHeader);
-    //     return ResponseEntity.noContent().build();
-    // }
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
+        authService.logout(authHeader);
+        return ResponseEntity.noContent().build();
+    }
 }

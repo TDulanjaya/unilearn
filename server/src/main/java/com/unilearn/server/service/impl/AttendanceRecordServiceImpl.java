@@ -126,4 +126,49 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
                 .map(attendanceRecordMapper::toAttendanceRecordResponse)
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public AttendanceRecordResponse checkIn(String sessionCode, Long studentId) {
+        if (sessionCode == null || sessionCode.trim().isEmpty()) {
+            throw new ValidationException("Session code is required");
+        }
+
+        String[] parts = sessionCode.split("-");
+        if (parts.length < 2) {
+            throw new ValidationException("Invalid session code format");
+        }
+
+        Long sessionId;
+        try {
+            sessionId = Long.parseLong(parts[1]);
+        } catch (NumberFormatException e) {
+            throw new ValidationException("Invalid session ID in code");
+        }
+
+        AttendanceSession session = attendanceSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new EntryNotFoundException("Attendance session not found with ID: " + sessionId));
+
+        if (!session.getSessionDate().equals(java.time.LocalDate.now())) {
+            throw new ValidationException("This attendance session is not active today");
+        }
+
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new EntryNotFoundException("Student profile not found for ID: " + studentId));
+
+        // Check if already checked in
+        java.util.Optional<AttendanceRecord> existingOpt = attendanceRecordRepository.findBySession_SessionIdAndStudent_StudentId(sessionId, studentId);
+        if (existingOpt.isPresent()) {
+            return attendanceRecordMapper.toAttendanceRecordResponse(existingOpt.get());
+        }
+
+        AttendanceRecord record = AttendanceRecord.builder()
+                .session(session)
+                .student(student)
+                .status("Present")
+                .build();
+
+        AttendanceRecord saved = attendanceRecordRepository.save(record);
+        return attendanceRecordMapper.toAttendanceRecordResponse(saved);
+    }
 }

@@ -43,4 +43,14 @@ public class UserRequest {
 
     @Size(max = 20, message = "Status must not exceed 20 characters")
     private String status;
+
+    private Long departmentId;
+
+    private Long batchId;
+
+    private String designation;
+
+    private Long facultyId;
+
+    private String scopeType;
 }

@@ -48,9 +48,6 @@ public class Exam {
     @JoinColumn(name = "scheduled_by_user_id", nullable = false)
     private User scheduledBy;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "examiner_id", columnDefinition = "int")
-    private User examiner;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "linked_slot_id")

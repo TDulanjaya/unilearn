@@ -5,6 +5,9 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Sidebar from "@/components/Sidebar";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const announcementSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
@@ -17,34 +20,33 @@ const announcementSchema = z.object({
 
 type AnnouncementFormData = z.infer<typeof announcementSchema>;
 
-interface PublishedAnnouncement {
-  id: string;
-  title: string;
-  content: string;
-  programs: string[];
-  semesters: string[];
-  batches: string[];
-  priority: "Normal" | "Urgent";
-  publishedAt: string;
-}
-
 const PROGRAM_OPTIONS = ["BSc Software Engineering", "BSc Computer Science", "BSc Information Technology"];
 const SEMESTER_OPTIONS = ["Semester 1", "Semester 3", "Semester 5", "Semester 7"];
 const BATCH_OPTIONS = ["Batch 2023-A", "Batch 2023-B", "Batch 2024-A", "Batch 2025-A"];
 
 export default function HodAnnouncement() {
-  const [publishedList, setPublishedList] = useState<PublishedAnnouncement[]>([
-    {
-      id: "ann-1",
-      title: "Departmental Midterm Evaluation Schedule 2026",
-      content: "All 3rd Year Software Engineering students must register their project milestones before Friday.",
-      programs: ["BSc Software Engineering"],
-      semesters: ["Semester 5", "Semester 7"],
-      batches: ["Batch 2023-A"],
-      priority: "Urgent",
-      publishedAt: "Aug 04, 2026 09:30 AM",
-    },
-  ]);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // 1. Fetch HOD's active assignment
+  const { data: assignments } = useQuery({
+    queryKey: ["hodAssignments", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/hod-dean-assignments/user/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
+  const activeAssignment = assignments?.find((a: any) => a.active);
+  const departmentId = activeAssignment?.departmentId;
+  const departmentName = activeAssignment?.departmentName || "Software Engineering";
+
+  // 2. Fetch HOD department announcements
+  const { data: announcementsData, isLoading: announcementsLoading } = useQuery({
+    queryKey: ["announcements", departmentId],
+    queryFn: () => api.get<any>(`/api/v1/announcements/me?scope=department&scopeId=${departmentId}&size=50`),
+    enabled: !!departmentId,
+  });
+
+  const publishedList = announcementsData?.dataList || [];
 
   const {
     register,
@@ -62,25 +64,45 @@ export default function HodAnnouncement() {
     },
   });
 
-  const onSubmit = (data: AnnouncementFormData) => {
-    const newNotice: PublishedAnnouncement = {
-      id: `ann-${Date.now()}`,
-      title: data.title,
-      content: data.content,
-      programs: data.targetPrograms,
-      semesters: data.targetSemesters,
-      batches: data.targetBatches,
-      priority: data.priority,
-      publishedAt: new Date().toLocaleString("en-US", { month: "short", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
-    };
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/announcements", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements", departmentId] });
+      reset();
+    },
+  });
 
-    setPublishedList([newNotice, ...publishedList]);
-    reset();
+  const onSubmit = async (data: AnnouncementFormData) => {
+    try {
+      const payload = {
+        scope: "department",
+        departmentId: departmentId,
+        title: data.title,
+        content: data.content,
+        postedByUserId: user?.userId,
+        targetPrograms: data.targetPrograms,
+        targetSemesters: data.targetSemesters,
+        targetBatches: data.targetBatches,
+      };
+      await createMutation.mutateAsync(payload);
+    } catch (err: any) {
+      alert("Failed to broadcast: " + err.message);
+    }
   };
+
+  if (announcementsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading HOD Announcements...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--background)] text-[var(--on-background)]">
-      <Sidebar role="hod" name="Dr. S. Wickramasinghe" sub="HOD · Software Engineering" />
+      <Sidebar role="hod" name={user?.fullName || "HOD Dean"} sub={`HOD · ${departmentName}`} />
       <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full space-y-8">
         <div>
           <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
@@ -92,7 +114,6 @@ export default function HodAnnouncement() {
         </div>
 
         <div className="grid lg:grid-cols-[1fr_400px] gap-6">
-          
           <div className="card p-6 space-y-5 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
             <div className="flex items-center gap-2 pb-3 border-b border-[var(--outline-variant)]">
               <i className="ti ti-speakerphone text-xl text-[var(--tertiary)]"></i>
@@ -128,7 +149,6 @@ export default function HodAnnouncement() {
                 {errors.content && <p className="text-[10px] text-red-500 mt-1">{errors.content.message}</p>}
               </div>
 
-              
               <div className="border border-[var(--outline-variant)] rounded-xl p-3.5 bg-[var(--surface-container-low)] space-y-2">
                 <label className="block text-xs font-bold text-[var(--on-surface)]">
                   Target Degree Programs:
@@ -160,7 +180,6 @@ export default function HodAnnouncement() {
                 {errors.targetPrograms && <p className="text-[10px] text-red-500">{errors.targetPrograms.message}</p>}
               </div>
 
-              
               <div className="border border-[var(--outline-variant)] rounded-xl p-3.5 bg-[var(--surface-container-low)] space-y-2">
                 <label className="block text-xs font-bold text-[var(--on-surface)]">
                   Target Academic Semesters:
@@ -192,7 +211,6 @@ export default function HodAnnouncement() {
                 {errors.targetSemesters && <p className="text-[10px] text-red-500">{errors.targetSemesters.message}</p>}
               </div>
 
-              
               <div className="border border-[var(--outline-variant)] rounded-xl p-3.5 bg-[var(--surface-container-low)] space-y-2">
                 <label className="block text-xs font-bold text-[var(--on-surface)]">
                   Target Student Batches:
@@ -245,28 +263,31 @@ export default function HodAnnouncement() {
             </form>
           </div>
 
-          
           <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] self-start">
             <h3 className="font-display font-bold text-base text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)]">
               Broadcast History ({publishedList.length})
             </h3>
             <div className="space-y-3">
-              {publishedList.map((ann) => (
-                <div key={ann.id} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ann.priority === "Urgent" ? "bg-red-500/10 text-red-600 border border-red-500/20" : "bg-blue-500/10 text-blue-600 border border-blue-500/20"}`}>
-                      {ann.priority}
-                    </span>
-                    <span className="text-[10px] text-[var(--outline)]">{ann.publishedAt}</span>
-                  </div>
-                  <p className="font-bold text-xs text-[var(--on-surface)]">{ann.title}</p>
-                  <p className="text-xs text-[var(--on-surface-variant)]">{ann.content}</p>
-                  <div className="flex flex-wrap gap-1 pt-1 text-[9px]">
-                    {ann.programs.map((p) => <span key={p} className="badge badge-accent">{p}</span>)}
-                    {ann.batches.map((b) => <span key={b} className="badge badge-gray">{b}</span>)}
-                  </div>
+              {publishedList.length === 0 ? (
+                <div className="text-center p-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                  No announcements broadcasted yet.
                 </div>
-              ))}
+              ) : (
+                publishedList.map((ann: any) => (
+                  <div key={ann.announcementId} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                        {ann.scope}
+                      </span>
+                      <span className="text-[10px] text-[var(--outline)]">
+                        {new Date(ann.postedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="font-bold text-xs text-[var(--on-surface)]">{ann.title}</p>
+                    <p className="text-xs text-[var(--on-surface-variant)]">{ann.content}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

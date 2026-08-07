@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/exams/{examId}/questions")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('EXAMINER')")
+@PreAuthorize("hasRole('LECTURER')")
 public class ExamQuestionController {
 
     private final ExamQuestionService examQuestionService;

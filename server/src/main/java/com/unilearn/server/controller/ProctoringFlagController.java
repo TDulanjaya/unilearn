@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/proctoring-flags")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('EXAMINER')")
+@PreAuthorize("hasRole('LECTURER')")
 public class ProctoringFlagController {
 
     private final ProctoringFlagService proctoringFlagService;

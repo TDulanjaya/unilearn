@@ -34,7 +34,7 @@ public class RegisterRequest {
     private String phone;
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(STUDENT|LECTURER|EXAMINER|HOD_DEAN|STAFF_ADMIN|GUEST_LECTURER)$", message = "Role must be one of: STUDENT, LECTURER, EXAMINER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER")
+    @Pattern(regexp = "^(STUDENT|LECTURER|HOD_DEAN|STAFF_ADMIN|GUEST_LECTURER)$", message = "Role must be one of: STUDENT, LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER")
     private String role;
 
     private Long batchId;
@@ -42,4 +42,8 @@ public class RegisterRequest {
     private Long departmentId;
 
     private String designation;
+
+    private Long facultyId;
+
+    private String scopeType;
 }

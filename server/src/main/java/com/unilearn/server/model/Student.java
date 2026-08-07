@@ -54,10 +54,6 @@ public class Student {
     @Column(nullable = false)
     private Integer enrollmentYear;
 
-    @Builder.Default
-    @Column(length = 20)
-    private String feeStatus = "pending";
-
     @OneToMany(mappedBy = "student", fetch = FetchType.LAZY)
     @JsonIgnore
     @ToString.Exclude

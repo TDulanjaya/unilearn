@@ -19,4 +19,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     Page<Message> findConversation(@Param("user1Id") Long user1Id, @Param("user2Id") Long user2Id, Pageable pageable);
 
     List<Message> findByReceiver_UserIdAndReadAtIsNull(Long receiverId);
+
+    List<Message> findBySender_UserIdOrReceiver_UserId(Long senderId, Long receiverId);
 }

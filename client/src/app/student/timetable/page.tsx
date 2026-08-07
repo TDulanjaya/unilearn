@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { useAcademicData } from "@/context/AcademicDataContext";
 
 interface ScheduleSlot {
   day: string;
@@ -12,21 +16,37 @@ interface ScheduleSlot {
   lecturer: string;
 }
 
-const SCHEDULE: ScheduleSlot[] = [
-  { day: "Monday", code: "SE308.3", title: "Software Process Mgmt", type: "Lecture", time: "09:00 AM - 11:00 AM", venue: "Main Hall A", lecturer: "Dr. K. Perera" },
-  { day: "Tuesday", code: "SE202.2", title: "Database Systems Lab", type: "Lab", time: "11:00 AM - 01:00 PM", venue: "Computing Lab B", lecturer: "Dr. M. Rathnayake" },
-  { day: "Wednesday", code: "SE309.3", title: "Software Verification", type: "Lecture", time: "10:00 AM - 12:00 PM", venue: "Hall 2B", lecturer: "Prof. A. Fernando" },
-  { day: "Thursday", code: "SE104.1", title: "OOP Tutorial", type: "Tutorial", time: "02:00 PM - 04:00 PM", venue: "Room 102", lecturer: "Dr. K. Perera" },
-  { day: "Friday", code: "SE399", title: "Project Review", type: "Discussion", time: "01:00 PM - 03:00 PM", venue: "Discussion Room 4", lecturer: "Prof. A. Fernando" },
-];
-
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export default function StudentTimetablePage() {
+  const { user } = useAuth();
+  const { slots, isLoadingSlots } = useAcademicData();
   const [viewMode, setViewMode] = useState<"Weekly" | "Daily">("Weekly");
   const [selectedDay, setSelectedDay] = useState("Monday");
 
-  
+  // 1. Fetch student enrollments
+  const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
+    queryKey: ["studentEnrollments", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
+  const enrolledOfferingIds = enrollments?.map((e: any) => e.offeringId) || [];
+  const enrolledSlots = slots.filter((slot) => enrolledOfferingIds.includes(slot.offeringId));
+
+  const schedule: ScheduleSlot[] = enrolledSlots.map((s) => {
+    const e = enrollments?.find((item: any) => item.offeringId === s.offeringId);
+    return {
+      day: s.dayOfWeek.charAt(0) + s.dayOfWeek.slice(1).toLowerCase(),
+      code: s.courseCode,
+      title: s.courseName,
+      type: s.slotType,
+      time: `${s.startTime} - ${s.endTime}`,
+      venue: s.venue,
+      lecturer: "Academic Instructor",
+    };
+  });
+
   const handleExportIcs = () => {
     let icsString = [
       "BEGIN:VCALENDAR",
@@ -37,7 +57,7 @@ export default function StudentTimetablePage() {
       "X-WR-CALNAME:UniLearn Semester Timetable",
     ];
 
-    SCHEDULE.forEach((slot, idx) => {
+    schedule.forEach((slot, idx) => {
       icsString.push(
         "BEGIN:VEVENT",
         `UID:unilearn-slot-${idx}@uni.edu`,
@@ -60,21 +80,29 @@ export default function StudentTimetablePage() {
     URL.revokeObjectURL(url);
   };
 
+  if (enrollmentsLoading || isLoadingSlots) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading Timetable...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
-      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
             Class Timetable & Schedule
           </h1>
           <p className="text-[var(--on-surface-variant)] text-sm">
-            Semester 2 lecture, tutorial, and laboratory session timings.
+            Weekly lecture, tutorial, and laboratory session timings for enrolled courses.
           </p>
         </div>
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
-          
           <div className="flex items-center gap-1 p-1 bg-[var(--surface-container-low)] border border-[var(--outline-variant)] rounded-2xl">
             {(["Weekly", "Daily"] as const).map((mode) => (
               <button
@@ -91,7 +119,6 @@ export default function StudentTimetablePage() {
             ))}
           </div>
 
-          
           <button
             onClick={handleExportIcs}
             className="btn-outline text-xs !py-2.5 !px-4 flex items-center gap-1.5"
@@ -102,11 +129,10 @@ export default function StudentTimetablePage() {
         </div>
       </div>
 
-      
       {viewMode === "Weekly" ? (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {DAYS.map((day) => {
-            const daySlot = SCHEDULE.find((s) => s.day === day);
+            const daySlot = schedule.find((s) => s.day === day);
             return (
               <div
                 key={day}
@@ -119,10 +145,9 @@ export default function StudentTimetablePage() {
                 {daySlot ? (
                   <div className="space-y-2 text-xs">
                     <span className="badge badge-accent font-bold">{daySlot.code}</span>
-                    <h4 className="font-semibold text-[var(--on-surface)]">{daySlot.title}</h4>
+                    <h4 className="font-semibold text-[var(--on-surface)] truncate">{daySlot.title}</h4>
                     <p className="text-[11px] text-[var(--on-surface-variant)]">{daySlot.time}</p>
                     <p className="text-[11px] text-[var(--outline)]">Venue: {daySlot.venue}</p>
-                    <p className="text-[10px] text-[var(--tertiary)] font-medium">{daySlot.lecturer}</p>
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--outline)] italic py-4">No scheduled classes</p>
@@ -132,9 +157,7 @@ export default function StudentTimetablePage() {
           })}
         </div>
       ) : (
-        
         <div className="space-y-4">
-          
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             {DAYS.map((day) => (
               <button
@@ -151,8 +174,7 @@ export default function StudentTimetablePage() {
             ))}
           </div>
 
-          
-          {SCHEDULE.filter((s) => s.day === selectedDay).map((slot, idx) => (
+          {schedule.filter((s) => s.day === selectedDay).map((slot, idx) => (
             <div
               key={idx}
               className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -167,7 +189,6 @@ export default function StudentTimetablePage() {
                     <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]">{slot.type}</span>
                   </div>
                   <h3 className="font-display font-bold text-base text-[var(--on-surface)]">{slot.title}</h3>
-                  <p className="text-xs text-[var(--on-surface-variant)]">Instructor: {slot.lecturer}</p>
                 </div>
               </div>
 

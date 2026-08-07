@@ -28,7 +28,7 @@ public class ExamAnswerController {
     }
 
     @PatchMapping("/{id}/grade")
-    @PreAuthorize("hasRole('EXAMINER')")
+    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<ExamAnswerResponse> gradeAnswerManually(
             @PathVariable Long id,
             @RequestParam Long questionId,
@@ -37,7 +37,7 @@ public class ExamAnswerController {
     }
 
     @GetMapping("/attempt/{attemptId}")
-    @PreAuthorize("hasAnyRole('EXAMINER', 'STUDENT')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
     // TODO: If STUDENT, enforce that the attempt belongs to the authenticated student
     public ResponseEntity<List<ExamAnswerResponse>> getAnswersByAttempt(@PathVariable Long attemptId) {
         return ResponseEntity.ok(examAnswerService.getAnswersForAttempt(attemptId));

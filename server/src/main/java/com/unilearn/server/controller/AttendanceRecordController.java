@@ -2,8 +2,12 @@ package com.unilearn.server.controller;
 
 import com.unilearn.server.dto.request.AttendanceBulkMarkRequest;
 import com.unilearn.server.dto.request.AttendanceRecordRequest;
+import com.unilearn.server.dto.request.StudentCheckInRequest;
 import com.unilearn.server.dto.response.AttendanceRecordResponse;
 import com.unilearn.server.service.AttendanceRecordService;
+import com.unilearn.server.repository.UserRepository;
+import com.unilearn.server.model.User;
+import com.unilearn.server.exception.EntryNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +23,7 @@ import java.util.List;
 public class AttendanceRecordController {
 
     private final AttendanceRecordService attendanceRecordService;
+    private final UserRepository userRepository;
 
     @PostMapping
     @PreAuthorize("hasRole('LECTURER')")
@@ -40,7 +45,20 @@ public class AttendanceRecordController {
         return ResponseEntity.ok(attendanceRecordService.getAttendanceForSession(sessionId));
     }
 
-    // TODO: GET /student/{studentId}/offering/{offeringId}/percentage
-    //       AttendanceRecordService does not have getAttendancePercentage() yet.
-    //       Add it to the service interface when ready.
+    @PostMapping("/check-in")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<AttendanceRecordResponse> checkIn(
+            @Valid @RequestBody StudentCheckInRequest request) {
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntryNotFoundException("User not found: " + email));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(attendanceRecordService.checkIn(request.getSessionCode(), user.getUserId()));
+    }
+
+    @GetMapping("/student/{studentId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'STAFF_ADMIN', 'HOD_DEAN')")
+    public ResponseEntity<List<AttendanceRecordResponse>> getRecordsByStudent(@PathVariable Long studentId) {
+        return ResponseEntity.ok(attendanceRecordService.getAttendanceForStudent(studentId));
+    }
 }

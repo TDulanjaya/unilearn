@@ -9,4 +9,8 @@ public interface AuthService {
     AuthResponse register(RegisterRequest request);
 
     AuthResponse login(LoginRequest request);
+
+    com.unilearn.server.dto.response.RefreshTokenResponse refresh(com.unilearn.server.dto.request.RefreshTokenRequest request);
+
+    void logout(String token);
 }

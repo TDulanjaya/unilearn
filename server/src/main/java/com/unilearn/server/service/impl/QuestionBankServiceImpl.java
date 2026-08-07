@@ -39,8 +39,8 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
 
-        User user = userRepository.findById(request.getCreatedByExaminerId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByExaminerId()));
+        User user = userRepository.findById(request.getCreatedByLecturerId())
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByLecturerId()));
 
         QuestionBank bank = questionBankMapper.toQuestionBank(request, course, user);
         QuestionBank saved = questionBankRepository.save(bank);
@@ -63,8 +63,8 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
 
-        User user = userRepository.findById(request.getCreatedByExaminerId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByExaminerId()));
+        User user = userRepository.findById(request.getCreatedByLecturerId())
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByLecturerId()));
 
         bank.setCourse(course);
         bank.setCreatedBy(user);

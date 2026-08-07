@@ -1202,15 +1202,13 @@ CREATE TABLE `students` (
   `department_id` int NOT NULL,
   `batch_id` int NOT NULL,
   `enrollment_year` int NOT NULL,
-  `fee_status` varchar(20) DEFAULT 'pending',
   PRIMARY KEY (`student_id`),
   UNIQUE KEY `student_no` (`student_no`),
   KEY `idx_students_department` (`department_id`),
   KEY `idx_students_batch` (`batch_id`),
   CONSTRAINT `students_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `users` (`user_id`),
   CONSTRAINT `students_ibfk_2` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`),
-  CONSTRAINT `students_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`batch_id`),
-  CONSTRAINT `students_chk_1` CHECK ((`fee_status` in (_utf8mb4'paid',_utf8mb4'pending',_utf8mb4'overdue')))
+  CONSTRAINT `students_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`batch_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

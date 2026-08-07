@@ -15,8 +15,8 @@ import lombok.ToString;
 @Builder
 public class QuestionBankResponse {
     private Long bankId;
-    private Long examinerId;
-    private String examinerName;
+    private Long lecturerId;
+    private String lecturerName;
     private Long courseId;
     private String courseName;
     private String courseCode;

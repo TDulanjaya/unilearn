@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import AttendanceQrModal, { AttendanceStatus } from "@/components/qr/AttendanceQrModal";
-import { useNotifications } from "@/lib/NotificationContext";
 import { useAcademicData } from "@/context/AcademicDataContext";
 
 interface TeachingSlot {
   id: string;
+  offeringId: number;
   courseCode: string;
   courseTitle: string;
   day: string;
@@ -15,20 +18,6 @@ interface TeachingSlot {
   venue: string;
   type: string;
   enrolledStudents: { id: string; name: string; indexNo: string }[];
-}
-
-const MOCK_STUDENTS: any[] = [];
-
-interface InClassExam {
-  id: string;
-  slotId: string;
-  courseCode: string;
-  title: string;
-  instructions: string;
-  day: string;
-  time: string;
-  venue: string;
-  publishedAt: string;
 }
 
 function checkSlotLiveStatus(slotTimeStr: string, dayOfWeek: string) {
@@ -65,47 +54,62 @@ function checkSlotLiveStatus(slotTimeStr: string, dayOfWeek: string) {
 }
 
 export default function LecturerSchedulePage() {
-  const { addNotification } = useNotifications();
-  const {
-    slots,
-    isLoadingSlots,
-    isErrorSlots,
-    slotsError,
-    refetchSlots,
-  } = useAcademicData();
+  const { user } = useAuth();
+  const { slots, isLoadingSlots } = useAcademicData();
 
-  const teachingSlots: TeachingSlot[] = slots.map((s) => ({
-    id: String(s.slotId),
-    courseCode: s.courseCode,
-    courseTitle: s.courseName,
-    day: s.dayOfWeek,
-    time: `${s.startTime} - ${s.endTime}`,
-    venue: s.venue,
-    type: s.slotType,
-    enrolledStudents: MOCK_STUDENTS,
-  }));
-
-  const [inClassExams, setInClassExams] = useState<InClassExam[]>([]);
-
-  
   const [previewMode, setPreviewMode] = useState(false);
   const [, setTick] = useState(0);
 
-  
-  const [activeQrSlot, setActiveQrSlot] = useState<TeachingSlot | null>(null);
-
-  
-  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, Record<string, AttendanceStatus>>>({});
+  // States
+  const [activeQrSession, setActiveQrSession] = useState<any | null>(null);
   const [selectedAttendanceSlot, setSelectedAttendanceSlot] = useState<TeachingSlot | null>(null);
   const [currentAttendance, setCurrentAttendance] = useState<Record<string, AttendanceStatus>>({});
   const [savedSlotIds, setSavedSlotIds] = useState<Record<string, boolean>>({});
 
-  
-  const [selectedExamSlot, setSelectedExamSlot] = useState<TeachingSlot | null>(null);
-  const [examTitle, setExamTitle] = useState("");
-  const [examInstructions, setExamInstructions] = useState("");
+  // 1. Fetch lecturer offerings to match enrollments
+  const { data: lecturerOfferings, isLoading: offeringsLoading } = useQuery({
+    queryKey: ["lecturerOfferings", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
 
-  
+  const lecturerOfferingIds = lecturerOfferings?.map((o: any) => o.offeringId) || [];
+  const lecturerSlots = slots.filter((slot) => lecturerOfferingIds.includes(slot.offeringId));
+
+  const teachingSlots: TeachingSlot[] = lecturerSlots.map((s) => {
+    const activeOffering = lecturerOfferings?.find((o: any) => o.offeringId === s.offeringId);
+    const enrolledStudents = activeOffering?.enrollments?.map((e: any) => ({
+      id: String(e.studentId),
+      name: e.studentName || `Student #${e.studentId}`,
+      indexNo: e.studentIndexNo || `SE/2023/0${e.studentId}`,
+    })) || [];
+
+    return {
+      id: String(s.slotId),
+      offeringId: s.offeringId,
+      courseCode: s.courseCode,
+      courseTitle: s.courseName,
+      day: s.dayOfWeek,
+      time: `${s.startTime} - ${s.endTime}`,
+      venue: s.venue,
+      type: s.slotType,
+      enrolledStudents,
+    };
+  });
+
+  // Mutations
+  const startSessionMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/attendance-sessions", data),
+  });
+
+  const closeSessionMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/v1/attendance-sessions/${id}`),
+  });
+
+  const bulkMarkMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/attendance-records/bulk", data),
+  });
+
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
@@ -113,193 +117,111 @@ export default function LecturerSchedulePage() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleOpenExamModal = (slot: TeachingSlot) => {
-    setSelectedExamSlot(slot);
-    setExamTitle(`Mid-Semester Quiz — ${slot.courseCode}`);
-    setExamInstructions("Closed book test. Bring student ID cards and basic stationary.");
+  const handleGenerateQr = async (slot: TeachingSlot) => {
+    try {
+      const now = new Date();
+      const sessionDate = now.toISOString().split("T")[0];
+      const startTime = now.toTimeString().split(" ")[0];
+      const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      const endTime = end.toTimeString().split(" ")[0];
+
+      const res = await startSessionMutation.mutateAsync({
+        offeringId: slot.offeringId,
+        sessionDate,
+        startTime,
+        endTime,
+        markedByLecturerId: user?.userId,
+      });
+
+      setActiveQrSession({
+        id: String(res.sessionId),
+        courseCode: slot.courseCode,
+        courseTitle: slot.courseTitle,
+        day: slot.day,
+        time: slot.time,
+        venue: slot.venue,
+        type: slot.type,
+        enrolledStudents: slot.enrolledStudents,
+      });
+    } catch (err: any) {
+      alert("Failed to start attendance session: " + err.message);
+    }
   };
 
-  const handlePublishExam = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedExamSlot || !examTitle.trim()) return;
-
-    const newExam: InClassExam = {
-      id: "exam-" + Date.now(),
-      slotId: selectedExamSlot.id,
-      courseCode: selectedExamSlot.courseCode,
-      title: examTitle.trim(),
-      instructions: examInstructions.trim(),
-      day: selectedExamSlot.day,
-      time: selectedExamSlot.time,
-      venue: selectedExamSlot.venue,
-      publishedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setInClassExams((prev) => [newExam, ...prev]);
-
-    addNotification({
-      icon: "ti-file-pencil",
-      iconBg: "bg-[var(--warning-container)]",
-      iconColor: "text-[var(--on-warning-container)]",
-      title: `In-Class Exam Scheduled: ${selectedExamSlot.courseCode}`,
-      detail: `${examTitle.trim()} scheduled for ${selectedExamSlot.day}s (${selectedExamSlot.time}) at ${selectedExamSlot.venue}.`,
-      time: "Just now",
-    });
-
-    setSelectedExamSlot(null);
-    setExamTitle("");
-    setExamInstructions("");
+  const handleSaveQrAttendance = async (updatedAttendance: Record<string, AttendanceStatus>) => {
+    if (!activeQrSession) return;
+    try {
+      await closeSessionMutation.mutateAsync(Number(activeQrSession.id));
+      setSavedSlotIds((prev) => ({ ...prev, [activeQrSession.id]: true }));
+      setActiveQrSession(null);
+      alert("Attendance session saved and closed successfully!");
+    } catch (err: any) {
+      alert("Failed to save QR session: " + err.message);
+    }
   };
 
   const handleOpenAttendance = (slot: TeachingSlot) => {
     setSelectedAttendanceSlot(slot);
-    const existing = attendanceRecords[slot.id];
-    if (existing) {
-      setCurrentAttendance(existing);
-    } else {
-      const initial: Record<string, AttendanceStatus> = {};
-      slot.enrolledStudents.forEach((st) => {
-        initial[st.id] = "Present";
-      });
-      setCurrentAttendance(initial);
-    }
+    const initial: Record<string, AttendanceStatus> = {};
+    slot.enrolledStudents.forEach((st) => {
+      initial[st.id] = "Present";
+    });
+    setCurrentAttendance(initial);
   };
 
   const handleToggleAttendanceStatus = (studentId: string, status: AttendanceStatus) => {
     setCurrentAttendance((prev) => ({ ...prev, [studentId]: status }));
   };
 
-  const handleSaveAttendance = () => {
+  const handleSaveAttendance = async () => {
     if (!selectedAttendanceSlot) return;
-    setAttendanceRecords((prev) => ({
-      ...prev,
-      [selectedAttendanceSlot.id]: currentAttendance,
-    }));
-    setSelectedAttendanceSlot(null);
+    try {
+      const now = new Date();
+      const sessionDate = now.toISOString().split("T")[0];
+      const startTime = now.toTimeString().split(" ")[0];
+      const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      const endTime = end.toTimeString().split(" ")[0];
+
+      // 1. Create temporary session
+      const session = await startSessionMutation.mutateAsync({
+        offeringId: selectedAttendanceSlot.offeringId,
+        sessionDate,
+        startTime,
+        endTime,
+        markedByLecturerId: user?.userId,
+      });
+
+      // 2. Bulk post student records
+      const records = Object.entries(currentAttendance).map(([studentId, status]) => ({
+        studentId: Number(studentId),
+        status,
+      }));
+
+      await bulkMarkMutation.mutateAsync({
+        sessionId: session.sessionId,
+        records,
+      });
+
+      // 3. Close the session
+      await closeSessionMutation.mutateAsync(session.sessionId);
+
+      setSavedSlotIds((prev) => ({ ...prev, [selectedAttendanceSlot.id]: true }));
+      setSelectedAttendanceSlot(null);
+      alert("Manual roster saved successfully!");
+    } catch (err: any) {
+      alert("Failed to save roster: " + err.message);
+    }
   };
 
-  const handleSaveQrAttendance = (updatedAttendance: Record<string, AttendanceStatus>) => {
-    if (!activeQrSlot) return;
-    setAttendanceRecords((prev) => ({
-      ...prev,
-      [activeQrSlot.id]: updatedAttendance,
-    }));
-    setSavedSlotIds((prev) => ({ ...prev, [activeQrSlot.id]: true }));
-    setActiveQrSlot(null);
-  };
-
-  const renderScheduleContent = () => {
-    if (isLoadingSlots) {
-      return (
-        <div className="p-8 text-center text-xs text-[var(--on-surface-variant)] flex flex-col items-center justify-center gap-2">
-          <div className="w-6 h-6 border-2 border-[var(--tertiary)] border-t-transparent rounded-full animate-spin"></div>
-          Loading weekly teaching schedule...
+  if (isLoadingSlots || offeringsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading Teaching Timetable...
         </div>
-      );
-    }
-    if (isErrorSlots) {
-      return (
-        <div className="p-4 bg-[var(--error-container)]/30 border border-[var(--error)]/30 rounded-xl text-xs text-[var(--error)] flex items-center justify-between gap-3">
-          <span>Failed to load schedule: {slotsError?.message || "Server Error"}</span>
-          <button onClick={refetchSlots} className="btn-secondary text-[11px] !py-1 !px-2 shrink-0">
-            Retry
-          </button>
-        </div>
-      );
-    }
-    if (teachingSlots.length === 0) {
-      return (
-        <p className="p-6 text-center text-xs text-[var(--on-surface-variant)] italic">No teaching slots scheduled.</p>
-      );
-    }
-
-    return teachingSlots.map((slot) => {
-      const examCount = inClassExams.filter((e) => e.slotId === slot.id).length;
-      const isAttendanceSaved = savedSlotIds[slot.id];
-      const isQrActive = activeQrSlot?.id === slot.id;
-
-      const liveStatus = checkSlotLiveStatus(slot.time, slot.day);
-      const canGenerateQr = previewMode || liveStatus.isLive;
-
-      return (
-        <div
-          key={slot.id}
-          className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
-            isQrActive
-              ? "border-[var(--tertiary)] bg-[var(--surface-container-low)]"
-              : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)]/50"
-          }`}
-        >
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="badge badge-accent font-bold">{slot.courseCode}</span>
-              <span className="badge badge-gray">{slot.type}</span>
-              {isQrActive && (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-600 border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> QR Live
-                </span>
-              )}
-              {isAttendanceSaved && (
-                <span className="badge badge-success text-[10px] font-bold">
-                  <i className="ti ti-check"></i> Attendance Marked
-                </span>
-              )}
-              {examCount > 0 && (
-                <span className="badge badge-warning text-[10px] font-bold">
-                  <i className="ti ti-file-pencil"></i> {examCount} In-Class Exam
-                </span>
-              )}
-            </div>
-
-            <p className="font-bold text-sm text-[var(--on-surface)]">
-              {slot.courseTitle}
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--on-surface-variant)] mt-0.5">
-              <span>
-                <i className="ti ti-clock text-[var(--tertiary)] mr-1"></i>
-                {slot.day}s · {slot.time}
-              </span>
-              <span>
-                <i className="ti ti-map-pin text-[var(--tertiary)] mr-1"></i>
-                {slot.venue}
-              </span>
-              {!canGenerateQr && liveStatus.note && (
-                <span className="text-[11px] text-[var(--outline)] italic">
-                  ({liveStatus.note})
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setActiveQrSlot(slot)}
-              disabled={!canGenerateQr}
-              className="btn-primary text-xs !py-1.5 shadow-sm disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1"
-              title={canGenerateQr ? "Display Live Rotating QR Code" : liveStatus.note}
-            >
-              <i className="ti ti-qrcode text-sm"></i> Generate QR
-            </button>
-
-            <button
-              onClick={() => handleOpenAttendance(slot)}
-              className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
-            >
-              <i className="ti ti-user-check text-sm"></i> Roster
-            </button>
-
-            <button
-              onClick={() => handleOpenExamModal(slot)}
-              className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
-            >
-              <i className="ti ti-plus text-sm"></i> Exam
-            </button>
-          </div>
-        </div>
-      );
-    });
-  };
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)] pb-12">
@@ -316,7 +238,6 @@ export default function LecturerSchedulePage() {
             </p>
           </div>
 
-          
           <div className="flex items-center gap-3 bg-[var(--surface-container-low)] p-2.5 px-4 rounded-2xl border border-[var(--outline-variant)] self-start sm:self-auto">
             <div className="flex flex-col">
               <span className="text-xs font-bold text-[var(--on-surface)]">Preview Mode</span>
@@ -328,150 +249,98 @@ export default function LecturerSchedulePage() {
                 previewMode ? "bg-[var(--tertiary)]" : "bg-[var(--outline-variant)]"
               }`}
             >
-              <div
-                className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                  previewMode ? "translate-x-5" : "translate-x-0"
-                }`}
-              ></div>
+              <div className={`w-4 h-4 rounded-full bg-white transition-transform ${previewMode ? "translate-x-5" : "translate-x-0"}`}></div>
             </button>
           </div>
         </div>
 
-        
         <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
             <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
               <i className="ti ti-calendar-event text-[var(--tertiary)] text-xl"></i>
               Weekly Teaching Slots
             </h3>
-            {previewMode && (
-              <span className="badge badge-warning text-[10px] font-bold">
-                <i className="ti ti-eye mr-1"></i> Preview Mode Active
-              </span>
-            )}
           </div>
 
           <div className="space-y-4">
-            {renderScheduleContent()}
+            {teachingSlots.length === 0 ? (
+              <p className="p-6 text-center text-xs text-[var(--on-surface-variant)] italic">
+                No teaching slots scheduled for your courses.
+              </p>
+            ) : (
+              teachingSlots.map((slot) => {
+                const isAttendanceSaved = savedSlotIds[slot.id];
+                const liveStatus = checkSlotLiveStatus(slot.time, slot.day);
+                const canGenerateQr = previewMode || liveStatus.isLive;
+
+                return (
+                  <div
+                    key={slot.id}
+                    className="p-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)]/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="badge badge-accent font-bold">{slot.courseCode}</span>
+                        <span className="badge badge-gray">{slot.type}</span>
+                        {isAttendanceSaved && (
+                          <span className="badge badge-success text-[10px] font-bold">
+                            <i className="ti ti-check"></i> Attendance Saved
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="font-bold text-sm text-[var(--on-surface)]">{slot.courseTitle}</p>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--on-surface-variant)] mt-0.5">
+                        <span>
+                          <i className="ti ti-clock text-[var(--tertiary)] mr-1"></i>
+                          {slot.day}s · {slot.time}
+                        </span>
+                        <span>
+                          <i className="ti ti-map-pin text-[var(--tertiary)] mr-1"></i>
+                          {slot.venue}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleGenerateQr(slot)}
+                        disabled={!canGenerateQr}
+                        className="btn-primary text-xs !py-1.5 shadow-sm disabled:opacity-40 flex items-center gap-1"
+                      >
+                        <i className="ti ti-qrcode text-sm"></i> Generate QR
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenAttendance(slot)}
+                        className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
+                      >
+                        <i className="ti ti-user-check text-sm"></i> Manual Roster
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
-
-        
-        {inClassExams.length > 0 && (
-          <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-            <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)] flex items-center gap-2">
-              <i className="ti ti-file-pencil text-[var(--tertiary)]"></i> Published In-Class Exams
-            </h3>
-            <div className="space-y-3">
-              {inClassExams.map((exam) => (
-                <div key={exam.id} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="badge badge-accent font-bold">{exam.courseCode}</span>
-                      <p className="font-bold text-sm text-[var(--on-surface)]">{exam.title}</p>
-                    </div>
-                    <p className="text-[var(--on-surface-variant)]">
-                      Slot: {exam.day} ({exam.time}) @ {exam.venue} • {exam.instructions}
-                    </p>
-                  </div>
-                  <span className="text-[11px] text-[var(--outline)] shrink-0 font-medium">Published {exam.publishedAt}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </main>
 
-      
-      {activeQrSlot && (
+      {activeQrSession && (
         <AttendanceQrModal
-          slot={activeQrSlot}
+          slot={activeQrSession}
           initialAttendance={
-            attendanceRecords[activeQrSlot.id] ||
-            activeQrSlot.enrolledStudents.reduce((acc, st) => {
+            activeQrSession.enrolledStudents.reduce((acc: any, st: any) => {
               acc[st.id] = "Absent";
               return acc;
             }, {} as Record<string, AttendanceStatus>)
           }
-          onClose={() => setActiveQrSlot(null)}
+          onClose={() => setActiveQrSession(null)}
           onSaveSession={handleSaveQrAttendance}
         />
       )}
 
-      
-      {selectedExamSlot && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card w-full max-w-lg p-6 bg-[var(--surface-container-lowest)] shadow-2xl border border-[var(--outline-variant)] animate-scaleIn">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
-              <div className="flex items-center gap-2">
-                <i className="ti ti-file-pencil text-xl text-[var(--tertiary)]"></i>
-                <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-                  Schedule In-Class Exam
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedExamSlot(null)}
-                className="text-[var(--outline)] hover:text-[var(--on-surface)]"
-              >
-                <i className="ti ti-x text-xl"></i>
-              </button>
-            </div>
-
-            <form onSubmit={handlePublishExam} className="space-y-4">
-              <div className="p-3 rounded-xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-xs space-y-1">
-                <p className="font-bold text-[var(--on-surface)]">
-                  Course: {selectedExamSlot.courseCode} {selectedExamSlot.courseTitle}
-                </p>
-                <p className="text-[var(--on-surface-variant)]">
-                  Auto-filled Slot: <span className="font-semibold text-[var(--tertiary)]">{selectedExamSlot.day}s ({selectedExamSlot.time}) @ {selectedExamSlot.venue}</span>
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
-                  Exam Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={examTitle}
-                  onChange={(e) => setExamTitle(e.target.value)}
-                  placeholder="e.g. Mid-Term Evaluation Quiz"
-                  className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
-                  Instructions & Guidelines
-                </label>
-                <textarea
-                  rows={3}
-                  value={examInstructions}
-                  onChange={(e) => setExamInstructions(e.target.value)}
-                  placeholder="e.g. Closed-book quiz. Calculator allowed."
-                  className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                ></textarea>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
-                <button
-                  type="button"
-                  onClick={() => setSelectedExamSlot(null)}
-                  className="btn-secondary text-xs"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary text-xs shadow-md">
-                  <i className="ti ti-send text-sm"></i> Publish & Notify Students
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      
       {selectedAttendanceSlot && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="card w-full max-w-2xl p-6 bg-[var(--surface-container-lowest)] shadow-2xl border border-[var(--outline-variant)] animate-scaleIn">

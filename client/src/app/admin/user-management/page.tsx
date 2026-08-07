@@ -18,7 +18,7 @@ interface UserRecord {
   assignedCourses?: string[];
   engagementEndDate?: string;
   scopeLevel?: string;
-  status: "Active" | "Locked";
+  status: "Active" | "Locked" | "Inactive";
 }
 
 interface CsvValidationRow {
@@ -46,6 +46,25 @@ export default function UserManagementPage() {
     queryKey: ["users"],
     queryFn: () => api.get<any>("/api/v1/users"),
   });
+
+  const { data: deptsResponse } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<any>("/api/v1/departments?size=100"),
+  });
+
+  const { data: batchesResponse } = useQuery({
+    queryKey: ["batches"],
+    queryFn: () => api.get<any>("/api/v1/batches"),
+  });
+
+  const { data: facultiesResponse } = useQuery({
+    queryKey: ["faculties"],
+    queryFn: () => api.get<any>("/api/v1/faculties?size=100"),
+  });
+
+  const departmentsList = deptsResponse?.dataList || [];
+  const batchesList = batchesResponse || [];
+  const facultiesList = facultiesResponse?.dataList || [];
 
   const apiUsers: UserRecord[] = usersResponse?.dataList
     ? usersResponse.dataList.map((u: any) => ({
@@ -91,14 +110,30 @@ function generateSmartPassword(name: string, role: string): string {
   const [newPassword, setNewPassword] = useState("");
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [newRole, setNewRole] = useState("Student");
-  const [newDept, setNewDept] = useState("Software Eng.");
-
   
-  const [studentNo, setStudentNo] = useState("");
-  const [enrollmentYear, setEnrollmentYear] = useState("2026");
-  const [batchName, setBatchName] = useState("2026-SE-A");
-  const [designation, setDesignation] = useState("Senior Lecturer");
-  const [scopeLevel, setScopeLevel] = useState("INSTITUTION");
+  const [selectedDeptId, setSelectedDeptId] = useState<string>("");
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+  const [selectedFacultyId, setSelectedFacultyId] = useState<string>("");
+  const [scopeType, setScopeType] = useState<string>("department");
+  const [designation, setDesignation] = useState<string>("Senior Lecturer");
+
+  useEffect(() => {
+    if (departmentsList.length > 0 && !selectedDeptId) {
+      setSelectedDeptId(String(departmentsList[0].departmentId));
+    }
+  }, [deptsResponse]);
+
+  useEffect(() => {
+    if (batchesList.length > 0 && !selectedBatchId) {
+      setSelectedBatchId(String(batchesList[0].batchId));
+    }
+  }, [batchesResponse]);
+
+  useEffect(() => {
+    if (facultiesList.length > 0 && !selectedFacultyId) {
+      setSelectedFacultyId(String(facultiesList[0].facultyId));
+    }
+  }, [facultiesResponse]);
 
   const handleGeneratePassword = (name = newFullName, role = newRole) => {
     const generated = generateSmartPassword(name, role);
@@ -131,8 +166,16 @@ function generateSmartPassword(name: string, role: string): string {
     },
   });
 
+  const deactivateMutation = useMutation({
+    mutationFn: (userId: number) =>
+      api.patch(`/api/v1/users/${userId}/active?active=false`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
   const createMutation = useMutation({
-    mutationFn: (data: { fullName: string; email: string; password: string; role: string; phone?: string }) =>
+    mutationFn: (data: any) =>
       api.post("/api/v1/users", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -159,20 +202,41 @@ function generateSmartPassword(name: string, role: string): string {
 
     const finalPassword = newPassword.trim() || generateSmartPassword(newFullName, newRole);
 
-    try {
-      const createdRes: any = await createMutation.mutateAsync({
-        fullName: newFullName.trim(),
-        email: newEmail.trim(),
-        password: finalPassword,
-        role: mapRoleToBackend(newRole),
-      });
+    const payload: any = {
+      fullName: newFullName.trim(),
+      email: newEmail.trim(),
+      password: finalPassword,
+      role: mapRoleToBackend(newRole),
+    };
 
+    const roleName = mapRoleToBackend(newRole);
+    if (roleName === "STUDENT") {
+      payload.departmentId = Number(selectedDeptId) || null;
+      payload.batchId = Number(selectedBatchId) || null;
+    } else if (roleName === "LECTURER" || roleName === "GUEST_LECTURER") {
+      payload.departmentId = Number(selectedDeptId) || null;
+      payload.designation = designation;
+    } else if (roleName === "STAFF_ADMIN") {
+      payload.departmentId = Number(selectedDeptId) || null;
+    } else if (roleName === "HOD_DEAN") {
+      payload.scopeType = scopeType;
+      if (scopeType === "department") {
+        payload.departmentId = Number(selectedDeptId) || null;
+      } else {
+        payload.facultyId = Number(selectedFacultyId) || null;
+      }
+    }
+
+    try {
+      const createdRes: any = await createMutation.mutateAsync(payload);
+
+      const deptObj = departmentsList.find((d: any) => String(d.departmentId) === String(selectedDeptId));
       const newUser: UserRecord = {
         id: String(createdRes?.userId || Date.now()),
         fullName: createdRes?.fullName || newFullName.trim(),
         email: createdRes?.email || newEmail.trim(),
         role: newRole,
-        department: newDept,
+        department: deptObj ? deptObj.name : "N/A",
         status: "Active",
       };
 
@@ -281,13 +345,30 @@ function generateSmartPassword(name: string, role: string): string {
     if (!isNaN(numericId)) {
       try {
         await deleteMutation.mutateAsync(numericId);
+        setUsers((prev) => prev.filter((u) => u.id !== user.id));
+        setDeletingUser(null);
+        showToast(`User ${user.fullName} deleted successfully from database.`);
       } catch (err: any) {
         console.error("Failed to delete user in backend:", err);
+        showToast(`Error: ${err.message || "Failed to delete user."}`);
       }
     }
-    setUsers((prev) => prev.filter((u) => u.id !== user.id));
-    setDeletingUser(null);
-    showToast(`User ${user.fullName} deleted successfully from database.`);
+  };
+
+  const handleDeactivateUser = async (user: UserRecord) => {
+    const numericId = Number(user.id);
+    if (!isNaN(numericId)) {
+      try {
+        await deactivateMutation.mutateAsync(numericId);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === user.id ? { ...u, status: "Inactive" } : u))
+        );
+        showToast(`User ${user.fullName} deactivated successfully.`);
+      } catch (err: any) {
+        console.error("Failed to deactivate user:", err);
+        showToast(`Error: ${err.message || "Failed to deactivate user."}`);
+      }
+    }
   };
 
   const handleTriggerPasswordReset = () => {
@@ -347,6 +428,15 @@ function generateSmartPassword(name: string, role: string): string {
           >
             <i className="ti ti-edit"></i> Edit Profile & Role
           </button>
+          {row.status === "Active" && (
+            <button
+              onClick={() => handleDeactivateUser(row)}
+              className="px-2.5 py-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-xs font-bold transition-colors flex items-center gap-1"
+              title="Deactivate Account (Recommended)"
+            >
+              <i className="ti ti-power"></i> Deactivate
+            </button>
+          )}
           <button
             onClick={() => setDeletingUser(row)}
             className="px-2.5 py-1 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-bold transition-colors flex items-center gap-1"
@@ -447,46 +537,63 @@ function generateSmartPassword(name: string, role: string): string {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Department</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Software Eng."
-                    value={newDept}
-                    onChange={(e) => setNewDept(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                  />
-                </div>
+                {newRole === "HOD/Dean" && scopeType === "faculty" ? (
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Faculty</label>
+                    <select
+                      value={selectedFacultyId}
+                      onChange={(e) => setSelectedFacultyId(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                      required
+                    >
+                      <option value="">Select Faculty</option>
+                      {facultiesList.map((f: any) => (
+                        <option key={f.facultyId} value={f.facultyId}>
+                          {f.name} ({f.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Department</label>
+                    <select
+                      value={selectedDeptId}
+                      onChange={(e) => setSelectedDeptId(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                      required
+                    >
+                      <option value="">Select Department</option>
+                      {departmentsList.map((d: any) => (
+                        <option key={d.departmentId} value={d.departmentId}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              
               {newRole === "Student" && (
                 <div className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50 space-y-2">
                   <p className="text-[11px] font-bold text-[var(--tertiary)] flex items-center gap-1">
                     <i className="ti ti-id"></i> Student Specific Profile Information
                   </p>
-                  <div className="grid sm:grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Student Reg No. (e.g. SE/2026/041)"
-                      value={studentNo}
-                      onChange={(e) => setStudentNo(e.target.value)}
-                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Enrollment Year"
-                      value={enrollmentYear}
-                      onChange={(e) => setEnrollmentYear(e.target.value)}
-                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Batch (e.g. 2026-SE-A)"
-                      value={batchName}
-                      onChange={(e) => setBatchName(e.target.value)}
-                      className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                    />
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Batch</label>
+                    <select
+                      value={selectedBatchId}
+                      onChange={(e) => setSelectedBatchId(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                      required
+                    >
+                      <option value="">Select Batch</option>
+                      {batchesList.map((b: any) => (
+                        <option key={b.batchId} value={b.batchId}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}
@@ -503,6 +610,7 @@ function generateSmartPassword(name: string, role: string): string {
                       value={designation}
                       onChange={(e) => setDesignation(e.target.value)}
                       className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                      required
                     />
                     <div className="flex items-center gap-2 p-2">
                       <input
@@ -518,20 +626,35 @@ function generateSmartPassword(name: string, role: string): string {
                 </div>
               )}
 
-              {(newRole === "Staff/Admin" || newRole === "HOD/Dean") && (
+              {newRole === "HOD/Dean" && (
                 <div className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50 space-y-2">
                   <p className="text-[11px] font-bold text-[var(--tertiary)] flex items-center gap-1">
-                    <i className="ti ti-shield-check"></i> Administrative Scope Level
+                    <i className="ti ti-shield-check"></i> HOD / Dean Scope Level
                   </p>
-                  <select
-                    value={scopeLevel}
-                    onChange={(e) => setScopeLevel(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
-                  >
-                    <option value="INSTITUTION">INSTITUTION (Full Administrative Scope)</option>
-                    <option value="FACULTY">FACULTY (Faculty Level Scope)</option>
-                    <option value="DEPARTMENT">DEPARTMENT (Departmental Scope)</option>
-                  </select>
+                  <div className="flex gap-4 p-2 bg-[var(--surface-container-lowest)] rounded-xl border border-[var(--outline-variant)]">
+                    <label className="flex items-center gap-1.5 text-xs text-[var(--on-surface)] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hodDeanScopeType"
+                        value="department"
+                        checked={scopeType === "department"}
+                        onChange={() => setScopeType("department")}
+                        className="radio"
+                      />
+                      Department Level (HOD)
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-[var(--on-surface)] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hodDeanScopeType"
+                        value="faculty"
+                        checked={scopeType === "faculty"}
+                        onChange={() => setScopeType("faculty")}
+                        className="radio"
+                      />
+                      Faculty Level (Dean)
+                    </label>
+                  </div>
                 </div>
               )}
 

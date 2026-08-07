@@ -35,13 +35,13 @@ public class ExamAttemptController {
     }
 
     @GetMapping("/exam/{examId}")
-    @PreAuthorize("hasRole('EXAMINER')")
+    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<List<ExamAttemptResponse>> getAttemptsByExam(@PathVariable Long examId) {
         return ResponseEntity.ok(examAttemptService.getAttemptsByExam(examId));
     }
 
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasAnyRole('EXAMINER', 'STUDENT')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
     // TODO: If STUDENT, enforce that studentId matches the authenticated student
     public ResponseEntity<List<ExamAttemptResponse>> getAttemptsByStudent(@PathVariable Long studentId) {
         return ResponseEntity.ok(examAttemptService.getAttemptsByStudent(studentId));

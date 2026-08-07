@@ -18,7 +18,7 @@ public class ExamResultController {
     private final ExamResultService examResultService;
 
     @PostMapping("/attempt/{attemptId}/compute")
-    @PreAuthorize("hasRole('EXAMINER')")
+    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<ExamResultResponse> computeAndPublishResult(
             @PathVariable Long attemptId,
             @RequestParam Long examId,
@@ -29,20 +29,20 @@ public class ExamResultController {
     }
 
     @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasRole('EXAMINER')")
+    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<List<ExamResultResponse>> publishAllResultsForExam(
             @PathVariable Long id) {
         return ResponseEntity.ok(examResultService.publishAllResultsForExam(id));
     }
 
     @GetMapping("/exam/{examId}")
-    @PreAuthorize("hasRole('EXAMINER')")
+    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<List<ExamResultResponse>> getResultsByExam(@PathVariable Long examId) {
         return ResponseEntity.ok(examResultService.getResultsForExam(examId));
     }
 
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasAnyRole('EXAMINER', 'STUDENT')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
     // TODO: If STUDENT, enforce that studentId matches the authenticated student
     //       and only return published results
     public ResponseEntity<ExamResultResponse> getResultsByStudent(

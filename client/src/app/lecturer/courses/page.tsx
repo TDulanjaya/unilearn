@@ -1,157 +1,167 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import FileDropzone from "@/components/FileDropzone";
 
-const examSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters"),
-  courseCode: z.string().min(1, "Please select a course"),
-  durationMinutes: z.number().min(5, "Minimum duration is 5 minutes"),
-  startDateTime: z.string().min(1, "Start time is required"),
-  endDateTime: z.string().min(1, "End time is required"),
-  randomizeQuestions: z.boolean(),
-});
-
-type ExamFormData = z.infer<typeof examSchema>;
-
-interface Question {
-  id: number;
-  text: string;
-  type: "MCQ" | "ESSAY";
-  marks: number;
-  options?: string[];
-  correctOptionIndex?: number;
-}
-
-interface CourseMaterial {
-  id: number;
-  title: string;
-  category: "Slide" | "Syllabus" | "Brief" | "Lab";
-  fileName: string;
-  size: string;
-  date: string;
-}
-
-interface Exam {
-  id: number;
-  title: string;
-  courseCode: string;
-  durationMinutes: number;
-  startDateTime: string;
-  endDateTime: string;
-  randomizeQuestions: boolean;
-  questionCount: number;
-}
-
 export default function LecturerCoursesPage() {
-  const [activeCourse, setActiveCourse] = useState("SE308.3");
-  const [materials, setMaterials] = useState<CourseMaterial[]>([
-    { id: 1, title: "Lecture 01 - Introduction to Agile", category: "Slide", fileName: "Lecture01_Agile.pdf", size: "2.4 MB", date: "Aug 01, 2026" },
-    { id: 2, title: "Software Process Management Syllabus", category: "Syllabus", fileName: "Syllabus_SE308.pdf", size: "1.1 MB", date: "Jul 25, 2026" },
-    { id: 3, title: "Assignment 01 Brief & Rubric", category: "Brief", fileName: "Assignment1_Brief.docx", size: "850 KB", date: "Aug 03, 2026" },
-  ]);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [announcements, setAnnouncements] = useState<string[]>([
-    "Welcome to SE308.3! Midterm exam schedule has been posted.",
-  ]);
-
-  const [questions, setQuestions] = useState<Question[]>([
-    { id: 1, text: "Which SDLC model is best suited for unclear initial requirements?", type: "MCQ", marks: 5, options: ["Waterfall", "Spiral", "Big Bang", "V-Model"], correctOptionIndex: 1 },
-    { id: 2, text: "Explain how sprint velocity is calculated in Scrum.", type: "ESSAY", marks: 10 },
-  ]);
-
-  const [exams, setExams] = useState<Exam[]>([
-    { id: 1, title: "SE308.3 Midterm Examination 2026", courseCode: "SE308.3", durationMinutes: 60, startDateTime: "2026-08-15T09:00", endDateTime: "2026-08-15T11:00", randomizeQuestions: true, questionCount: 25 },
-  ]);
-
-  
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [showExamModal, setShowExamModal] = useState(false);
-  const [materialCategory, setMaterialCategory] = useState<CourseMaterial["category"]>("Slide");
+  const [activeOfferingId, setActiveOfferingId] = useState<number | null>(null);
+  const [materialCategory, setMaterialCategory] = useState<"Slide" | "Syllabus" | "Brief" | "Lab">("Slide");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
-  
   const editorRef = useRef<HTMLDivElement>(null);
+
+  // 1. Fetch lecturer offerings
+  const { data: offerings, isLoading: offeringsLoading } = useQuery({
+    queryKey: ["lecturerOfferings", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
+  useEffect(() => {
+    if (offerings && offerings.length > 0 && !activeOfferingId) {
+      setActiveOfferingId(offerings[0].offeringId);
+    }
+  }, [offerings]);
+
+  // 2. Fetch materials for selected offering
+  const { data: materialsData, isLoading: materialsLoading } = useQuery({
+    queryKey: ["materials", activeOfferingId],
+    queryFn: () => api.get<any>(`/api/v1/materials/offering/${activeOfferingId}?size=100`),
+    enabled: !!activeOfferingId,
+  });
+
+  const materials = materialsData?.dataList || [];
+
+  // 3. Fetch announcements for selected offering
+  const { data: announcementsData } = useQuery({
+    queryKey: ["courseAnnouncements", activeOfferingId],
+    queryFn: () => api.get<any>(`/api/v1/announcements/me?scope=course&scopeId=${activeOfferingId}&size=50`),
+    enabled: !!activeOfferingId,
+  });
+
+  const announcements = announcementsData?.dataList || [];
+
+  // 4. Fetch exams for selected offering
+  const { data: examsList } = useQuery({
+    queryKey: ["exams", activeOfferingId],
+    queryFn: () => api.get<any[]>(`/api/v1/exams/offering/${activeOfferingId}`),
+    enabled: !!activeOfferingId,
+  });
+
+  const exams = examsList || [];
+
+  // 5. Fetch question bank questions
+  const activeOffering = offerings?.find((o: any) => o.offeringId === activeOfferingId);
+  const courseId = activeOffering?.courseId;
+
+  const { data: qbList } = useQuery({
+    queryKey: ["qbs", courseId],
+    queryFn: () => api.get<any[]>(`/api/v1/question-banks/course/${courseId}`),
+    enabled: !!courseId,
+  });
+
+  const activeBankId = qbList && qbList.length > 0 ? qbList[0].bankId : null;
+  const { data: questionsResponse } = useQuery({
+    queryKey: ["questions", activeBankId],
+    queryFn: () => api.get<any>(`/api/v1/questions/bank/${activeBankId}?size=100`),
+    enabled: !!activeBankId,
+  });
+
+  const questions = questionsResponse?.dataList || [];
+
+  // Mutations
+  const uploadMaterialMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/materials", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials", activeOfferingId] });
+      setShowUploadModal(false);
+      setUploadedFiles([]);
+    },
+  });
+
+  const deleteMaterialMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/v1/materials/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials", activeOfferingId] });
+    },
+  });
+
+  const postAnnouncementMutation = useMutation({
+    mutationFn: (data: any) => api.post("/api/v1/announcements", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courseAnnouncements", activeOfferingId] });
+      if (editorRef.current) {
+        editorRef.current.innerHTML = "";
+      }
+    },
+  });
+
+  const handleConfirmUpload = async () => {
+    if (uploadedFiles.length === 0 || !activeOfferingId) return;
+    try {
+      for (const file of uploadedFiles) {
+        await uploadMaterialMutation.mutateAsync({
+          offeringId: activeOfferingId,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          resourceType: materialCategory,
+          fileUrl: `/uploads/${file.name}`,
+          uploadedById: user?.userId,
+        });
+      }
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    }
+  };
+
+  const handleRemoveMaterial = async (id: number) => {
+    if (confirm("Are you sure you want to delete this material?")) {
+      try {
+        await deleteMaterialMutation.mutateAsync(id);
+      } catch (err: any) {
+        alert("Failed to delete material: " + err.message);
+      }
+    }
+  };
+
+  const handlePostAnnouncement = async () => {
+    if (editorRef.current && editorRef.current.innerHTML.trim() && activeOfferingId) {
+      try {
+        await postAnnouncementMutation.mutateAsync({
+          scope: "course",
+          offeringId: activeOfferingId,
+          title: "Course Announcement",
+          content: editorRef.current.innerHTML,
+          postedByUserId: user?.userId,
+        });
+      } catch (err: any) {
+        alert("Failed to publish announcement: " + err.message);
+      }
+    }
+  };
 
   const applyFormatting = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
   };
 
-  const handlePostAnnouncement = () => {
-    if (editorRef.current && editorRef.current.innerHTML.trim()) {
-      setAnnouncements([editorRef.current.innerHTML, ...announcements]);
-      editorRef.current.innerHTML = "";
-    }
-  };
+  if (offeringsLoading || materialsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading Course Offerings...
+        </div>
+      </div>
+    );
+  }
 
-  
-  const [qText, setQText] = useState("");
-  const [qType, setQType] = useState<"MCQ" | "ESSAY">("MCQ");
-  const [qMarks, setQMarks] = useState(5);
-  const [qOptions, setQOptions] = useState<string[]>(["Option A", "Option B", "Option C", "Option D"]);
-  const [correctIdx, setCorrectIdx] = useState(0);
-
-  const handleCreateQuestion = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!qText.trim()) return;
-    const newQ: Question = {
-      id: Date.now(),
-      text: qText.trim(),
-      type: qType,
-      marks: qMarks,
-      options: qType === "MCQ" ? qOptions : undefined,
-      correctOptionIndex: qType === "MCQ" ? correctIdx : undefined,
-    };
-    setQuestions([...questions, newQ]);
-    setQText("");
-    setShowQuestionModal(false);
-  };
-
-  
-  const {
-    register: registerExam,
-    handleSubmit: handleSubmitExam,
-    formState: { errors: examErrors },
-    reset: resetExam,
-  } = useForm<ExamFormData>({
-    resolver: zodResolver(examSchema),
-    defaultValues: {
-      courseCode: activeCourse,
-      durationMinutes: 60,
-      randomizeQuestions: true,
-    },
-  });
-
-  const onExamSubmit = (data: ExamFormData) => {
-    const newExam: Exam = {
-      id: Date.now(),
-      ...data,
-      questionCount: questions.length,
-    };
-    setExams([...exams, newExam]);
-    resetExam();
-    setShowExamModal(false);
-  };
-
-  const handleConfirmUpload = () => {
-    if (uploadedFiles.length === 0) return;
-    const newMats: CourseMaterial[] = uploadedFiles.map((file, idx) => ({
-      id: Date.now() + idx,
-      title: file.name.replace(/\.[^/.]+$/, ""),
-      category: materialCategory,
-      fileName: file.name,
-      size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-      date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-    }));
-    setMaterials([...newMats, ...materials]);
-    setUploadedFiles([]);
-    setShowUploadModal(false);
-  };
+  const selectedCode = activeOffering?.courseCode || "Courses";
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)] pb-12">
@@ -171,23 +181,25 @@ export default function LecturerCoursesPage() {
           <div className="flex items-center gap-2">
             <label className="text-xs font-semibold text-[var(--on-surface-variant)]">Select Course:</label>
             <select
-              value={activeCourse}
-              onChange={(e) => setActiveCourse(e.target.value)}
+              value={activeOfferingId || ""}
+              onChange={(e) => setActiveOfferingId(Number(e.target.value))}
               className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
             >
-              <option value="SE308.3">SE308.3 — Software Process Management</option>
-              <option value="SE202.2">SE202.2 — Database Systems</option>
-              <option value="SE309.3">SE309.3 — Software Verification</option>
+              {offerings?.map((o: any) => (
+                <option key={o.offeringId} value={o.offeringId}>
+                  {o.courseCode} — {o.courseName} ({o.batchName})
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
-        
+        {/* Materials Card */}
         <div className="card p-6 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
             <div>
               <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
-                <i className="ti ti-folder text-[var(--tertiary)]"></i> Course Materials ({activeCourse})
+                <i className="ti ti-folder text-[var(--tertiary)]"></i> Course Materials ({selectedCode})
               </h3>
               <p className="text-xs text-[var(--on-surface-variant)]">Manage slides, syllabus, and assignment briefs.</p>
             </div>
@@ -197,35 +209,42 @@ export default function LecturerCoursesPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {materials.map((m) => (
-              <div key={m.id} className="border border-[var(--outline-variant)] rounded-xl p-3.5 bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)] transition-colors flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-[var(--surface-container-high)] text-[var(--on-surface)] border-[var(--outline-variant)] mb-1.5 inline-block">
-                    {m.category}
-                  </span>
-                  <p className="text-xs font-bold text-[var(--on-surface)] truncate">{m.title}</p>
-                  <p className="text-[10px] text-[var(--on-surface-variant)] mt-1">{m.fileName} · {m.size} · {m.date}</p>
-                </div>
-                <button
-                  onClick={() => setMaterials(materials.filter((item) => item.id !== m.id))}
-                  className="text-[var(--on-surface-variant)] hover:text-red-500 p-1"
-                  title="Remove material"
-                >
-                  <i className="ti ti-trash text-sm"></i>
-                </button>
+            {materials.length === 0 ? (
+              <div className="text-center p-6 text-xs text-[var(--on-surface-variant)] font-semibold col-span-3">
+                No course materials uploaded yet.
               </div>
-            ))}
+            ) : (
+              materials.map((m: any) => (
+                <div key={m.materialId} className="border border-[var(--outline-variant)] rounded-xl p-3.5 bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)] transition-colors flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-[var(--surface-container-high)] text-[var(--on-surface)] border-[var(--outline-variant)] mb-1.5 inline-block">
+                      {m.resourceType}
+                    </span>
+                    <p className="text-xs font-bold text-[var(--on-surface)] truncate">{m.title}</p>
+                    <p className="text-[10px] text-[var(--on-surface-variant)] mt-1">
+                      {m.fileUrl?.split("/").pop()} · {new Date(m.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveMaterial(m.materialId)}
+                    className="text-[var(--on-surface-variant)] hover:text-red-500 p-1"
+                    title="Remove material"
+                  >
+                    <i className="ti ti-trash text-sm"></i>
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        
+        {/* Announcements Editor */}
         <div className="card p-6 space-y-4">
           <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2 pb-3 border-b border-[var(--outline-variant)]">
             <i className="ti ti-speakerphone text-[var(--tertiary)]"></i> Course Announcements Editor
           </h3>
 
           <div className="border border-[var(--outline-variant)] rounded-xl overflow-hidden bg-[var(--surface-container-lowest)]">
-            
             <div className="flex items-center gap-1 p-2 bg-[var(--surface-container-low)] border-b border-[var(--outline-variant)] text-xs">
               <button
                 type="button"
@@ -255,7 +274,6 @@ export default function LecturerCoursesPage() {
               <span className="text-[10px] text-[var(--outline)]">Rich Text Announcement Editor</span>
             </div>
 
-            
             <div
               ref={editorRef}
               contentEditable
@@ -269,85 +287,82 @@ export default function LecturerCoursesPage() {
             </button>
           </div>
 
-          
           <div className="space-y-2 pt-2">
-            <p className="text-xs font-bold text-[var(--on-surface)]">Recent Published Announcements:</p>
-            {announcements.map((ann, idx) => (
-              <div key={idx} className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-xs text-[var(--on-surface)]">
-                <div dangerouslySetInnerHTML={{ __html: ann }} />
+            <p className="text-xs font-bold text-[var(--on-surface)]">Recent Course Announcements:</p>
+            {announcements.length === 0 ? (
+              <div className="text-center p-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                No announcements published for this course yet.
               </div>
-            ))}
+            ) : (
+              announcements.map((ann: any) => (
+                <div key={ann.announcementId} className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-xs text-[var(--on-surface)] space-y-1">
+                  <span className="text-[10px] text-[var(--outline)]">
+                    Published: {new Date(ann.postedAt).toLocaleDateString()}
+                  </span>
+                  <div dangerouslySetInnerHTML={{ __html: ann.content }} />
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        
+        {/* Dynamic bottom views */}
         <div className="grid lg:grid-cols-2 gap-6">
-          
           <div className="card p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)] flex items-center gap-2">
-                <i className="ti ti-help-circle text-[var(--tertiary)]"></i> Question Bank ({questions.length})
+                <i className="ti ti-help-circle text-[var(--tertiary)]"></i> Course Question Bank ({questions.length})
               </h3>
-              <button onClick={() => setShowQuestionModal(true)} className="btn-primary text-xs">
-                <i className="ti ti-plus"></i> Add Question
-              </button>
             </div>
 
-            <div className="space-y-3">
-              {questions.map((q) => (
-                <div key={q.id} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
-                  <div className="flex items-start justify-between gap-2">
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              {questions.length === 0 ? (
+                <div className="text-center py-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                  No questions found in this course's bank.
+                </div>
+              ) : (
+                questions.map((q: any) => (
+                  <div key={q.questionId} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
                     <p className="text-xs font-semibold text-[var(--on-surface)]">{q.text}</p>
                     <span className="badge badge-accent text-[10px]">{q.marks} Marks</span>
                   </div>
-                  {q.type === "MCQ" && q.options && (
-                    <ul className="text-[11px] text-[var(--on-surface-variant)] space-y-0.5 pl-3 list-disc">
-                      {q.options.map((opt, i) => (
-                        <li key={i} className={i === q.correctOptionIndex ? "text-emerald-500 font-bold" : ""}>
-                          {opt} {i === q.correctOptionIndex && "(Correct)"}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          
           <div className="card p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)] flex items-center gap-2">
-                <i className="ti ti-file-certificate text-[var(--tertiary)]"></i> Scheduled Exams
+                <i className="ti ti-file-certificate text-[var(--tertiary)]"></i> Scheduled Exams ({exams.length})
               </h3>
-              <button onClick={() => setShowExamModal(true)} className="btn-primary text-xs">
-                <i className="ti ti-plus"></i> Create Exam
-              </button>
             </div>
 
-            <div className="space-y-3">
-              {exams.map((ex) => (
-                <div key={ex.id} className="p-4 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-[var(--on-surface)]">{ex.title}</p>
-                    <span className="badge badge-accent">{ex.courseCode}</span>
-                  </div>
-                  <div className="text-[11px] text-[var(--on-surface-variant)] space-y-1">
-                    <p><i className="ti ti-clock mr-1"></i> Duration: {ex.durationMinutes} mins · {ex.questionCount} Questions</p>
-                    <p><i className="ti ti-calendar mr-1"></i> Start: {new Date(ex.startDateTime).toLocaleString()}</p>
-                    <p><i className="ti ti-arrows-shuffle mr-1"></i> Question Randomization: {ex.randomizeQuestions ? "Enabled" : "Disabled"}</p>
-                  </div>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              {exams.length === 0 ? (
+                <div className="text-center py-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                  No exams scheduled for this course.
                 </div>
-              ))}
+              ) : (
+                exams.map((ex: any) => (
+                  <div key={ex.examId} className="p-4 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
+                    <p className="text-xs font-bold text-[var(--on-surface)]">{ex.title}</p>
+                    <div className="text-[11px] text-[var(--on-surface-variant)] space-y-1">
+                      <p><i className="ti ti-clock mr-1"></i> Duration: {ex.durationMinutes} mins</p>
+                      <p><i className="ti ti-calendar mr-1"></i> Start: {new Date(ex.startDateTime).toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       </main>
 
-      
+      {/* Upload modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="card max-w-md w-full p-6 space-y-4 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] shadow-2xl rounded-3xl">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Upload Course File</h3>
               <button onClick={() => setShowUploadModal(false)} className="text-[var(--on-surface-variant)]">
@@ -359,7 +374,7 @@ export default function LecturerCoursesPage() {
               <label className="block text-xs font-semibold text-[var(--on-surface)] mb-1">Material Category</label>
               <select
                 value={materialCategory}
-                onChange={(e) => setMaterialCategory(e.target.value as CourseMaterial["category"])}
+                onChange={(e) => setMaterialCategory(e.target.value as any)}
                 className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
               >
                 <option value="Slide">Lecture Slides (.pdf, .pptx)</option>
@@ -383,191 +398,6 @@ export default function LecturerCoursesPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      
-      {showQuestionModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleCreateQuestion} className="card max-w-lg w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
-              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Add New Question</h3>
-              <button type="button" onClick={() => setShowQuestionModal(false)} className="text-[var(--on-surface-variant)]">
-                <i className="ti ti-x text-lg"></i>
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Question Text</label>
-              <textarea
-                rows={2}
-                value={qText}
-                onChange={(e) => setQText(e.target.value)}
-                placeholder="Enter question statement..."
-                className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Question Type</label>
-                <select
-                  value={qType}
-                  onChange={(e) => setQType(e.target.value as "MCQ" | "ESSAY")}
-                  className="w-full text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                >
-                  <option value="MCQ">Multiple Choice (MCQ)</option>
-                  <option value="ESSAY">Essay / Descriptive</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Mark Weight</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={qMarks}
-                  onChange={(e) => setQMarks(Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                />
-              </div>
-            </div>
-
-            {qType === "MCQ" && (
-              <div className="space-y-2 border-t border-[var(--outline-variant)] pt-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[var(--on-surface)]">MCQ Options Builder</label>
-                  <button
-                    type="button"
-                    onClick={() => setQOptions([...qOptions, `Option ${qOptions.length + 1}`])}
-                    className="text-[11px] text-[var(--tertiary)] font-semibold"
-                  >
-                    + Add Option
-                  </button>
-                </div>
-                {qOptions.map((opt, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="correctOption"
-                      checked={correctIdx === idx}
-                      onChange={() => setCorrectIdx(idx)}
-                      title="Mark as correct answer"
-                    />
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => {
-                        const updated = [...qOptions];
-                        updated[idx] = e.target.value;
-                        setQOptions(updated);
-                      }}
-                      className="flex-1 text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                    />
-                    {qOptions.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => setQOptions(qOptions.filter((_, i) => i !== idx))}
-                        className="text-red-500 text-xs p-1"
-                      >
-                        <i className="ti ti-x"></i>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
-              <button type="button" onClick={() => setShowQuestionModal(false)} className="btn-secondary text-xs">Cancel</button>
-              <button type="submit" className="btn-primary text-xs">Save Question</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      
-      {showExamModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleSubmitExam(onExamSubmit)} className="card max-w-lg w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
-              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Create New Examination</h3>
-              <button type="button" onClick={() => setShowExamModal(false)} className="text-[var(--on-surface-variant)]">
-                <i className="ti ti-x text-lg"></i>
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Exam Title</label>
-              <input
-                type="text"
-                {...registerExam("title")}
-                placeholder="e.g. SE308.3 Final Exam 2026"
-                className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-              />
-              {examErrors.title && <p className="text-[10px] text-red-500 mt-1">{examErrors.title.message}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Course</label>
-                <select
-                  {...registerExam("courseCode")}
-                  className="w-full text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                >
-                  <option value="SE308.3">SE308.3</option>
-                  <option value="SE202.2">SE202.2</option>
-                  <option value="SE309.3">SE309.3</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Duration (Minutes)</label>
-                <input
-                  type="number"
-                  {...registerExam("durationMinutes", { valueAsNumber: true })}
-                  className="w-full text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                />
-                {examErrors.durationMinutes && <p className="text-[10px] text-red-500 mt-1">{examErrors.durationMinutes.message}</p>}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Start Date & Time</label>
-                <input
-                  type="datetime-local"
-                  {...registerExam("startDateTime")}
-                  className="w-full text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">End Date & Time</label>
-                <input
-                  type="datetime-local"
-                  {...registerExam("endDateTime")}
-                  className="w-full text-xs p-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="randomize"
-                {...registerExam("randomizeQuestions")}
-                className="rounded text-[var(--tertiary)] focus:ring-0"
-              />
-              <label htmlFor="randomize" className="text-xs font-medium text-[var(--on-surface)]">
-                Randomize Question Order for Each Student
-              </label>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
-              <button type="button" onClick={() => setShowExamModal(false)} className="btn-secondary text-xs">Cancel</button>
-              <button type="submit" className="btn-primary text-xs">Schedule Exam</button>
-            </div>
-          </form>
         </div>
       )}
     </div>

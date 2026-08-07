@@ -1,4 +1,4 @@
-import { getToken, clearAuth } from "./auth";
+import { getToken, getRefreshToken, setToken, setRefreshToken, getUser, setUser, clearAuth } from "./auth";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -30,6 +30,52 @@ export async function apiFetch<T = any>(
   });
 
   if (response.status === 401) {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        const refreshUrl = `${BASE_URL}/api/v1/auth/refresh`;
+        const refreshRes = await fetch(refreshUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          setToken(refreshData.accessToken);
+          if (refreshData.refreshToken) {
+            setRefreshToken(refreshData.refreshToken);
+          }
+          const currentUser = getUser();
+          if (currentUser) {
+            currentUser.token = refreshData.accessToken;
+            if (refreshData.refreshToken) {
+              currentUser.refreshToken = refreshData.refreshToken;
+            }
+            setUser(currentUser);
+          }
+          // Retry original request
+          headers["Authorization"] = `Bearer ${refreshData.accessToken}`;
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers,
+          });
+          if (retryResponse.status === 204) {
+            return null as T;
+          }
+          if (retryResponse.ok) {
+            const contentType = retryResponse.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              return await retryResponse.json() as T;
+            } else {
+              return await retryResponse.text() as unknown as T;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Token refresh failed:", err);
+      }
+    }
+
     clearAuth();
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
       window.location.href = "/login";
@@ -75,6 +121,13 @@ export const api = {
     apiFetch<T>(endpoint, {
       ...options,
       method: "PUT",
+      body: body instanceof FormData ? body : JSON.stringify(body),
+    }),
+
+  patch: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: "PATCH",
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 

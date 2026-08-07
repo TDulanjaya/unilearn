@@ -34,7 +34,7 @@ public class AttendanceSessionController {
     }
 
     @GetMapping("/offering/{offeringId}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STAFF_ADMIN', 'HOD_DEAN', 'STUDENT')")
     public ResponseEntity<List<AttendanceSessionResponse>> getSessionsByOffering(
             @PathVariable Long offeringId) {
         return ResponseEntity.ok(attendanceSessionService.getSessionsByOffering(offeringId));

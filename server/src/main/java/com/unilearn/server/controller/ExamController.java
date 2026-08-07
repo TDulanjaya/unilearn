@@ -22,7 +22,7 @@ public class ExamController {
     private final ExamService examService;
 
     @PostMapping("/final")
-    @PreAuthorize("hasRole('EXAMINER')")
+    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<ExamResponse> createFinalExam(@Valid @RequestBody ExamFinalCreateRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(examService.createFinalExam(request));
     }
@@ -34,8 +34,8 @@ public class ExamController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('EXAMINER', 'LECTURER')")
-    // Note: EXAMINER can update final exams, LECTURER can update in-class exams.
+    @PreAuthorize("hasRole('LECTURER')")
+    // Note: LECTURER can update exams.
     // Enforcing "owner of the exam" check should be done in the service layer.
     public ResponseEntity<ExamResponse> updateExam(@PathVariable Long id,
                                                    @Valid @RequestBody ExamRequest request) {
@@ -43,7 +43,7 @@ public class ExamController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('EXAMINER', 'LECTURER')")
+    @PreAuthorize("hasRole('LECTURER')")
     // Note: Same owner-based authorization as updateExam above
     public ResponseEntity<Void> deleteExam(@PathVariable Long id) {
         examService.deleteExam(id);
