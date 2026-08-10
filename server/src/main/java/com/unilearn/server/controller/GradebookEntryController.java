@@ -10,6 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.model.User;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.util.List;
 
 @RestController
@@ -28,17 +31,13 @@ public class GradebookEntryController {
 
     @GetMapping("/student/{studentId}/offering/{offeringId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: If STUDENT, enforce that studentId matches the authenticated student.
-    //       GradebookEntryService only has getEntriesByStudent(studentId), not filtered by offering.
-    //       Filtering by offering may need to be done here or added to the service.
     public ResponseEntity<List<GradebookEntryResponse>> getEntriesByStudentAndOffering(
+            @AuthenticationPrincipal User principal,
             @PathVariable Long studentId,
             @PathVariable Long offeringId) {
-        // Note: Service currently only supports getEntriesByStudent(studentId).
-        // The offeringId filtering should be implemented in the service layer.
+        if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
+            throw new AccessDeniedException("Access denied: Students can only access their own gradebook entries");
+        }
         return ResponseEntity.ok(gradebookEntryService.getEntriesByStudent(studentId));
     }
-
-    // TODO: GET /student/{studentId}/offering/{offeringId}/final-grade
-    //       computeFinalGrade is not in the current GradebookEntryService interface.
 }

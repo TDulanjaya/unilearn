@@ -34,6 +34,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.unilearn.server.model.AuditLog;
+import com.unilearn.server.model.PasswordResetToken;
+import com.unilearn.server.repository.AuditLogRepository;
+import com.unilearn.server.repository.PasswordResetTokenRepository;
+import com.unilearn.server.dto.request.ForgotPasswordRequest;
+import com.unilearn.server.dto.request.ResetPasswordRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -47,6 +59,8 @@ public class AuthServiceImpl implements AuthService {
     private final BatchRepository batchRepository;
     private final HodDeanAssignmentRepository hodDeanAssignmentRepository;
     private final FacultyRepository facultyRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final AuditLogRepository auditLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -54,6 +68,25 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        // Public registration MUST always create STUDENT accounts, ignoring client-supplied role
+        return createUserWithRole(request, "STUDENT");
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse createStaffUser(RegisterRequest request) {
+        if (request == null) {
+            throw new ValidationException("Register request cannot be null");
+        }
+        String requestedRole = request.getRole() != null ? request.getRole().toUpperCase() : "";
+        if (!"LECTURER".equals(requestedRole) && !"HOD_DEAN".equals(requestedRole) 
+                && !"STAFF_ADMIN".equals(requestedRole) && !"GUEST_LECTURER".equals(requestedRole)) {
+            throw new ValidationException("Role must be one of: LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER");
+        }
+        return createUserWithRole(request, requestedRole);
+    }
+
+    private AuthResponse createUserWithRole(RegisterRequest request, String roleName) {
         if (request == null) {
             throw new ValidationException("Register request cannot be null");
         }
@@ -61,8 +94,6 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateEntryException("Email already registered: " + request.getEmail());
         }
-
-        String roleName = request.getRole() != null ? request.getRole().toUpperCase() : "STUDENT";
 
         User user = User.builder()
                 .fullName(request.getFullName())
@@ -153,30 +184,81 @@ public class AuthServiceImpl implements AuthService {
             throw new ValidationException("Login request cannot be null");
         }
 
+        String email = request.getEmail();
+        String clientIp = getClientIp();
+        User user = userRepository.findByEmail(email).orElse(null);
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
+
+            if (user == null) {
+                user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new ValidationException("User not found with email: " + email));
+            }
+
+            logLoginAttempt(email, true, clientIp, user);
+
+            String token = jwtService.generateAccessToken(user.getEmail(), user.getRole());
+            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+
+            return AuthResponse.builder()
+                    .token(token)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .userId(user.getUserId())
+                    .fullName(user.getFullName())
+                    .email(user.getEmail())
+                    .role(user.getRole())
+                    .status(user.getStatus())
+                    .build();
         } catch (AuthenticationException e) {
+            logLoginAttempt(email, false, clientIp, user);
             throw new ValidationException("Invalid credentials");
         }
+    }
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ValidationException("User not found with email: " + request.getEmail()));
+    private void logLoginAttempt(String email, boolean success, String ipAddress, User user) {
+        try {
+            String detailsJson = String.format(
+                    "{\"email\":\"%s\",\"status\":\"%s\",\"ip\":\"%s\",\"timestamp\":\"%s\"}",
+                    email != null ? email.replace("\"", "\\\"") : "",
+                    success ? "SUCCESS" : "FAILURE",
+                    ipAddress != null ? ipAddress : "unknown",
+                    LocalDateTime.now()
+            );
 
-        String token = jwtService.generateAccessToken(user.getEmail(), user.getRole());
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+            AuditLog log = AuditLog.builder()
+                    .user(user)
+                    .action(success ? "LOGIN_SUCCESS" : "LOGIN_FAILURE")
+                    .entityType("User")
+                    .entityId(user != null && user.getUserId() != null ? user.getUserId().intValue() : 0)
+                    .details(detailsJson)
+                    .createdAt(LocalDateTime.now())
+                    .build();
 
-        return AuthResponse.builder()
-                .token(token)
-                .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .userId(user.getUserId())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .role(user.getRole())
-                .status(user.getStatus())
-                .build();
+            auditLogRepository.save(log);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String getClientIp() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null) {
+                HttpServletRequest req = attrs.getRequest();
+                String ip = req.getHeader("X-Forwarded-For");
+                if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+                    ip = req.getRemoteAddr();
+                } else if (ip.contains(",")) {
+                    ip = ip.split(",")[0].trim();
+                }
+                return ip;
+            }
+        } catch (Exception ignored) {
+        }
+        return "unknown";
     }
 
     @Override
@@ -201,6 +283,60 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(newRefreshToken)
                 .expiresIn(900000)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void processForgotPassword(ForgotPasswordRequest request) {
+        if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new ValidationException("Email is required");
+        }
+
+        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        if (user == null) {
+            // Do not reveal whether email exists to prevent user enumeration
+            return;
+        }
+
+        passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
+
+        String resetTokenStr = UUID.randomUUID().toString();
+        PasswordResetToken tokenEntity = PasswordResetToken.builder()
+                .token(resetTokenStr)
+                .user(user)
+                .expiryDate(LocalDateTime.now().plusHours(1))
+                .used(false)
+                .build();
+        passwordResetTokenRepository.save(tokenEntity);
+
+        // Log reset link to console in dev profile
+        System.out.println("==========================================================================");
+        System.out.println("[DEV] Password reset requested for: " + user.getEmail());
+        System.out.println("[DEV] Reset link: http://localhost:3000/reset-password?token=" + resetTokenStr);
+        System.out.println("==========================================================================");
+        // TODO: Wire real EmailService / NotificationService for production email delivery
+    }
+
+    @Override
+    @Transactional
+    public void processResetPassword(ResetPasswordRequest request) {
+        if (request == null || request.getToken() == null || request.getNewPassword() == null) {
+            throw new ValidationException("Token and new password are required");
+        }
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new ValidationException("Invalid or expired password reset token"));
+
+        if (resetToken.isUsed() || LocalDateTime.now().isAfter(resetToken.getExpiryDate())) {
+            throw new ValidationException("Invalid or expired password reset token");
+        }
+
+        User user = resetToken.getUser();
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
     }
 
     @Override

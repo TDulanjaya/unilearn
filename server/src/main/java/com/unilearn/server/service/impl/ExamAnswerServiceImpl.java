@@ -32,13 +32,18 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
 
     @Override
     @Transactional
-    public ExamAnswerResponse saveAnswer(ExamAnswerRequest request) {
+    public ExamAnswerResponse saveAnswer(ExamAnswerRequest request, Long studentId) {
         if (request == null) {
             throw new ValidationException("ExamAnswer request cannot be null");
         }
 
         ExamAttempt attempt = examAttemptRepository.findById(request.getAttemptId())
                 .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found with ID: " + request.getAttemptId()));
+
+        if (studentId != null && attempt.getStudent() != null
+                && !studentId.equals(attempt.getStudent().getStudentId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Attempt belongs to another student");
+        }
 
         if (attempt.getEndTime() != null || "submitted".equalsIgnoreCase(attempt.getStatus())) {
             throw new com.unilearn.server.exception.IllegalStateException("Cannot submit or modify answers after exam attempt has been submitted");
@@ -66,12 +71,16 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
     }
 
     @Override
-    public List<ExamAnswerResponse> getAnswersForAttempt(Long attemptId) {
+    public List<ExamAnswerResponse> getAnswersForAttempt(Long attemptId, Long studentId) {
         if (attemptId == null) {
             throw new ValidationException("Attempt ID cannot be null");
         }
-        if (!examAttemptRepository.existsById(attemptId)) {
-            throw new EntryNotFoundException("ExamAttempt not found with ID: " + attemptId);
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found with ID: " + attemptId));
+
+        if (studentId != null && attempt.getStudent() != null
+                && !studentId.equals(attempt.getStudent().getStudentId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Attempt belongs to another student");
         }
 
         return examAnswerRepository.findByAttempt_AttemptId(attemptId)

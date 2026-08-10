@@ -9,6 +9,7 @@ import { z } from "zod";
 import Logo from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Please enter a valid email address"),
@@ -24,7 +25,7 @@ function LoginFormContent() {
   const { login } = useAuth();
 
   const [isForgot, setIsForgot] = useState(false);
-  const [resetEmail, setResetEmail] = useState("admin@uni.edu");
+  const [resetEmail, setResetEmail] = useState("user.s@uni.edu");
   const [resetSent, setResetSent] = useState(false);
   const [serverError, setServerError] = useState<string | null>(
     errorParam === "unauthorized" ? "Please sign in to access this page." : null
@@ -65,9 +66,18 @@ function LoginFormContent() {
     }
   };
 
-  const handleForgot = (e: React.FormEvent) => {
+  const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
-    setResetSent(true);
+    setServerError(null);
+    setIsSubmitting(true);
+    try {
+      await api.post("/api/v1/auth/forgot-password", { email: resetEmail });
+      setResetSent(true);
+    } catch (err: any) {
+      setServerError(err.message || "Failed to send reset link.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -191,11 +201,17 @@ function LoginFormContent() {
 
             {resetSent ? (
               <div className="bg-[var(--secondary-container)] border border-[var(--outline-variant)] rounded-xl p-4 text-center text-sm text-[var(--on-secondary-container)] mb-6">
-                <i className="ti ti-circle-check text-2xl block mb-1"></i>
-                Password reset link sent to <b>{resetEmail}</b>! Check your inbox.
+                <i className="ti ti-circle-check text-2xl block mb-1 text-[var(--tertiary)]"></i>
+                Password reset link sent to <b>{resetEmail}</b>! Check your inbox or dev logs.
               </div>
             ) : (
               <form onSubmit={handleForgot} className="space-y-4">
+                {serverError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs flex items-center gap-2 font-medium">
+                    <i className="ti ti-alert-circle text-base shrink-0"></i>
+                    <span>{serverError}</span>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                     Email address
@@ -209,8 +225,12 @@ function LoginFormContent() {
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] focus:outline-none focus:border-[var(--tertiary)]"
                   />
                 </div>
-                <button type="submit" className="btn-primary w-full justify-center !py-2.5 text-sm shadow-md">
-                  Send reset link
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn-primary w-full justify-center !py-2.5 text-sm shadow-md disabled:opacity-50"
+                >
+                  {isSubmitting ? "Sending..." : "Send reset link"}
                 </button>
               </form>
             )}
@@ -219,6 +239,7 @@ function LoginFormContent() {
               onClick={() => {
                 setIsForgot(false);
                 setResetSent(false);
+                setServerError(null);
               }}
               className="btn-secondary w-full justify-center !py-2 text-xs mt-4"
             >

@@ -10,6 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.model.User;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.util.List;
 
 @RestController
@@ -21,17 +24,19 @@ public class ExamAttemptController {
 
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    // TODO: Enforce self-only — derive studentId from authenticated principal
     public ResponseEntity<ExamAttemptResponse> startAttempt(
+            @AuthenticationPrincipal User principal,
             @Valid @RequestBody ExamAttemptStartRequestDTO request) {
+        request.setStudentId(principal.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(examAttemptService.startAttempt(request));
     }
 
     @PatchMapping("/{id}/complete")
     @PreAuthorize("hasRole('STUDENT')")
-    // TODO: Enforce self-only — verify the attempt belongs to the authenticated student
-    public ResponseEntity<ExamAttemptResponse> completeAttempt(@PathVariable Long id) {
-        return ResponseEntity.ok(examAttemptService.submitAttempt(id));
+    public ResponseEntity<ExamAttemptResponse> completeAttempt(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(examAttemptService.submitAttempt(id, principal.getUserId()));
     }
 
     @GetMapping("/exam/{examId}")
@@ -42,8 +47,12 @@ public class ExamAttemptController {
 
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: If STUDENT, enforce that studentId matches the authenticated student
-    public ResponseEntity<List<ExamAttemptResponse>> getAttemptsByStudent(@PathVariable Long studentId) {
+    public ResponseEntity<List<ExamAttemptResponse>> getAttemptsByStudent(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long studentId) {
+        if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
+            throw new AccessDeniedException("Access denied: Students can only access their own exam attempts");
+        }
         return ResponseEntity.ok(examAttemptService.getAttemptsByStudent(studentId));
     }
 }

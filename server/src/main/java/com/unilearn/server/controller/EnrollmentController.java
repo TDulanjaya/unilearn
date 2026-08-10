@@ -13,6 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.model.User;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.util.List;
 
 @RestController
@@ -24,24 +27,33 @@ public class EnrollmentController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('STUDENT', 'STAFF_ADMIN')")
-    // TODO: If STUDENT, enforce self-enrollment only via authenticated principal
     public ResponseEntity<EnrollmentResponse> enrollStudent(
+            @AuthenticationPrincipal User principal,
             @Valid @RequestBody EnrollmentCreateRequestDTO request) {
+        if ("student".equalsIgnoreCase(principal.getRole())) {
+            request.setStudentId(principal.getUserId());
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(enrollmentService.enrollStudent(request));
     }
 
     @PatchMapping("/{id}/withdraw")
     @PreAuthorize("hasAnyRole('STUDENT', 'STAFF_ADMIN')")
-    // TODO: If STUDENT, enforce that the enrollment belongs to the authenticated student
-    public ResponseEntity<Void> withdrawEnrollment(@PathVariable Long id) {
-        enrollmentService.dropEnrollment(id);
+    public ResponseEntity<Void> withdrawEnrollment(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long id) {
+        Long currentUserId = "student".equalsIgnoreCase(principal.getRole()) ? principal.getUserId() : null;
+        enrollmentService.dropEnrollment(id, currentUserId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'LECTURER', 'STUDENT')")
-    // TODO: If STUDENT, enforce that studentId matches the authenticated student
-    public ResponseEntity<List<EnrollmentResponse>> getEnrollmentsByStudent(@PathVariable Long studentId) {
+    public ResponseEntity<List<EnrollmentResponse>> getEnrollmentsByStudent(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long studentId) {
+        if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
+            throw new AccessDeniedException("Access denied: Students can only access their own enrollments");
+        }
         return ResponseEntity.ok(enrollmentService.getEnrollmentsByStudent(studentId));
     }
 

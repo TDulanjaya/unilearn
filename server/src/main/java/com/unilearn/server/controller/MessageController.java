@@ -24,8 +24,10 @@ public class MessageController {
     private final MessageService messageService;
 
     @PostMapping
-    public ResponseEntity<MessageResponse> sendMessage(@Valid @RequestBody MessageRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(messageService.sendMessage(request));
+    public ResponseEntity<MessageResponse> sendMessage(
+            @AuthenticationPrincipal User principal,
+            @Valid @RequestBody MessageRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(messageService.sendMessage(principal.getUserId(), request));
     }
 
     @GetMapping("/thread/{otherUserId}")

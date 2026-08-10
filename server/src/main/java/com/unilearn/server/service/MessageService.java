@@ -12,7 +12,7 @@ import java.util.List;
  */
 public interface MessageService {
 
-    MessageResponse sendMessage(MessageRequest request);
+    MessageResponse sendMessage(Long senderId, MessageRequest request);
 
     PageResponseDTO<MessageResponse> getConversation(Long user1Id, Long user2Id, Pageable pageable);
 

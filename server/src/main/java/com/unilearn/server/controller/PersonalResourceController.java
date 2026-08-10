@@ -29,14 +29,18 @@ public class PersonalResourceController {
 
     @PostMapping
     public ResponseEntity<PersonalResourceResponse> uploadResource(
+            @AuthenticationPrincipal User principal,
             @Valid @RequestBody PersonalResourceRequest request) {
+        request.setStudentId(principal.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(personalResourceService.createPersonalResource(request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteResource(@PathVariable Long id) {
-        personalResourceService.deletePersonalResource(id);
+    public ResponseEntity<Void> deleteResource(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long id) {
+        personalResourceService.deletePersonalResource(id, principal.getUserId());
         return ResponseEntity.noContent().build();
     }
 

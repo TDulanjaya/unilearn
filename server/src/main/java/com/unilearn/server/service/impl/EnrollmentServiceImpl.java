@@ -62,12 +62,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional
-    public void dropEnrollment(Long enrollmentId) {
+    public void dropEnrollment(Long enrollmentId, Long currentUserId) {
         if (enrollmentId == null) {
             throw new ValidationException("Enrollment ID cannot be null");
         }
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new EntryNotFoundException("Enrollment not found with ID: " + enrollmentId));
+
+        if (currentUserId != null && enrollment.getStudent() != null
+                && !currentUserId.equals(enrollment.getStudent().getStudentId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Enrollment belongs to another student");
+        }
 
         enrollment.setStatus("dropped");
         enrollmentRepository.save(enrollment);

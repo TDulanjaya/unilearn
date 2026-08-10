@@ -30,13 +30,16 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional
-    public MessageResponse sendMessage(MessageRequest request) {
+    public MessageResponse sendMessage(Long senderId, MessageRequest request) {
+        if (senderId == null) {
+            throw new ValidationException("Sender ID cannot be null");
+        }
         if (request == null) {
             throw new ValidationException("Message request cannot be null");
         }
 
-        User sender = userRepository.findById(request.getSenderId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getSenderId()));
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + senderId));
 
         User receiver = userRepository.findById(request.getReceiverId())
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getReceiverId()));

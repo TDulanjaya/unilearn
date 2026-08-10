@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -48,17 +49,20 @@ public class AttendanceRecordController {
     @PostMapping("/check-in")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<AttendanceRecordResponse> checkIn(
+            @AuthenticationPrincipal User principal,
             @Valid @RequestBody StudentCheckInRequest request) {
-        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntryNotFoundException("User not found: " + email));
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(attendanceRecordService.checkIn(request.getSessionCode(), user.getUserId()));
+                .body(attendanceRecordService.checkIn(request.getSessionCode(), principal.getUserId()));
     }
 
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'STAFF_ADMIN', 'HOD_DEAN')")
-    public ResponseEntity<List<AttendanceRecordResponse>> getRecordsByStudent(@PathVariable Long studentId) {
+    public ResponseEntity<List<AttendanceRecordResponse>> getRecordsByStudent(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long studentId) {
+        if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Students can only access their own attendance records");
+        }
         return ResponseEntity.ok(attendanceRecordService.getAttendanceForStudent(studentId));
     }
 }

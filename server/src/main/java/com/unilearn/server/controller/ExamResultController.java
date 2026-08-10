@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.model.User;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.util.List;
 
 @RestController
@@ -43,11 +46,13 @@ public class ExamResultController {
 
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: If STUDENT, enforce that studentId matches the authenticated student
-    //       and only return published results
     public ResponseEntity<ExamResultResponse> getResultsByStudent(
+            @AuthenticationPrincipal User principal,
             @PathVariable Long studentId,
             @RequestParam Long examId) {
+        if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
+            throw new AccessDeniedException("Access denied: Students can only access their own results");
+        }
         return ResponseEntity.ok(examResultService.getResultForStudent(examId, studentId));
     }
 }

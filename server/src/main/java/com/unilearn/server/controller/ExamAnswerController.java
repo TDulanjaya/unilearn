@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.model.User;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -22,9 +24,10 @@ public class ExamAnswerController {
 
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    // TODO: Enforce self-only — verify the attempt belongs to the authenticated student
-    public ResponseEntity<ExamAnswerResponse> saveAnswer(@Valid @RequestBody ExamAnswerRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(examAnswerService.saveAnswer(request));
+    public ResponseEntity<ExamAnswerResponse> saveAnswer(
+            @AuthenticationPrincipal User principal,
+            @Valid @RequestBody ExamAnswerRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(examAnswerService.saveAnswer(request, principal.getUserId()));
     }
 
     @PatchMapping("/{id}/grade")
@@ -38,8 +41,10 @@ public class ExamAnswerController {
 
     @GetMapping("/attempt/{attemptId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: If STUDENT, enforce that the attempt belongs to the authenticated student
-    public ResponseEntity<List<ExamAnswerResponse>> getAnswersByAttempt(@PathVariable Long attemptId) {
-        return ResponseEntity.ok(examAnswerService.getAnswersForAttempt(attemptId));
+    public ResponseEntity<List<ExamAnswerResponse>> getAnswersByAttempt(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long attemptId) {
+        Long studentId = "student".equalsIgnoreCase(principal.getRole()) ? principal.getUserId() : null;
+        return ResponseEntity.ok(examAnswerService.getAnswersForAttempt(attemptId, studentId));
     }
 }

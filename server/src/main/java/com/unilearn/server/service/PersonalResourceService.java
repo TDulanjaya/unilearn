@@ -14,7 +14,7 @@ public interface PersonalResourceService {
 
     PersonalResourceResponse updatePersonalResource(Long resourceId, PersonalResourceRequest request);
 
-    void deletePersonalResource(Long resourceId);
+    void deletePersonalResource(Long resourceId, Long currentUserId);
 
     PersonalResourceResponse getResourceById(Long resourceId);
 

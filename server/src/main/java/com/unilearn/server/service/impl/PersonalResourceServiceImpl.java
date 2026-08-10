@@ -80,14 +80,17 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
 
     @Override
     @Transactional
-    public void deletePersonalResource(Long resourceId) {
+    public void deletePersonalResource(Long resourceId, Long currentUserId) {
         if (resourceId == null) {
             throw new ValidationException("Resource ID cannot be null");
         }
-        if (!personalResourceRepository.existsById(resourceId)) {
-            throw new EntryNotFoundException("PersonalResource not found with ID: " + resourceId);
+        PersonalResource resource = personalResourceRepository.findById(resourceId)
+                .orElseThrow(() -> new EntryNotFoundException("PersonalResource not found with ID: " + resourceId));
+        if (currentUserId != null && resource.getStudent() != null
+                && !currentUserId.equals(resource.getStudent().getStudentId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: You do not own this resource");
         }
-        personalResourceRepository.deleteById(resourceId);
+        personalResourceRepository.delete(resource);
     }
 
     @Override

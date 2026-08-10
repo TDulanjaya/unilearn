@@ -8,9 +8,15 @@ public interface AuthService {
 
     AuthResponse register(RegisterRequest request);
 
+    AuthResponse createStaffUser(RegisterRequest request);
+
     AuthResponse login(LoginRequest request);
 
     com.unilearn.server.dto.response.RefreshTokenResponse refresh(com.unilearn.server.dto.request.RefreshTokenRequest request);
+
+    void processForgotPassword(com.unilearn.server.dto.request.ForgotPasswordRequest request);
+
+    void processResetPassword(com.unilearn.server.dto.request.ResetPasswordRequest request);
 
     void logout(String token);
 }

@@ -11,9 +11,9 @@ import java.util.List;
  */
 public interface ExamAnswerService {
 
-    ExamAnswerResponse saveAnswer(ExamAnswerRequest request);
+    ExamAnswerResponse saveAnswer(ExamAnswerRequest request, Long studentId);
 
-    List<ExamAnswerResponse> getAnswersForAttempt(Long attemptId);
+    List<ExamAnswerResponse> getAnswersForAttempt(Long attemptId, Long studentId);
 
     ExamAnswerResponse gradeAnswer(Long attemptId, Long questionId, BigDecimal marksAwarded);
 }

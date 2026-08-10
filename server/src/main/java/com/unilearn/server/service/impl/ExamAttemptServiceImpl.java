@@ -59,13 +59,18 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
 
     @Override
     @Transactional
-    public ExamAttemptResponse submitAttempt(Long attemptId) {
+    public ExamAttemptResponse submitAttempt(Long attemptId, Long studentId) {
         if (attemptId == null) {
             throw new ValidationException("Attempt ID cannot be null");
         }
 
         ExamAttempt attempt = examAttemptRepository.findById(attemptId)
                 .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found with ID: " + attemptId));
+
+        if (studentId != null && attempt.getStudent() != null
+                && !studentId.equals(attempt.getStudent().getStudentId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Attempt belongs to another student");
+        }
 
         if ("submitted".equalsIgnoreCase(attempt.getStatus())) {
             throw new com.unilearn.server.exception.IllegalStateException("Exam attempt is already submitted");

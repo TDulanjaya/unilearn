@@ -11,6 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.unilearn.server.model.User;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.util.List;
 
 @RestController
@@ -22,9 +25,10 @@ public class SubmissionController {
 
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    // TODO: Enforce self-submission via authenticated principal
     public ResponseEntity<SubmissionResponse> submitAssignment(
+            @AuthenticationPrincipal User principal,
             @Valid @RequestBody SubmissionCreateRequestDTO request) {
+        request.setStudentId(principal.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(submissionService.submitAssignment(request));
     }
 
@@ -45,8 +49,12 @@ public class SubmissionController {
 
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: If STUDENT, enforce that studentId matches the authenticated student
-    public ResponseEntity<List<SubmissionResponse>> getSubmissionsByStudent(@PathVariable Long studentId) {
+    public ResponseEntity<List<SubmissionResponse>> getSubmissionsByStudent(
+            @AuthenticationPrincipal User principal,
+            @PathVariable Long studentId) {
+        if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
+            throw new AccessDeniedException("Access denied: Students can only access their own submissions");
+        }
         return ResponseEntity.ok(submissionService.getSubmissionsByStudent(studentId));
     }
 }

@@ -12,7 +12,7 @@ public interface ExamAttemptService {
 
     ExamAttemptResponse startAttempt(ExamAttemptStartRequestDTO request);
 
-    ExamAttemptResponse submitAttempt(Long attemptId);
+    ExamAttemptResponse submitAttempt(Long attemptId, Long studentId);
 
     ExamAttemptResponse getAttemptById(Long attemptId);
 

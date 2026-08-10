@@ -14,7 +14,7 @@ public interface EnrollmentService {
 
     EnrollmentResponse enrollStudent(EnrollmentCreateRequestDTO request);
 
-    void dropEnrollment(Long enrollmentId);
+    void dropEnrollment(Long enrollmentId, Long currentUserId);
 
     List<EnrollmentResponse> getEnrollmentsByStudent(Long studentId);
 

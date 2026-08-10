@@ -17,7 +17,6 @@ import lombok.ToString;
 @Builder
 public class MessageRequest {
 
-    @NotNull(message = "Sender ID is required")
     private Long senderId;
 
     @NotNull(message = "Receiver ID is required")
