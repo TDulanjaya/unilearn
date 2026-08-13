@@ -53,8 +53,15 @@ public class AiQuizQuestionServiceImpl implements AiQuizQuestionService {
 
         question.setStudentAnswer(studentAnswer);
         question.setAnswerRevealed(true);
-        if (question.getCorrectAnswer() != null) {
-            question.setIsCorrect(question.getCorrectAnswer().trim().equalsIgnoreCase(studentAnswer.trim()));
+
+        if ("mcq".equalsIgnoreCase(question.getQuestionType())) {
+            // FR-AI-03: For MCQ, instant boolean evaluation
+            if (question.getCorrectAnswer() != null) {
+                question.setIsCorrect(question.getCorrectAnswer().trim().equalsIgnoreCase(studentAnswer.trim()));
+            }
+        } else {
+            // FR-AI-05: For structured, do NOT auto-grade — just mark answerRevealed=true and return stored model answer
+            question.setIsCorrect(null);
         }
 
         AiQuizQuestion updated = aiQuizQuestionRepository.save(question);

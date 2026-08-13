@@ -22,4 +22,6 @@ public class AiChatMessageResponse {
     private String role;
     private String content;
     private LocalDateTime createdAt;
+    @Builder.Default
+    private Boolean aiGenerated = true;
 }

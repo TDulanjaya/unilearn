@@ -25,4 +25,6 @@ public class AiQuizSessionResponse {
     private String sourceScope;
     private LocalDateTime createdAt;
     private List<AiQuizQuestionResponse> questions;
+    @Builder.Default
+    private Boolean aiGenerated = true;
 }

@@ -24,4 +24,6 @@ public class AiQuizQuestionResponse {
     private String studentAnswer;
     private Boolean isCorrect;
     private Boolean answerRevealed;
+    @Builder.Default
+    private Boolean aiGenerated = true;
 }

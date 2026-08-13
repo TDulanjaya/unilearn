@@ -1,5 +1,7 @@
 package com.unilearn.server.service.impl;
 
+import com.unilearn.server.ai.AiGroundingContextHelper;
+import com.unilearn.server.ai.AiProviderClient;
 import com.unilearn.server.dto.request.AiChatMessageRequest;
 import com.unilearn.server.dto.response.AiChatMessageResponse;
 import com.unilearn.server.exception.EntryNotFoundException;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -27,6 +30,8 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
     private final StudentRepository studentRepository;
     private final CourseOfferingRepository courseOfferingRepository;
     private final AiChatMessageMapper aiChatMessageMapper;
+    private final AiProviderClient aiProviderClient;
+    private final AiGroundingContextHelper aiGroundingContextHelper;
 
     @Override
     @Transactional
@@ -41,9 +46,37 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        AiChatMessage message = aiChatMessageMapper.toAiChatMessage(request, student, offering);
-        AiChatMessage saved = aiChatMessageRepository.save(message);
-        return aiChatMessageMapper.toAiChatMessageResponse(saved);
+        // 1. Persist the user's prompt as a role="user" message
+        AiChatMessage userMessage = AiChatMessage.builder()
+                .student(student)
+                .courseOffering(offering)
+                .role("user")
+                .content(request.getContent())
+                .createdAt(LocalDateTime.now())
+                .build();
+        aiChatMessageRepository.save(userMessage);
+
+        // 2. Fetch existing chat history for grounding context
+        List<AiChatMessage> priorMessages = aiChatMessageRepository
+                .findByStudent_StudentIdAndCourseOffering_OfferingIdOrderByCreatedAtAsc(student.getStudentId(), offering.getOfferingId());
+
+        // 3. Fetch course material context
+        String courseContext = aiGroundingContextHelper.fetchCourseContext(offering.getOfferingId(), "full_course");
+
+        // 4. Generate grounded AI response
+        String aiAnswer = aiProviderClient.generateChatAnswer(courseContext, "full_course", priorMessages, request.getContent());
+
+        // 5. Persist AI response as a role="assistant" message
+        AiChatMessage assistantMessage = AiChatMessage.builder()
+                .student(student)
+                .courseOffering(offering)
+                .role("assistant")
+                .content(aiAnswer)
+                .createdAt(LocalDateTime.now())
+                .build();
+        AiChatMessage savedAssistant = aiChatMessageRepository.save(assistantMessage);
+
+        return aiChatMessageMapper.toAiChatMessageResponse(savedAssistant);
     }
 
     @Override
