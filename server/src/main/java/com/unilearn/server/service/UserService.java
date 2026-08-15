@@ -21,4 +21,6 @@ public interface UserService {
     PageResponseDTO<UserResponse> getAllUsers(Pageable pageable);
 
     UserResponse setUserActive(Long userId, boolean active);
+
+    UserResponse adminChangePassword(Long userId, String newPassword);
 }

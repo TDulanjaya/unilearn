@@ -79,7 +79,7 @@ export default function DataTable<T extends Record<string, any>>({
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         
         <div className="relative flex-1 max-w-sm">
-          <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--outline)] text-base"></i>
+          <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-variant)] text-base pointer-events-none z-10"></i>
           <input
             type="text"
             placeholder={searchPlaceholder}
@@ -88,7 +88,7 @@ export default function DataTable<T extends Record<string, any>>({
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] focus:outline-none focus:border-[var(--tertiary)] transition-colors"
+            className="w-full !pl-10 pr-4 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)]/60 focus:outline-none focus:border-[var(--tertiary)] transition-colors"
           />
         </div>
 

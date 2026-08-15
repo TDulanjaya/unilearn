@@ -270,4 +270,24 @@ public class UserServiceImpl implements UserService {
         User updated = userRepository.save(user);
         return userMapper.toUserResponse(updated);
     }
+
+    @Override
+    @Transactional
+    public UserResponse adminChangePassword(Long userId, String newPassword) {
+        if (userId == null) {
+            throw new ValidationException("User ID cannot be null");
+        }
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new ValidationException("New password cannot be empty");
+        }
+        if (newPassword.length() < 6) {
+            throw new ValidationException("New password must be at least 6 characters");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword.trim()));
+        User updated = userRepository.save(user);
+        return userMapper.toUserResponse(updated);
+    }
 }

@@ -38,6 +38,13 @@ public class UserController {
         return ResponseEntity.ok(userService.setUserActive(id, active));
     }
 
+    @PatchMapping("/{id}/password")
+    public ResponseEntity<UserResponse> changeUserPassword(@PathVariable Long id,
+                                                           @RequestBody java.util.Map<String, String> request) {
+        String newPassword = request != null ? request.get("password") : null;
+        return ResponseEntity.ok(userService.adminChangePassword(id, newPassword));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);

@@ -90,6 +90,8 @@ export default function UserManagementPage() {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [editPassword, setEditPassword] = useState("");
+  const [showEditPasswordText, setShowEditPasswordText] = useState(false);
 
   
 function generateSmartPassword(name: string, role: string): string {
@@ -183,14 +185,23 @@ function generateSmartPassword(name: string, role: string): string {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: number; fullName: string; email: string; role: string; phone?: string; active: boolean }) =>
+    mutationFn: (data: { id: number; fullName: string; email: string; role: string; phone?: string; active: boolean; password?: string }) =>
       api.put(`/api/v1/users/${data.id}`, {
         fullName: data.fullName,
         email: data.email,
         role: data.role,
         phone: data.phone,
         active: data.active,
+        password: data.password || undefined,
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: (data: { id: number; password: string }) =>
+      api.patch(`/api/v1/users/${data.id}/password`, { password: data.password }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },
@@ -330,14 +341,22 @@ function generateSmartPassword(name: string, role: string): string {
           role: mapRoleToBackend(editingUser.role),
           phone: editingUser.phone,
           active: editingUser.status === "Active",
+          password: editPassword.trim() || undefined,
         });
+        if (editPassword.trim()) {
+          showToast(`Updated details & password for ${editingUser.fullName} (${editingUser.role}).`);
+        } else {
+          showToast(`Updated user settings for ${editingUser.fullName}.`);
+        }
       } catch (err: any) {
         console.error("Backend update user error:", err);
+        showToast(`Error updating user: ${err.message || "Server error"}`);
+        return;
       }
     }
     setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? editingUser : u)));
     setEditingUser(null);
-    showToast(`Updated user settings for ${editingUser.fullName}.`);
+    setEditPassword("");
   };
 
   const handleDeleteUser = async (user: UserRecord) => {
@@ -683,9 +702,9 @@ function generateSmartPassword(name: string, role: string): string {
                   <button
                     type="button"
                     onClick={() => setShowPasswordText(!showPasswordText)}
-                    className="absolute right-3 top-2.5 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] flex items-center justify-center transition-colors"
                   >
-                    <i className={`ti ${showPasswordText ? "ti-eye-off" : "ti-eye"}`}></i>
+                    <i className={`ti ${showPasswordText ? "ti-eye-off" : "ti-eye"} text-base`}></i>
                   </button>
                 </div>
               </div>
@@ -812,27 +831,39 @@ function generateSmartPassword(name: string, role: string): string {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]">
-                <div>
-                  <p className="font-bold text-[var(--on-surface)]">Account Access Status</p>
-                  <p className="text-[10px] text-[var(--on-surface-variant)]">Toggle active or locked access</p>
+              <div className="p-3.5 rounded-xl border border-[var(--tertiary)]/30 bg-[var(--surface-container-low)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
+                    <i className="ti ti-key text-[var(--tertiary)] text-base"></i> Reset / Change User Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const gen = generateSmartPassword(editingUser.fullName, editingUser.role);
+                      setEditPassword(gen);
+                    }}
+                    className="text-[11px] text-[var(--tertiary)] font-bold hover:underline flex items-center gap-1"
+                  >
+                    <i className="ti ti-wand"></i> Auto-Generate
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEditingUser({ ...editingUser, status: editingUser.status === "Active" ? "Locked" : "Active" })}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold ${editingUser.status === "Active" ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-red-500/10 text-red-600 border border-red-500/20"}`}
-                >
-                  {editingUser.status}
-                </button>
+                <div className="relative">
+                  <input
+                    type={showEditPasswordText ? "text" : "password"}
+                    placeholder="New password (leave blank to keep)"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    className="w-full text-xs p-2.5 pr-10 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-mono text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)]/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPasswordText(!showEditPasswordText)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] flex items-center justify-center transition-colors"
+                  >
+                    <i className={`ti ${showEditPasswordText ? "ti-eye-off" : "ti-eye"} text-base`}></i>
+                  </button>
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={handleTriggerPasswordReset}
-                className="btn-secondary text-xs w-full justify-center !py-2"
-              >
-                <i className="ti ti-key mr-1"></i> Send Password Reset Email
-              </button>
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
