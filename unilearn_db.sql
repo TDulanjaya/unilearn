@@ -1,6 +1,8 @@
 CREATE DATABASE IF NOT EXISTS `unilearn_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE `unilearn_db`;
 
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- Table: academic_years
 DROP TABLE IF EXISTS `academic_years`;
 CREATE TABLE `academic_years` (
@@ -692,3 +694,5 @@ CREATE TABLE `personal_resources` (
   CONSTRAINT `personal_resources_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
   CONSTRAINT `personal_resources_ibfk_2` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;
