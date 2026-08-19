@@ -4,13 +4,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 export default function StudentNavbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+
+  const displayName = user?.fullName || "Student";
+  const displayInitials = displayName.charAt(0).toUpperCase();
+  const displaySub = user?.email || "Student Portal";
 
   const links = [
     { href: "/student/dashboard", label: "Dashboard" },
@@ -34,7 +40,7 @@ export default function StudentNavbar() {
   const handleLogout = () => {
     setIsOpen(false);
     setIsAccountOpen(false);
-    router.push("/login");
+    logout();
   };
 
   return (
@@ -84,8 +90,8 @@ export default function StudentNavbar() {
               className="flex items-center gap-2 pl-2 border-l border-[var(--outline-variant)] hover:opacity-80 transition-opacity"
               aria-label="Account menu"
             >
-              <div className="avatar w-8 h-8 text-xs">N</div>
-              <span className="text-xs font-semibold text-[var(--on-surface)] hidden lg:inline">Nadeesha S.</span>
+              <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
+              <span className="text-xs font-semibold text-[var(--on-surface)] hidden lg:inline">{displayName}</span>
               <i className="ti ti-chevron-down text-xs text-[var(--on-surface-variant)]"></i>
             </button>
 
@@ -96,10 +102,10 @@ export default function StudentNavbar() {
                   onClick={() => setIsAccountOpen(false)}
                   className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[var(--surface-container-low)] transition-colors"
                 >
-                  <div className="avatar w-8 h-8 text-xs">N</div>
+                  <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
                   <div className="overflow-hidden">
-                    <p className="text-xs font-bold text-[var(--on-surface)] truncate">Nadeesha Silva</p>
-                    <p className="text-[11px] text-[var(--on-surface-variant)] truncate">SE/2023/042</p>
+                    <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
+                    <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
                   </div>
                 </Link>
                 <div className="my-1 border-t border-[var(--outline-variant)]"></div>
@@ -131,10 +137,10 @@ export default function StudentNavbar() {
             onClick={() => setIsOpen(false)}
             className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-container-low)] mb-2"
           >
-            <div className="avatar w-8 h-8 text-xs">N</div>
+            <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
             <div className="overflow-hidden">
-              <p className="text-xs font-bold text-[var(--on-surface)] truncate">Nadeesha Silva</p>
-              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">Student Profile</p>
+              <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
+              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
             </div>
           </Link>
           {links.map((link) => {

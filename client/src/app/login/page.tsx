@@ -27,6 +27,7 @@ function LoginFormContent() {
   const [isForgot, setIsForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState("user.s@uni.edu");
   const [resetSent, setResetSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(
     errorParam === "unauthorized" ? "Please sign in to access this page." : null
   );
@@ -147,16 +148,26 @@ function LoginFormContent() {
                     Forgot password?
                   </button>
                 </div>
-                <input
-                  type="password"
-                  {...register("password")}
-                  placeholder="••••••••"
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border bg-[var(--surface-container-lowest)] focus:outline-none transition-colors ${
-                    errors.password
-                      ? "border-red-500 focus:border-red-500"
-                      : "border-[var(--outline-variant)] focus:border-[var(--tertiary)]"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    {...register("password")}
+                    placeholder="••••••••"
+                    className={`w-full pl-3.5 pr-10 py-2.5 text-xs rounded-xl border bg-[var(--surface-container-lowest)] focus:outline-none transition-colors ${
+                      errors.password
+                        ? "border-red-500 focus:border-red-500"
+                        : "border-[var(--outline-variant)] focus:border-[var(--tertiary)]"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors p-1"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <i className={`ti ${showPassword ? "ti-eye-off" : "ti-eye"} text-base`}></i>
+                  </button>
+                </div>
                 {errors.password && (
                   <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1 font-medium">
                     <i className="ti ti-alert-circle"></i> {errors.password.message}
@@ -172,23 +183,6 @@ function LoginFormContent() {
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
             </form>
-
-            {process.env.NODE_ENV === "development" && (
-              <div className="mt-6 pt-4 border-t border-[var(--outline-variant)] text-center text-xs text-[var(--outline)]">
-                Demo Role Jump:{" "}
-                <Link href="/student/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
-                  Student
-                </Link>{" "}
-                ·{" "}
-                <Link href="/lecturer/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
-                  Lecturer
-                </Link>{" "}
-                ·{" "}
-                <Link href="/admin/dashboard" className="text-[var(--tertiary)] font-medium hover:underline">
-                  Admin
-                </Link>
-              </div>
-            )}
           </div>
         ) : (
           <div>

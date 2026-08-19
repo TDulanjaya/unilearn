@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+import { useAuth } from "@/context/AuthContext";
+
 interface CourseItem {
   id: string;
   code: string;
@@ -26,32 +28,53 @@ type FilterType =
   | "Removed from view";
 
 export default function StudentCoursesPage() {
-  const { data: offeringsData, isLoading, isError } = useQuery({
+  const { user } = useAuth();
+
+  // 1. Fetch student enrollments
+  const { data: enrollmentsData } = useQuery({
+    queryKey: ["studentEnrollments", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
+  // 2. Fetch all offerings
+  const { data: offeringsData, isLoading } = useQuery({
     queryKey: ["courseOfferings"],
     queryFn: () => api.get<any>("/api/v1/course-offerings"),
   });
 
-  const apiCourses: CourseItem[] = Array.isArray(offeringsData) && offeringsData.length > 0
-    ? offeringsData.map((o: any, idx: number) => ({
-        id: String(o.offeringId || idx + 1),
-        code: o.courseCode || "SE308.3",
-        title: o.courseName || o.courseTitle || "Software Course",
-        lecturer: `${o.primaryLecturerName || o.lecturerName || "Lecturer"} · ${o.departmentName || "Department"}`,
-        progress: 75,
-        assignmentsPending: 1,
-        status: "In progress",
-        isStarred: false,
-        isRemovedFromView: false,
-      }))
-    : INITIAL_COURSES;
+  const enrolledList: any[] = Array.isArray(enrollmentsData)
+    ? enrollmentsData
+    : (enrollmentsData as any)?.content || (enrollmentsData as any)?.dataList || [];
+
+  const allOfferingsList: any[] = Array.isArray(offeringsData)
+    ? offeringsData
+    : offeringsData?.content || offeringsData?.dataList || [];
+
+  // If student has specific enrollments, display them; otherwise display all offerings
+  const activeList = enrolledList.length > 0 ? enrolledList : allOfferingsList;
+
+  const apiCourses: CourseItem[] = activeList.map((o: any, idx: number) => ({
+    id: String(o.offeringId || idx + 1),
+    code: o.courseCode || "SE308.3",
+    title: o.courseName || o.courseTitle || "Software Engineering Module",
+    lecturer: `${o.primaryLecturerName || o.lecturerName || "Lecturer"} · ${o.departmentName || o.batchName || "Faculty of Computing"}`,
+    progress: 75,
+    assignmentsPending: 0,
+    status: "In progress",
+    isStarred: false,
+    isRemovedFromView: false,
+  }));
 
   const [courses, setCourses] = useState<CourseItem[]>(apiCourses);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("All (except removed from view)");
 
   useEffect(() => {
-    if (offeringsData) setCourses(apiCourses);
-  }, [offeringsData]);
+    if (activeList.length > 0) {
+      setCourses(apiCourses);
+    }
+  }, [enrollmentsData, offeringsData]);
 
   const toggleRemoveFromView = (id: string, e: React.MouseEvent) => {
     e.preventDefault();

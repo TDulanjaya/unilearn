@@ -63,3 +63,5 @@ target/
 *.log
 hs_err_pid*
 replay_pid*
+uploads/
+server/uploads/

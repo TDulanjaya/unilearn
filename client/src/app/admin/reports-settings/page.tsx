@@ -123,14 +123,12 @@ export default function Page() {
             Reports & System Audit Log
           </h1>
           <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm">
-            Institution analytics, financial statements, and filterable system audit trail.
+            Institution analytics and filterable system audit trail.
           </p>
         </div>
 
         <div className="flex gap-2 border-b border-[var(--outline-variant)] overflow-x-auto" data-tabgroup="rs">
           <span className="tab-btn active" data-tab="rep">Reports</span>
-          <span className="tab-btn" data-tab="fin">Finance</span>
-          <span className="tab-btn" data-tab="set">Settings</span>
           <span className="tab-btn" data-tab="aud">Audit log</span>
         </div>
 
@@ -168,36 +166,6 @@ export default function Page() {
             <div className="card p-4 text-center">
               <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Total Enrolled</p>
               <p className="font-display font-extrabold text-2xl text-[var(--on-surface)]">{report.totalStudents}</p>
-            </div>
-          </div>
-        </div>
-
-        
-        <div id="rs-fin" data-tabpanel="rs" className="hidden">
-          <div className="grid sm:grid-cols-2 gap-4 mb-6">
-            <div className="card p-5 flex items-center gap-4">
-              <div className="w-11 h-11 rounded-2xl bg-[var(--secondary-container)] text-[var(--on-secondary-container)] flex items-center justify-center font-bold">
-                <i className="ti ti-cash text-xl"></i>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-0.5">Total Collected</p>
-                <p className="font-display font-extrabold text-2xl text-[var(--secondary)]">LKR 42.1M</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        
-        <div id="rs-set" data-tabpanel="rs" className="hidden">
-          <div className="card p-6">
-            <h3 className="font-display font-bold text-base text-[var(--on-surface)] mb-4 pb-2 border-b border-[var(--outline-variant)]">
-              Notification & Security Settings
-            </h3>
-            <div className="space-y-3 text-sm font-medium text-[var(--on-surface)]">
-              <label className="flex items-center justify-between p-3 rounded-xl border border-[var(--outline-variant)]">
-                <span>System Security Audit Logs</span>
-                <input type="checkbox" defaultChecked />
-              </label>
             </div>
           </div>
         </div>

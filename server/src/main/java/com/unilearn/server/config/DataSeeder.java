@@ -28,7 +28,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // DataSeeder is disabled. No default users or structure will be created on restart.
+
     }
 
     private void seedAcademicStructureIfMissing() {
@@ -85,12 +85,12 @@ public class DataSeeder implements CommandLineRunner {
                     .build();
             User saved = userRepository.save(user);
             log.info("Seeded default user: {}", email);
-            
+
             // Create extension rows
             String roleName = role.toUpperCase();
             var dept = departmentRepository.findAll().stream().findFirst().orElse(null);
             var batch = batchRepository.findAll().stream().findFirst().orElse(null);
-            
+
             if ("STUDENT".equals(roleName)) {
                 if (!studentRepository.existsById(saved.getUserId())) {
                     Student student = Student.builder()

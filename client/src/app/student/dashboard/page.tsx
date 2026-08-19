@@ -28,7 +28,7 @@ export default function StudentDashboard() {
   const averageScore = allEntries.length > 0 
     ? allEntries.reduce((acc: number, e: any) => acc + Number(e.score || 0), 0) / allEntries.length 
     : 0;
-  const currentGpa = averageScore > 0 ? (averageScore / 25).toFixed(2) : "3.78";
+  const currentGpa = averageScore > 0 ? (averageScore / 25).toFixed(2) : "0.00";
 
   // 3. Fetch student's attendance records to calculate rate
   const { data: attendanceRecords } = useQuery({
@@ -40,7 +40,7 @@ export default function StudentDashboard() {
   const presentRecords = attendanceRecords?.filter((r: any) => r.status === "Present") || [];
   const attendanceRate = attendanceRecords && attendanceRecords.length > 0 
     ? Math.round((presentRecords.length / attendanceRecords.length) * 100) 
-    : 92;
+    : 0;
 
   // 4. Fetch assignments for enrolled offerings
   const assignmentQueries = useQueries({

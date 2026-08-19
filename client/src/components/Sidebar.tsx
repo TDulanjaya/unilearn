@@ -20,9 +20,9 @@ export default function Sidebar({ role, name, sub }: SidebarProps) {
       { href: "/admin/dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },
       { href: "/admin/user-management", label: "User management", icon: "ti-users" },
       { href: "/admin/academic-structure", label: "Academic structure", icon: "ti-building-bank" },
-      { href: "/admin/events-enrollment", label: "Events & Announcements", icon: "ti-calendar-event" },
+      { href: "/admin/events-enrollment", label: "Events & Enrollment", icon: "ti-calendar-event" },
       { href: "/admin/exam-scheduling", label: "Exam scheduling", icon: "ti-calendar-time" },
-      { href: "/admin/reports-settings", label: "Reports & settings", icon: "ti-settings" },
+      { href: "/admin/reports-settings", label: "Reports & Audit Logs", icon: "ti-file-analytics" },
     ],
     hod: [
       { href: "/hod/dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },

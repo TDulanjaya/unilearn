@@ -32,9 +32,11 @@ const INITIAL_SEMESTERS: SemesterData[] = [];
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { useEffect } from "react";
 
 export default function StudentRecordsPage() {
+  const { user } = useAuth();
   const { data: rawSemesters } = useQuery({
     queryKey: ["semesters"],
     queryFn: () => api.get<any>("/api/v1/semesters"),
@@ -100,12 +102,14 @@ export default function StudentRecordsPage() {
   };
 
   const handleDownloadTranscript = () => {
+    const studentName = user?.fullName || "Student User";
+    const studentId = `STU-${user?.userId || "2026"}`;
     let transcriptText = `
 ============================================================
            UNILEARN OFFICIAL ACADEMIC TRANSCRIPT
 ============================================================
-Student Name: Nadeesha Silva
-Student ID  : SE-2023-042
+Student Name: ${studentName}
+Student ID  : ${studentId}
 Degree      : Bachelor of Science (Hons) in Software Engineering
 Overall CGPA: ${actualCgpa}
 Total Credits: ${totalCredits}
@@ -128,7 +132,7 @@ Total Credits: ${totalCredits}
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `AcademicTranscript_Nadeesha_Silva.txt`;
+    a.download = `AcademicTranscript_${studentName.replace(/\s+/g, "_")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -64,4 +64,12 @@ public class EnrollmentController {
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(enrollmentService.getEnrollmentsByOffering(offeringId, pageable));
     }
+
+    @PostMapping("/batch/{batchId}/offering/{offeringId}")
+    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    public ResponseEntity<java.util.Map<String, Object>> enrollBatch(
+            @PathVariable Long batchId,
+            @PathVariable Long offeringId) {
+        return ResponseEntity.ok(enrollmentService.enrollBatch(batchId, offeringId));
+    }
 }

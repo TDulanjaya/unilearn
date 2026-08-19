@@ -45,6 +45,9 @@ public class Event {
 
     private Integer capacity;
 
+    @Column(name = "poster_url", length = 500)
+    private String posterUrl;
+
     @ManyToOne
     @JoinColumn(name = "faculty_id")
     private Faculty faculty;

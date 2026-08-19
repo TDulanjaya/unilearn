@@ -21,4 +21,6 @@ public interface EnrollmentService {
     PageResponseDTO<EnrollmentResponse> getEnrollmentsByOffering(Long offeringId, Pageable pageable);
 
     EnrollmentResponse updateStatus(Long enrollmentId, String status);
+
+    java.util.Map<String, Object> enrollBatch(Long batchId, Long offeringId);
 }

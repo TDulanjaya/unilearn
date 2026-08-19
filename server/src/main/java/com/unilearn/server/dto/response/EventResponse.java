@@ -26,6 +26,7 @@ public class EventResponse {
     private LocalDateTime endDateTime;
     private LocalDateTime eventDate;
     private String venue;
+    private String posterUrl;
     private Long createdById;
     private String createdByName;
 }

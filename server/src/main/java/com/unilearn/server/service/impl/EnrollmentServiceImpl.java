@@ -134,4 +134,53 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         Enrollment updated = enrollmentRepository.save(enrollment);
         return enrollmentMapper.toEnrollmentResponse(updated);
     }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, Object> enrollBatch(Long batchId, Long offeringId) {
+        if (batchId == null || offeringId == null) {
+            throw new ValidationException("Batch ID and Offering ID are required");
+        }
+
+        CourseOffering offering = courseOfferingRepository.findById(offeringId)
+                .orElseThrow(() -> new EntryNotFoundException("Course Offering not found with ID: " + offeringId));
+
+        List<Student> students = studentRepository.findByBatch_BatchId(batchId);
+        if (students.isEmpty()) {
+            return java.util.Map.of(
+                    "totalStudents", 0,
+                    "newlyEnrolled", 0,
+                    "alreadyEnrolled", 0,
+                    "message", "No students found in the selected batch."
+            );
+        }
+
+        int newlyEnrolled = 0;
+        int alreadyEnrolled = 0;
+
+        for (Student student : students) {
+            if (enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(student.getStudentId(), offeringId)) {
+                alreadyEnrolled++;
+                continue;
+            }
+
+            Enrollment enrollment = Enrollment.builder()
+                    .student(student)
+                    .courseOffering(offering)
+                    .enrollmentDate(java.time.LocalDate.now())
+                    .status("active")
+                    .build();
+            enrollmentRepository.save(enrollment);
+            newlyEnrolled++;
+        }
+
+        String courseLabel = offering.getCourse() != null ? offering.getCourse().getCode() : "offering #" + offeringId;
+        return java.util.Map.of(
+                "totalStudents", students.size(),
+                "newlyEnrolled", newlyEnrolled,
+                "alreadyEnrolled", alreadyEnrolled,
+                "message", String.format("Successfully enrolled %d student(s) into %s (Already enrolled: %d)",
+                        newlyEnrolled, courseLabel, alreadyEnrolled)
+        );
+    }
 }

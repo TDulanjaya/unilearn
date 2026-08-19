@@ -79,6 +79,9 @@ public class EventServiceImpl implements EventService {
         event.setDescription(request.getDescription());
         event.setVenue(request.getVenue());
         event.setEventDate(request.getEventDate());
+        if (request.getPosterUrl() != null) {
+            event.setPosterUrl(request.getPosterUrl());
+        }
         event.setFaculty(faculty);
         event.setCreatedBy(createdBy);
 

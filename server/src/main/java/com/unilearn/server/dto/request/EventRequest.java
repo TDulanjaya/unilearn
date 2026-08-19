@@ -34,6 +34,8 @@ public class EventRequest {
 
     private Long facultyId;
 
+    private String posterUrl;
+
     @NotNull(message = "Creator staff ID is required")
     private Long createdByStaffId;
 }
