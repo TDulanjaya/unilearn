@@ -473,9 +473,9 @@ function generateSmartPassword(name: string, role: string): string {
       <Sidebar role="admin" name="R. Jayawardena" sub="Staff Admin · Institution-wide" />
       <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full space-y-6">
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-[var(--surface-container-highest)] border border-[var(--tertiary)] text-[var(--on-surface)] px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 animate-bounce">
-            <i className="ti ti-check text-[var(--tertiary)] text-lg"></i>
-            <span className="text-xs font-semibold">{toastMessage}</span>
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce" style={{ minWidth: '320px', boxShadow: '0 8px 32px rgba(16,185,129,0.4)' }}>
+            <i className="ti ti-circle-check text-white text-2xl"></i>
+            <span className="text-sm font-bold">{toastMessage}</span>
           </div>
         )}
 

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
-@Component
+// @Component - DataSeeder is disabled.
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements CommandLineRunner {
@@ -28,11 +28,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        seedAcademicStructureIfMissing();
-        seedIfMissing("admin@uni.edu", "System Administrator", "admin123", "staff_admin", "0771234567");
-        seedIfMissing("lecturer@uni.edu", "Dr. K. Perera", "admin123", "lecturer", "0719876543");
-        seedIfMissing("student@uni.edu", "Nadeesha Silva", "admin123", "student", "0779998877");
-        seedIfMissing("hod@uni.edu", "Dr. S. Wickramasinghe", "admin123", "hod_dean", "0755544332");
+        // DataSeeder is disabled. No default users or structure will be created on restart.
     }
 
     private void seedAcademicStructureIfMissing() {

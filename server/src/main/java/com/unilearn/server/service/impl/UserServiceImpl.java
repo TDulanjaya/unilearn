@@ -175,47 +175,24 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
 
         String role = user.getRole() != null ? user.getRole().toLowerCase() : "";
-        boolean hasAcademicData = false;
 
+        // Cascade-delete all related academic records before removing the user
         if ("student".equals(role)) {
-            if (!enrollmentRepository.findByStudent_StudentId(userId).isEmpty() ||
-                !submissionRepository.findByStudent_StudentId(userId).isEmpty() ||
-                !examAttemptRepository.findByStudent_StudentId(userId).isEmpty() ||
-                !attendanceRecordRepository.findByStudent_StudentId(userId).isEmpty()) {
-                hasAcademicData = true;
-            }
-        } else if ("lecturer".equals(role)) {
-            List<com.unilearn.server.model.CourseOfferingLecturer> colList = courseOfferingLecturerRepository.findByLecturer_LecturerId(userId);
-            if (!colList.isEmpty() ||
-                !assignmentRepository.findByCreatedBy_LecturerId(userId).isEmpty() ||
-                !materialRepository.findByUploadedBy_LecturerId(userId).isEmpty()) {
-                hasAcademicData = true;
-            }
-            if (!hasAcademicData && !colList.isEmpty()) {
-                for (com.unilearn.server.model.CourseOfferingLecturer col : colList) {
-                    if (!gradebookEntryRepository.findByCourseOffering_OfferingId(col.getCourseOffering().getOfferingId()).isEmpty()) {
-                        hasAcademicData = true;
-                        break;
-                    }
-                }
-            }
-        } else if ("hod_dean".equals(role) || "staff_admin".equals(role)) {
-            if (!hodDeanAssignmentRepository.findByUser_UserId(userId).isEmpty() ||
-                !auditLogRepository.findByUser_UserId(userId).isEmpty()) {
-                hasAcademicData = true;
-            }
-        }
-
-        if (hasAcademicData) {
-            throw new com.unilearn.server.exception.IllegalStateException(
-                "Cannot permanently delete a user with existing academic records. Deactivate the account instead."
-            );
-        }
-
-        // Genueinely unused account path - perform deletion
-        if ("student".equals(role)) {
+            attendanceRecordRepository.deleteAll(attendanceRecordRepository.findByStudent_StudentId(userId));
+            submissionRepository.deleteAll(submissionRepository.findByStudent_StudentId(userId));
+            examAttemptRepository.deleteAll(examAttemptRepository.findByStudent_StudentId(userId));
+            enrollmentRepository.deleteAll(enrollmentRepository.findByStudent_StudentId(userId));
             studentRepository.deleteById(userId);
         } else if ("lecturer".equals(role)) {
+            List<com.unilearn.server.model.CourseOfferingLecturer> colList = courseOfferingLecturerRepository.findByLecturer_LecturerId(userId);
+            for (com.unilearn.server.model.CourseOfferingLecturer col : colList) {
+                gradebookEntryRepository.deleteAll(
+                    gradebookEntryRepository.findByCourseOffering_OfferingId(col.getCourseOffering().getOfferingId())
+                );
+            }
+            courseOfferingLecturerRepository.deleteAll(colList);
+            assignmentRepository.deleteAll(assignmentRepository.findByCreatedBy_LecturerId(userId));
+            materialRepository.deleteAll(materialRepository.findByUploadedBy_LecturerId(userId));
             lecturerRepository.deleteById(userId);
         } else if ("staff_admin".equals(role)) {
             staffAdminRepository.deleteById(userId);
@@ -223,7 +200,8 @@ public class UserServiceImpl implements UserService {
             hodDeanAssignmentRepository.deleteAll(hodDeanAssignmentRepository.findByUser_UserId(userId));
         }
 
-        // Delete user's notifications and messages
+        // Delete audit logs, notifications and messages
+        auditLogRepository.deleteAll(auditLogRepository.findByUser_UserId(userId));
         notificationRepository.deleteAll(notificationRepository.findByUser_UserId(userId));
         messageRepository.deleteAll(messageRepository.findBySender_UserIdOrReceiver_UserId(userId, userId));
 
