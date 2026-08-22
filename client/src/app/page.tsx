@@ -1,201 +1,253 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-const SERVICES = [
-  {
-    icon: "ti-sparkles",
-    tileBg: "bg-[var(--primary)] text-[var(--secondary-container)]",
-    title: "AI Study Assistant",
-    desc: "Grounded, course-aware quizzes and Q&A generated instantly from official course materials to accelerate student mastery.",
-    featured: true,
-  },
-  {
-    icon: "ti-clipboard-check",
-    tileBg: "bg-[#ffdad6] text-[#ba1a1a]",
-    title: "Exams & Grading",
-    desc: "Full assessment lifecycle from workspace setup and live proctoring to automated gradebooks.",
-    featured: false,
-  },
-  {
-    icon: "ti-calendar-event",
-    tileBg: "bg-[#86f2e4] text-[#006f66]",
-    title: "Attendance & Timetables",
-    desc: "Live schedules and real-time attendance tracking kept in sync across every course offering.",
-    featured: false,
-  },
-  {
-    icon: "ti-speakerphone",
-    tileBg: "bg-[#acedff] text-[#004e5c]",
-    title: "Announcements",
-    desc: "Institution and department-wide announcements delivered instantly to target audiences.",
-    featured: false,
-  },
-  {
-    icon: "ti-certificate",
-    tileBg: "bg-[#ffdad6] text-[#ba1a1a]",
-    title: "Academic Records",
-    desc: "A single source of truth for transcripts, semester GPAs, and student academic history.",
-    featured: false,
-  },
-];
+interface EventDisplayItem {
+  id?: number | string;
+  day: string;
+  month: string;
+  time?: string;
+  venue: string;
+  title: string;
+  desc: string;
+  category: string;
+  posterUrl?: string;
+}
 
-const UPDATES = [
-  {
-    date: "Aug 12, 2026",
-    title: "New AI Quiz Generator Rolled Out for Semester 2 Modules",
-    gradient: "from-[#0d1c2e] via-[#006a61] to-[#0090a9]",
-  },
-  {
-    date: "Aug 08, 2026",
-    title: "Semester 2 Class Timetables & Exam Venues Now Live",
-    gradient: "from-[#006a61] via-[#0090a9] to-[#6bd8cb]",
-  },
-  {
-    date: "Aug 02, 2026",
-    title: "Automated Grading Workflow Streamlines Assessment Cycles",
-    gradient: "from-[#0d1c2e] via-[#1c3454] to-[#0090a9]",
-  },
-];
+function resolvePosterUrl(url?: string): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
+    return url;
+  }
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  return `${apiBase.replace(/\/+$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
+}
 
-const EVENTS = [
+// Academic Programs & Faculties
+const FACULTIES_DATA = [
   {
-    day: "18",
-    month: "AUG",
-    title: "Semester 2 Academic Orientation",
-    desc: "Welcome session and platform walkthrough for newly registered software engineering students.",
-    time: "09:00 AM - 11:30 AM · Main Auditorium",
-  },
-  {
-    day: "25",
-    month: "AUG",
-    title: "Final Exam Timetable Release",
-    desc: "Official publication of final exam dates, venues, and student hall admission slips.",
-    time: "02:00 PM - 04:00 PM · Online Portal",
-  },
-];
-
-const FACULTIES = [
-  {
+    id: "computing",
     name: "Faculty of Computing",
-    desc: "Software Engineering, Computer Science, and AI Systems.",
+    tagline: "Pioneering Software Engineering, AI & Cybersecurity",
     icon: "ti-code",
-    gradient: "from-[#0d1c2e] to-[#006a61]",
+    color: "from-blue-950 via-teal-900 to-emerald-950",
+    badge: "Accredited by BCS & IESL",
+    stats: "3,400+ Undergraduates · 18 Research Labs",
+    programs: [
+      { name: "BSc (Hons) in Software Engineering", duration: "4 Years", type: "Undergraduate" },
+      { name: "BSc (Hons) in Artificial Intelligence & Data Science", duration: "4 Years", type: "Undergraduate" },
+      { name: "BSc (Hons) in Cybersecurity & Cloud Computing", duration: "4 Years", type: "Undergraduate" },
+      { name: "MSc in Computer Science & Applied AI", duration: "2 Years", type: "Postgraduate" },
+    ],
   },
   {
-    name: "Faculty of Business",
-    desc: "Management Information Systems and Financial Technology.",
+    id: "business",
+    name: "Faculty of Business & Management",
+    tagline: "Cultivating Next-Generation Enterprise Leaders & Innovators",
     icon: "ti-building-bank",
-    gradient: "from-[#0d1c2e] to-[#0090a9]",
+    color: "from-blue-950 via-indigo-950 to-slate-900",
+    badge: "AACSB Member Institution",
+    stats: "2,200+ Undergraduates · 95% Placement",
+    programs: [
+      { name: "BBA (Hons) in Management Information Systems", duration: "3-4 Years", type: "Undergraduate" },
+      { name: "BSc (Hons) in Financial Technology & Analytics", duration: "4 Years", type: "Undergraduate" },
+      { name: "BBA (Hons) in International Business & Marketing", duration: "3-4 Years", type: "Undergraduate" },
+      { name: "Master of Business Administration (Executive MBA)", duration: "2 Years", type: "Postgraduate" },
+    ],
   },
   {
-    name: "Faculty of Science",
-    desc: "Computational Mathematics and Data Science analytics.",
+    id: "engineering",
+    name: "Faculty of Engineering & Technology",
+    tagline: "Designing Intelligent Systems, Robotics & Infrastructure",
+    icon: "ti-settings",
+    color: "from-slate-950 via-cyan-950 to-blue-950",
+    badge: "Washington Accord Recognized",
+    stats: "1,800+ Undergraduates · 12 Maker Spaces",
+    programs: [
+      { name: "BSc (Eng) Hons in Electronic & Mechatronics Engineering", duration: "4 Years", type: "Undergraduate" },
+      { name: "BSc (Eng) Hons in Computer Systems & IoT", duration: "4 Years", type: "Undergraduate" },
+      { name: "BSc (Eng) Hons in Electrical & Smart Grid Systems", duration: "4 Years", type: "Undergraduate" },
+      { name: "MSc in Autonomous Systems & Robotics", duration: "2 Years", type: "Postgraduate" },
+    ],
+  },
+  {
+    id: "science",
+    name: "Faculty of Applied Sciences",
+    tagline: "Discovery-Driven Research in Mathematics & Bio-Sciences",
     icon: "ti-flask",
-    gradient: "from-[#006a61] to-[#4cd7f6]",
+    color: "from-teal-950 via-emerald-950 to-slate-900",
+    badge: "National Science Foundation Partner",
+    stats: "1,200+ Undergraduates · 8 Centers of Excellence",
+    programs: [
+      { name: "BSc (Hons) in Computational Mathematics & Statistics", duration: "4 Years", type: "Undergraduate" },
+      { name: "BSc (Hons) in Bioinformatics & Genomic Analytics", duration: "4 Years", type: "Undergraduate" },
+      { name: "BSc (Hons) in Data Science & Operational Research", duration: "4 Years", type: "Undergraduate" },
+      { name: "MSc in Quantitative Modeling & Analytics", duration: "2 Years", type: "Postgraduate" },
+    ],
   },
 ];
 
-const TESTIMONIALS = [
+// Academic Events
+const UPCOMING_EVENTS = [
   {
-    name: "Dr. K. Perera",
-    role: "Senior Lecturer · Software Engineering",
-    initials: "KP",
-    avatarGrad: "from-[#0d1c2e] to-[#006a61]",
-    quote:
-      "UniLearn's automated grading and AI quiz generation saves me hours every week during assessment preparation. It seamlessly bridges lecture content with evaluation.",
+    day: "28",
+    month: "AUG",
+    time: "09:00 AM - 04:30 PM",
+    venue: "Main Convocation Hall & Live Stream",
+    title: "Fall 2026 University Open Day & Degree Fair",
+    desc: "Meet faculty deans, explore state-of-the-art campus labs, and receive instant on-the-spot admission evaluations.",
+    category: "Admissions",
   },
   {
-    name: "Nadeesha Silva",
-    role: "Student · BSc (Hons) Software Engineering",
-    initials: "NS",
-    avatarGrad: "from-[#006a61] to-[#0090a9]",
-    quote:
-      "The AI study assistant helped me master complex data structure topics with customized practice quizzes right before my mid-term examinations.",
+    day: "04",
+    month: "SEP",
+    time: "02:00 PM - 06:00 PM",
+    venue: "Auditorium Complex 1",
+    title: "International Symposium on Advances in Applied Computing (ISAAC 2026)",
+    desc: "Keynote addresses by leading scholars from industry and global research institutes on generative AI and quantum algorithms.",
+    category: "Conference",
   },
   {
-    name: "Dr. S. Wickramasinghe",
-    role: "Head of Department · Software Engineering",
-    initials: "SW",
-    avatarGrad: "from-[#0090a9] to-[#6bd8cb]",
-    quote:
-      "Institution-wide analytics and real-time attendance tracking give our faculty complete visibility over student progress and academic performance.",
+    day: "12",
+    month: "SEP",
+    time: "10:00 AM - 01:00 PM",
+    venue: "Student Activity Center",
+    title: "Semester 2 New Undergraduate Orientation & Induction",
+    desc: "Official welcome for enrolled students, campus library walkthroughs, student union societies registration, and LMS access.",
+    category: "Orientation",
   },
 ];
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedFaculty, setSelectedFaculty] = useState<string>("computing");
+  const [liveEvents, setLiveEvents] = useState<EventDisplayItem[]>(UPCOMING_EVENTS);
+  const [selectedPosterModal, setSelectedPosterModal] = useState<{ title: string; url: string } | null>(null);
+
+  useEffect(() => {
+    async function fetchUpcomingEvents() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+        const res = await fetch(`${apiBase.replace(/\/+$/, "")}/api/v1/events/upcoming?size=6`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : data?.content || data?.dataList || [];
+        if (items.length > 0) {
+          const parsed: EventDisplayItem[] = items.map((e: any) => {
+            const rawDate = e.eventDate || e.startDateTime || "";
+            let day = "28";
+            let month = "AUG";
+            let time = "09:00 AM - 04:00 PM";
+            if (rawDate) {
+              const d = new Date(rawDate);
+              if (!isNaN(d.getTime())) {
+                day = String(d.getDate()).padStart(2, "0");
+                month = d.toLocaleString("default", { month: "short" }).toUpperCase();
+                time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              }
+            }
+            return {
+              id: e.eventId || e.id,
+              day,
+              month,
+              time,
+              venue: e.venue || "University Main Campus",
+              title: e.name || e.title || "Academic Event",
+              desc: e.description || "",
+              category: e.facultyName || "Campus Event",
+              posterUrl: e.posterUrl || "",
+            };
+          });
+          setLiveEvents(parsed);
+        }
+      } catch {
+        // Keep fallback UPCOMING_EVENTS
+      }
+    }
+    fetchUpcomingEvents();
+  }, []);
+
+  const currentFaculty = FACULTIES_DATA.find((f) => f.id === selectedFaculty) || FACULTIES_DATA[0];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--on-background)] transition-colors duration-300">
+    <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--on-background)] transition-colors duration-300 antialiased selection:bg-[#006a61] selection:text-white">
       
-      <header className="sticky top-0 z-50 glass border-b border-[var(--glass-border)]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      {/* ─── Main University Header ────────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 glass border-b border-[var(--glass-border)] backdrop-blur-xl">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          
+          {/* Logo & Mobile Menu Trigger */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden p-2 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] rounded-lg transition-colors"
-              aria-label="Toggle menu"
+              className="lg:hidden p-2 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] rounded-xl transition-colors"
+              aria-label="Toggle navigation menu"
             >
               <i className={`ti ${isMenuOpen ? "ti-x" : "ti-menu-2"} text-xl`}></i>
             </button>
-            <Link href="/">
+            <Link href="/" className="flex items-center group">
               <Logo />
             </Link>
           </div>
 
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold">
-            <Link href="/" className="text-[var(--tertiary)] font-bold">
-              Home
-            </Link>
-            <a href="#features" className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-              Features
+          {/* Desktop Navigation Links (Clean, Single Line, No Wrapping) */}
+          <nav className="hidden lg:flex items-center gap-7 xl:gap-9 text-sm font-semibold text-[var(--on-surface-variant)] whitespace-nowrap">
+            <a href="#about" className="hover:text-[var(--on-surface)] transition-colors">
+              About
             </a>
-            <a href="#role-solutions" className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition">
-              Role Solutions
+            <a href="#faculties" className="hover:text-[var(--on-surface)] transition-colors">
+              Faculties &amp; Degrees
+            </a>
+            <a href="#campus-life" className="hover:text-[var(--on-surface)] transition-colors">
+              Campus Life
+            </a>
+            <a href="#events" className="hover:text-[var(--on-surface)] transition-colors">
+              Academic Events
             </a>
           </nav>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link href="/login" className="btn-secondary hidden sm:inline-flex">
-              Sign In
+          {/* Right Action Buttons */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Link
+              href="/login"
+              className="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] border border-[var(--outline-variant)] transition flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <i className="ti ti-user-circle text-base text-[var(--tertiary)]"></i>
+              <span>Portal Sign In</span>
             </Link>
-            <Link href="/login" className="btn-primary group text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-2.5">
-              <span>Get Started</span>
-              <i className="ti ti-arrow-right text-xs sm:text-sm group-hover:translate-x-1 transition-transform"></i>
+            <Link
+              href="/login"
+              className="btn-primary text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl shadow-md font-bold whitespace-nowrap hidden sm:inline-flex items-center gap-1.5"
+            >
+              <span>Apply Now</span>
+              <i className="ti ti-arrow-right text-xs"></i>
             </Link>
             <ThemeToggle />
           </div>
+
         </div>
 
+        {/* Mobile menu dropdown */}
         {isMenuOpen && (
-          <nav className="lg:hidden px-4 pt-3 pb-4 border-t border-[var(--glass-border)] flex flex-col space-y-2 text-sm font-semibold">
-            <Link
-              href="/"
-              onClick={() => setIsMenuOpen(false)}
-              className="p-2 rounded-lg text-[var(--tertiary)] font-bold hover:bg-[var(--surface-container-low)]"
-            >
-              Home
-            </Link>
-            <a
-              href="#features"
-              onClick={() => setIsMenuOpen(false)}
-              className="p-2 rounded-lg text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
-            >
-              Features
+          <nav className="lg:hidden px-4 pt-3 pb-5 border-t border-[var(--glass-border)] flex flex-col space-y-2 text-sm font-bold bg-[var(--surface)]/95 backdrop-blur-md">
+            <a href="#about" onClick={() => setIsMenuOpen(false)} className="p-2.5 rounded-xl text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] transition">
+              About University
             </a>
-            <a
-              href="#role-solutions"
-              onClick={() => setIsMenuOpen(false)}
-              className="p-2 rounded-lg text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
-            >
-              Role Solutions
+            <a href="#faculties" onClick={() => setIsMenuOpen(false)} className="p-2.5 rounded-xl text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] transition">
+              Faculties &amp; Degrees
             </a>
-            <div className="pt-2 border-t border-[var(--outline-variant)] sm:hidden flex flex-col gap-2">
-              <Link href="/login" className="btn-secondary w-full justify-center">
-                Sign In
+            <a href="#campus-life" onClick={() => setIsMenuOpen(false)} className="p-2.5 rounded-xl text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] transition">
+              Campus Life
+            </a>
+            <a href="#events" onClick={() => setIsMenuOpen(false)} className="p-2.5 rounded-xl text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] transition">
+              Academic Events
+            </a>
+            <div className="pt-2 border-t border-[var(--outline-variant)] flex flex-col gap-2">
+              <Link href="/login" className="btn-primary w-full justify-center text-center">
+                Access Student &amp; Staff Portal
               </Link>
             </div>
           </nav>
@@ -204,399 +256,469 @@ export default function Home() {
 
       <main className="flex-1">
         
-        <section className="relative max-w-[1400px] mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-20 sm:pb-28 text-center overflow-hidden">
+        {/* ─── Hero Section: Prestigious University Campus ──────────────────── */}
+        <section className="relative bg-[#071321] text-white pt-16 sm:pt-24 pb-28 sm:pb-36 overflow-hidden">
           
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-tr from-[#0d1c2e] via-[#006a61] to-[#6bd8cb] opacity-25 blur-[110px] rounded-full -z-10 pointer-events-none"></div>
+          {/* Background Ambient Lighting & Texture */}
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#4cd7f6_1px,transparent_1px)] [background-size:24px_24px]"></div>
+          <div className="absolute -top-20 -left-20 w-[600px] h-[600px] bg-gradient-to-tr from-[#006a61] to-[#0090a9] opacity-25 blur-[140px] rounded-full pointer-events-none"></div>
+          <div className="absolute -bottom-20 -right-20 w-[500px] h-[500px] bg-gradient-to-tr from-[#0d1c2e] to-[#4cd7f6] opacity-20 blur-[130px] rounded-full pointer-events-none"></div>
 
-          <div className="max-w-3xl mx-auto space-y-6 flex flex-col items-center">
-            <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-[60px] leading-[1.1] tracking-[-0.02em]">
-              We Help You Build Your Academic{" "}
-              <span className="bg-gradient-to-r from-[var(--tertiary)] via-[#006a61] to-[var(--secondary)] bg-clip-text text-transparent">
-                Future
-              </span>
-            </h1>
-
-            <p className="text-[var(--on-surface-variant)] text-base sm:text-lg leading-relaxed max-w-2xl">
-              Empower your institution with real-time course analytics, proctored exams, automated grading, and intelligent AI study assistance built for modern universities.
-            </p>
-
-            <div className="flex items-center gap-4 pt-2">
-              <Link href="/login" className="btn-primary text-base px-8 py-3.5 shadow-lg group">
-                <span>Get Started</span>
-                <i className="ti ti-arrow-right text-base group-hover:translate-x-1 transition-transform"></i>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[var(--surface-container-low)] border-y border-[var(--outline-variant)] py-14 relative">
-          <div className="max-w-[1400px] mx-auto px-6 text-center">
-            <p className="eyebrow mb-6">Powering Every Faculty</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-items-center">
-              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
-                <i className="ti ti-code text-2xl text-[var(--tertiary)]"></i>
-                <span>Faculty of Computing</span>
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 relative z-10">
+            <div className="max-w-4xl mx-auto text-center space-y-6 flex flex-col items-center">
+              
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-bold text-[#6bd8cb] backdrop-blur-md">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>National Institute of Higher Learning · Est. 1999</span>
               </div>
-              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
-                <i className="ti ti-building-bank text-2xl text-[var(--tertiary)]"></i>
-                <span>Faculty of Business</span>
-              </div>
-              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
-                <i className="ti ti-settings text-2xl text-[var(--tertiary)]"></i>
-                <span>Faculty of Engineering</span>
-              </div>
-              <div className="flex items-center gap-2.5 font-display font-bold text-sm sm:text-base text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all">
-                <i className="ti ti-palette text-2xl text-[var(--tertiary)]"></i>
-                <span>Faculty of Arts</span>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <section id="features" className="max-w-[1400px] mx-auto px-6 py-28">
-          
-          <div className="md:flex md:items-end md:justify-between mb-14 pb-6 border-b border-[var(--outline-variant)] gap-8">
-            <div>
-              <p className="eyebrow mb-2">Comprehensive Platform</p>
-              <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--on-surface)]">
-                Our Services
-              </h2>
-            </div>
-            <p className="text-[var(--on-surface-variant)] text-sm sm:text-base max-w-md mt-3 md:mt-0">
-              Tailored LMS solutions supporting academic excellence across every department.
-            </p>
-          </div>
+              <h1 className="font-display font-extrabold text-4xl sm:text-6xl lg:text-[66px] leading-[1.12] tracking-[-0.02em] text-white">
+                Empowering Scholars, Innovators &amp;{" "}
+                <span className="bg-gradient-to-r from-[#6bd8cb] via-[#4cd7f6] to-white bg-clip-text text-transparent">
+                  Global Leaders
+                </span>
+              </h1>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            
-            <div className="md:col-span-2 glass rounded-3xl p-8 border-t-4 border-t-[var(--tertiary)] border-x border-b border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-[var(--secondary-container)] flex items-center justify-center mb-6 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
-                  <i className="ti ti-sparkles text-2xl"></i>
-                </div>
-                <h3 className="font-display font-bold text-2xl mb-3 text-[var(--on-surface)]">
-                  {SERVICES[0].title}
-                </h3>
-                <p className="text-[var(--on-surface-variant)] text-base leading-relaxed mb-8 max-w-xl">
-                  {SERVICES[0].desc}
-                </p>
-              </div>
-              <a href="#" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--tertiary)] group/link">
-                <span>Learn More</span>
-                <i className="ti ti-arrow-right text-base group-hover/link:translate-x-1 transition-transform"></i>
-              </a>
-            </div>
-
-            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
-                  <i className="ti ti-clipboard-check text-xl"></i>
-                </div>
-                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
-                  {SERVICES[1].title}
-                </h3>
-                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
-                  {SERVICES[1].desc}
-                </p>
-              </div>
-              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
-                <span>Learn More</span>
-                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
-              </a>
-            </div>
-
-            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-[#86f2e4] text-[#006f66] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
-                  <i className="ti ti-calendar-event text-xl"></i>
-                </div>
-                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
-                  {SERVICES[2].title}
-                </h3>
-                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
-                  {SERVICES[2].desc}
-                </p>
-              </div>
-              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
-                <span>Learn More</span>
-                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
-              </a>
-            </div>
-
-            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-[#acedff] text-[#004e5c] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
-                  <i className="ti ti-speakerphone text-xl"></i>
-                </div>
-                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
-                  {SERVICES[3].title}
-                </h3>
-                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
-                  {SERVICES[3].desc}
-                </p>
-              </div>
-              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
-                <span>Learn More</span>
-                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
-              </a>
-            </div>
-
-            <div className="glass rounded-2xl p-7 border border-[var(--glass-border)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between group">
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-5 font-bold group-hover:scale-110 group-hover:rotate-6 transition-transform">
-                  <i className="ti ti-certificate text-xl"></i>
-                </div>
-                <h3 className="font-display font-bold text-xl mb-2 text-[var(--on-surface)]">
-                  {SERVICES[4].title}
-                </h3>
-                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed mb-6">
-                  {SERVICES[4].desc}
-                </p>
-              </div>
-              <a href="#" className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--tertiary)] group/link">
-                <span>Learn More</span>
-                <i className="ti ti-arrow-right text-sm group-hover/link:translate-x-1 transition-transform"></i>
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[var(--surface-container-lowest)] border-y border-[var(--outline-variant)] py-24">
-          <div className="max-w-[1400px] mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <p className="eyebrow mb-2">Latest News</p>
-              <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
-                Campus Updates
-              </h2>
-              <p className="text-[var(--on-surface-variant)] text-base">
-                Stay informed with the latest platform rollouts and academic announcements.
+              <p className="text-slate-300 text-base sm:text-xl leading-relaxed max-w-2xl font-normal">
+                UniLearn is a premier university dedicated to academic excellence, state-of-the-art laboratory research, and world-class undergraduate and postgraduate degree pathways.
               </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-4 pt-3">
+                <a
+                  href="#faculties"
+                  className="bg-gradient-to-r from-[#006a61] to-[#0090a9] hover:from-[#00554e] hover:to-[#00788d] text-white px-8 py-4 rounded-2xl font-bold text-base shadow-xl hover:scale-105 transition-all duration-200 inline-flex items-center gap-2"
+                >
+                  <span>Explore Academic Faculties</span>
+                  <i className="ti ti-arrow-right text-base"></i>
+                </a>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Institutional Key Stats / By The Numbers ─────────────────────── */}
+        <section id="about" className="bg-[var(--surface-container-low)] border-y border-[var(--outline-variant)] py-14 relative">
+          <div className="max-w-[1400px] mx-auto px-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-[var(--outline-variant)]">
+              
+              <div className="pt-4 md:pt-0">
+                <p className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--tertiary)]">
+                  #1
+                </p>
+                <p className="text-xs sm:text-sm font-bold text-[var(--on-surface)] mt-1">
+                  Private Higher Education Institute
+                </p>
+                <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">
+                  Ranked for Computing &amp; Business
+                </p>
+              </div>
+
+              <div className="pt-4 md:pt-0 md:pl-8">
+                <p className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--secondary)]">
+                  18,500+
+                </p>
+                <p className="text-xs sm:text-sm font-bold text-[var(--on-surface)] mt-1">
+                  Enrolled Students
+                </p>
+                <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">
+                  Undergraduate &amp; Postgraduate Scholars
+                </p>
+              </div>
+
+              <div className="pt-4 md:pt-0 md:pl-8">
+                <p className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--tertiary)]">
+                  98.4%
+                </p>
+                <p className="text-xs sm:text-sm font-bold text-[var(--on-surface)] mt-1">
+                  Graduate Employability Rate
+                </p>
+                <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">
+                  Placed within 6 months of graduation
+                </p>
+              </div>
+
+              <div className="pt-4 md:pt-0 md:pl-8">
+                <p className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--secondary)]">
+                  140+
+                </p>
+                <p className="text-xs sm:text-sm font-bold text-[var(--on-surface)] mt-1">
+                  Global Academic Alliances
+                </p>
+                <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">
+                  UK, Australia &amp; US Dual Degrees
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Academic Faculties & Degree Pathways ─────────────────────────── */}
+        <section id="faculties" className="max-w-[1400px] mx-auto px-6 py-24 sm:py-32">
+          
+          <div className="max-w-3xl mx-auto text-center mb-16 space-y-3">
+            <p className="eyebrow">Academic Excellence</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--on-surface)]">
+              Academic Faculties &amp; Degree Programs
+            </h2>
+            <p className="text-[var(--on-surface-variant)] text-base">
+              Discover industry-focused degrees configured to meet international quality standards and future industry demands.
+            </p>
+          </div>
+
+          {/* Faculty Selector Tabs */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
+            {FACULTIES_DATA.map((fac) => {
+              const isSelected = selectedFaculty === fac.id;
+              return (
+                <button
+                  key={fac.id}
+                  onClick={() => setSelectedFaculty(fac.id)}
+                  className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-display font-bold text-sm transition-all duration-200 border ${
+                    isSelected
+                      ? "bg-[var(--primary)] text-[var(--on-primary)] border-[var(--primary)] shadow-lg shadow-[var(--primary)]/15 scale-105"
+                      : "bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                  }`}
+                >
+                  <i className={`ti ${fac.icon} text-lg ${isSelected ? "text-[var(--secondary-container)]" : ""}`}></i>
+                  <span>{fac.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected Faculty Details Card */}
+          <div className="glass rounded-3xl p-6 sm:p-10 border border-[var(--glass-border)] shadow-2xl max-w-5xl mx-auto space-y-8">
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--outline-variant)]">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] text-xs font-bold mb-2">
+                  <span>{currentFaculty.badge}</span>
+                </div>
+                <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
+                  {currentFaculty.name}
+                </h3>
+                <p className="text-sm text-[var(--on-surface-variant)] mt-1">
+                  {currentFaculty.tagline}
+                </p>
+              </div>
+              <div className="text-left md:text-right">
+                <span className="text-xs font-bold text-[var(--secondary)] bg-[var(--secondary-container)]/30 px-3 py-1.5 rounded-xl border border-[var(--secondary)]/20">
+                  {currentFaculty.stats}
+                </span>
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              {UPDATES.map((item, idx) => (
-                <div key={idx} className="glass rounded-2xl overflow-hidden border border-[var(--glass-border)] shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col group">
-                  <div className={`h-40 bg-gradient-to-br ${item.gradient} relative overflow-hidden flex items-center justify-center p-6`}>
-                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]"></div>
-                    <i className="ti ti-article text-4xl text-white/80 z-10 group-hover:scale-110 transition-transform"></i>
+            {/* Degree Programs Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {currentFaculty.programs.map((prog, idx) => (
+                <div
+                  key={idx}
+                  className="p-5 rounded-2xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] hover:border-[var(--tertiary)] transition-all flex flex-col justify-between space-y-3 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]">
+                      {prog.type}
+                    </span>
+                    <span className="text-xs font-semibold text-[var(--on-surface-variant)] flex items-center gap-1">
+                      <i className="ti ti-clock text-xs text-[var(--tertiary)]"></i>
+                      <span>{prog.duration}</span>
+                    </span>
                   </div>
-                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface-variant)] font-semibold">
-                      <i className="ti ti-calendar text-sm text-[var(--tertiary)]"></i>
-                      <span>{item.date}</span>
-                    </div>
-                    <h3 className="font-display font-bold text-base text-[var(--on-surface)] leading-snug line-clamp-2">
-                      {item.title}
-                    </h3>
+
+                  <h4 className="font-display font-bold text-base text-[var(--on-surface)] group-hover:text-[var(--tertiary)] transition-colors">
+                    {prog.name}
+                  </h4>
+
+                  <div className="pt-2 border-t border-[var(--outline-variant)]/60 flex items-center justify-between text-xs font-semibold text-[var(--on-surface-variant)]">
+                    <span className="flex items-center gap-1.5">
+                      <i className="ti ti-certificate text-xs text-[var(--tertiary)]"></i>
+                      <span>Accredited Degree</span>
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--tertiary)]">
+                      Full-Time
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="text-center">
-              <Link href="/login" className="btn-primary group">
-                <span>View All Updates</span>
-                <i className="ti ti-arrow-right text-sm group-hover:translate-x-1 transition-transform"></i>
-              </Link>
-            </div>
           </div>
+
         </section>
 
-        <section className="relative bg-dot-grid py-28 overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-tr from-[#0d1c2e] via-[#006a61] to-[#6bd8cb] opacity-15 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
-
+        {/* ─── Upcoming Academic Events Calendar ─────────────────────────────── */}
+        <section id="events" className="bg-[var(--surface-container-low)] border-y border-[var(--outline-variant)] py-24 sm:py-32">
           <div className="max-w-[1400px] mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <p className="eyebrow mb-2">Academic Schedule</p>
-              <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
+            
+            <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
+              <p className="eyebrow">Campus Calendar</p>
+              <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--on-surface)]">
                 Upcoming Academic Events
               </h2>
               <p className="text-[var(--on-surface-variant)] text-base">
-                Mark your calendar for key university milestones and orientation dates.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {EVENTS.map((evt, idx) => (
-                <div key={idx} className="glass rounded-3xl p-7 border border-[var(--glass-border)] flex items-start gap-5 shadow-xl hover:shadow-2xl transition-all">
-                  <div className="w-16 h-16 rounded-2xl bg-[var(--surface-container-high)] border border-[var(--outline-variant)] flex flex-col items-center justify-center font-bold shrink-0 text-[var(--tertiary)]">
-                    <span className="text-xl leading-none">{evt.day}</span>
-                    <span className="text-[10px] tracking-wider uppercase mt-0.5">{evt.month}</span>
-                  </div>
-                  <div className="space-y-2 flex-1">
-                    <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-                      {evt.title}
-                    </h3>
-                    <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed">
-                      {evt.desc}
-                    </p>
-                    <div className="flex items-center justify-between pt-3 border-t border-[var(--outline-variant)]">
-                      <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface-variant)] font-medium">
-                        <i className="ti ti-clock text-sm text-[var(--tertiary)]"></i>
-                        <span>{evt.time}</span>
-                      </div>
-                      <a href="#" className="inline-flex items-center gap-1 text-xs font-bold text-[var(--tertiary)] group/link">
-                        <span>Learn More</span>
-                        <i className="ti ti-arrow-right text-xs group-hover/link:translate-x-1 transition-transform"></i>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="role-solutions" className="max-w-[1400px] mx-auto px-6 py-28">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="eyebrow mb-2">Faculties</p>
-            <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
-              Explore by Faculty
-            </h2>
-            <p className="text-[var(--on-surface-variant)] text-base">
-              Specialized academic environments configured for distinct degree disciplines.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {FACULTIES.map((fac, idx) => (
-              <div key={idx} className="glass rounded-2xl p-6 border border-[var(--glass-border)] text-center space-y-4 hover:shadow-xl transition-all group">
-                <div className={`h-36 rounded-xl bg-gradient-to-br ${fac.gradient} flex items-center justify-center shadow-inner`}>
-                  <i className={`ti ${fac.icon} text-4xl text-white group-hover:scale-110 transition-transform`}></i>
-                </div>
-                <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-                  {fac.name}
-                </h3>
-                <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed">
-                  {fac.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="bg-[var(--surface-container-low)] border-y border-[var(--outline-variant)] py-28 relative">
-          <div className="max-w-[1400px] mx-auto px-6 text-center relative">
-            <div className="max-w-2xl mx-auto mb-14">
-              <p className="eyebrow mb-2">Testimonials</p>
-              <h2 className="font-display font-extrabold text-3xl sm:text-4xl mb-3 text-[var(--on-surface)]">
-                What People Say
-              </h2>
-              <p className="text-[var(--on-surface-variant)] text-base">
-                Hear from lecturers, students, and department heads using UniLearn daily.
+                Mark your calendar for symposia, degree orientations, and public lectures.
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
-              {TESTIMONIALS.map((t, idx) => (
-                <div key={idx} className="glass rounded-2xl p-7 border border-[var(--glass-border)] flex flex-col justify-between text-left shadow-lg">
-                  <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm leading-relaxed italic mb-6">
-                    &ldquo;{t.quote}&rdquo;
-                  </p>
-                  <div className="flex items-center gap-3 pt-4 border-t border-[var(--outline-variant)]">
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${t.avatarGrad} text-white flex items-center justify-center font-bold text-xs shadow-md`}>
-                      {t.initials}
+              {liveEvents.map((evt, idx) => (
+                <div
+                  key={evt.id || idx}
+                  className="glass rounded-3xl p-5 border border-[var(--glass-border)] shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between space-y-4 group overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    {/* Event Poster Image (if uploaded by admin) */}
+                    {evt.posterUrl ? (
+                      <div
+                        onClick={() => setSelectedPosterModal({ title: evt.title, url: resolvePosterUrl(evt.posterUrl) })}
+                        className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden cursor-pointer bg-slate-900 border border-[var(--outline-variant)]/60 shadow-inner group/poster"
+                      >
+                        <img
+                          src={resolvePosterUrl(evt.posterUrl)}
+                          alt={evt.title}
+                          className="w-full h-full object-cover group-hover/poster:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-end justify-between p-3.5">
+                          <span className="text-[11px] font-bold text-white flex items-center gap-1.5 bg-black/60 px-3 py-1 rounded-lg backdrop-blur-md">
+                            <i className="ti ti-zoom-in text-sm text-[#4cd7f6]"></i>
+                            <span>View Full Poster</span>
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Date badge & Category */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[var(--surface-container-high)] border border-[var(--outline-variant)] flex flex-col items-center justify-center font-bold shrink-0 text-[var(--tertiary)] p-2">
+                        <span className="text-lg leading-none">{evt.day}</span>
+                        <span className="text-[10px] tracking-wider uppercase mt-0.5">{evt.month}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--tertiary-container)]/40 text-[var(--tertiary)] inline-block truncate max-w-full">
+                          {evt.category}
+                        </span>
+                        {evt.time && (
+                          <p className="text-xs text-[var(--on-surface-variant)] mt-1 flex items-center gap-1 font-medium">
+                            <i className="ti ti-clock text-xs text-[var(--tertiary)]"></i>
+                            <span>{evt.time}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-display font-bold text-sm text-[var(--on-surface)]">
-                        {t.name}
+
+                    <h3 className="font-display font-bold text-base text-[var(--on-surface)] leading-snug group-hover:text-[var(--tertiary)] transition-colors">
+                      {evt.title}
+                    </h3>
+
+                    {evt.desc && (
+                      <p className="text-[var(--on-surface-variant)] text-xs leading-relaxed line-clamp-3">
+                        {evt.desc}
                       </p>
-                      <p className="text-[11px] text-[var(--on-surface-variant)]">
-                        {t.role}
-                      </p>
-                    </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-[var(--outline-variant)]/60 text-xs text-[var(--on-surface-variant)] flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1 truncate max-w-[70%]">
+                      <i className="ti ti-map-pin text-[var(--tertiary)] shrink-0"></i>
+                      <span className="truncate">{evt.venue}</span>
+                    </span>
+                    {evt.posterUrl && (
+                      <button
+                        onClick={() => setSelectedPosterModal({ title: evt.title, url: resolvePosterUrl(evt.posterUrl) })}
+                        className="text-[11px] font-bold text-[var(--tertiary)] hover:underline flex items-center gap-1 shrink-0"
+                      >
+                        <i className="ti ti-photo text-xs"></i>
+                        <span>Poster</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+
           </div>
         </section>
 
-        <section className="bg-[#0a1626] text-white py-32 relative overflow-hidden border-t border-b border-[var(--outline-variant)]">
+        {/* ─── Campus Life & Facilities ─────────────────────────────────────── */}
+        <section id="campus-life" className="max-w-[1400px] mx-auto px-6 py-24 sm:py-32">
           
-          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#4cd7f6_1px,transparent_1px)] [background-size:20px_20px]"></div>
+          <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
+            <p className="eyebrow">Vibrant Student Experience</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--on-surface)]">
+              Life on Campus &amp; Student Development
+            </h2>
+            <p className="text-[var(--on-surface-variant)] text-base">
+              Beyond lectures and coursework, UniLearn provides a world-class environment fostering innovation, leadership, and community.
+            </p>
+          </div>
 
-          <div className="absolute -top-10 -left-10 w-96 h-96 bg-gradient-to-tr from-[#0d1c2e] to-[#006a61] opacity-30 blur-[100px] rounded-full pointer-events-none"></div>
-          <div className="absolute -bottom-10 -right-10 w-96 h-96 bg-gradient-to-tr from-[#006a61] to-[#4cd7f6] opacity-30 blur-[100px] rounded-full pointer-events-none"></div>
-
-          <div className="max-w-[1400px] mx-auto px-6 relative z-10">
-            <div className="glass rounded-3xl p-10 md:p-16 text-center max-w-4xl mx-auto border border-white/10 shadow-2xl bg-white/5">
-              <div className="space-y-6">
-                <p className="text-xs font-extrabold uppercase tracking-widest text-[#4cd7f6]">
-                  Get Started Today
-                </p>
-                <h2 className="font-display font-extrabold text-3xl sm:text-5xl leading-tight">
-                  Ready to Elevate Your Campus?
-                </h2>
-                <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto">
-                  Transform your institution&apos;s learning experience with UniLearn today.
-                </p>
-                <div className="pt-2">
-                  <Link href="/login" className="bg-gradient-to-r from-[#0d1c2e] via-[#006a61] to-[#0090a9] text-white px-8 py-3.5 rounded-xl font-bold text-base shadow-lg hover:opacity-95 transition-all duration-200 hover:scale-105 inline-flex items-center gap-2 group">
-                    <span>Get Started</span>
-                    <i className="ti ti-arrow-right text-base group-hover:translate-x-1 transition-transform"></i>
-                  </Link>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="p-6 rounded-3xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] hover:border-[var(--tertiary)] transition-all space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] flex items-center justify-center font-bold text-xl">
+                <i className="ti ti-books"></i>
               </div>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                24/7 Digital Library
+              </h3>
+              <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+                Over 500,000 journals, IEEE &amp; ACM database access with quiet collaborative study pods.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] hover:border-[var(--tertiary)] transition-all space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] flex items-center justify-center font-bold text-xl">
+                <i className="ti ti-trophy"></i>
+              </div>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                Sports &amp; Athletics
+              </h3>
+              <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+                Olympic swimming pool, indoor arena, fitness gymnasium, and national inter-university leagues.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] hover:border-[var(--tertiary)] transition-all space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] flex items-center justify-center font-bold text-xl">
+                <i className="ti ti-users-group"></i>
+              </div>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                45+ Student Clubs
+              </h3>
+              <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+                IEEE Student Branch, Hackathons, Rotaract, Toastmasters, Robotics, and Arts Societies.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] hover:border-[var(--tertiary)] transition-all space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] flex items-center justify-center font-bold text-xl">
+                <i className="ti ti-heart-handshake"></i>
+              </div>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                Career Guidance Unit
+              </h3>
+              <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+                One-on-one career coaching, industry internships, and global corporate networking days.
+              </p>
             </div>
           </div>
+
         </section>
+
       </main>
 
-      <footer className="bg-[#07111e] text-slate-400 border-t border-white/10">
-        <div className="max-w-[1400px] mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-4 gap-10 text-sm">
+      {/* ─── Authentic University Footer ───────────────────────────────────── */}
+      <footer className="bg-[#050e18] text-slate-400 border-t border-white/10">
+        <div className="max-w-[1400px] mx-auto px-6 py-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-10 text-sm">
           
-          <div className="space-y-4">
+          {/* Col 1: University Identity */}
+          <div className="space-y-4 md:col-span-2">
             <Logo />
-            <div className="text-xs leading-relaxed space-y-1 text-slate-400 pt-1">
-              <p>128 University Park Blvd</p>
-              <p>Faculty Quadrant, Suite 400</p>
-              <p>Colombo, Sri Lanka</p>
+            <p className="text-xs leading-relaxed text-slate-400 max-w-sm">
+              UniLearn University is an accredited national higher education institute committed to transformative research, undergraduate excellence, and future leadership development.
+            </p>
+            <div className="text-xs text-slate-400 space-y-1 pt-1">
+              <p className="font-semibold text-slate-300">University Main Campus:</p>
+              <p>128 University Park Boulevard, Faculty Quadrant</p>
+              <p>Colombo 00700, Sri Lanka</p>
             </div>
             <div className="flex items-center gap-2 pt-2">
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition">
+              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="Facebook">
                 <i className="ti ti-brand-facebook text-sm"></i>
               </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition">
+              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="Twitter">
                 <i className="ti ti-brand-x text-sm"></i>
               </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition">
+              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="LinkedIn">
                 <i className="ti ti-brand-linkedin text-sm"></i>
+              </a>
+              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="YouTube">
+                <i className="ti ti-brand-youtube text-sm"></i>
               </a>
             </div>
           </div>
 
+          {/* Col 2: Academic Faculties */}
           <div>
-            <p className="font-display font-bold text-sm mb-4 text-white">Company</p>
+            <p className="font-display font-bold text-sm mb-4 text-white">Academics</p>
             <ul className="space-y-2.5 text-xs">
-              <li><a href="#" className="hover:text-white transition">About Us</a></li>
-              <li><a href="#" className="hover:text-white transition">Responsibilities</a></li>
-              <li><a href="#features" className="hover:text-white transition">Our Services</a></li>
+              <li><a href="#faculties" className="hover:text-white transition">Faculty of Computing</a></li>
+              <li><a href="#faculties" className="hover:text-white transition">Faculty of Business</a></li>
+              <li><a href="#faculties" className="hover:text-white transition">Faculty of Engineering</a></li>
+              <li><a href="#faculties" className="hover:text-white transition">Faculty of Applied Sciences</a></li>
+              <li><a href="#faculties" className="hover:text-white transition">Postgraduate Studies</a></li>
             </ul>
           </div>
 
+          {/* Col 3: Quick Portals */}
           <div>
-            <p className="font-display font-bold text-sm mb-4 text-white">Legal</p>
+            <p className="font-display font-bold text-sm mb-4 text-white">Portals &amp; Resources</p>
             <ul className="space-y-2.5 text-xs">
-              <li><a href="#" className="hover:text-white transition">Disclaimer</a></li>
-              <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
-              <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
+              <li><Link href="/login" className="hover:text-white transition">Student LMS Portal</Link></li>
+              <li><Link href="/login" className="hover:text-white transition">Faculty Gateway</Link></li>
+              <li><Link href="/login" className="hover:text-white transition">Exam &amp; Gradebook</Link></li>
+              <li><a href="#campus-life" className="hover:text-white transition">24/7 Digital Library</a></li>
+              <li><a href="#events" className="hover:text-white transition">Academic Calendar</a></li>
             </ul>
           </div>
 
+          {/* Col 4: University Governance & Info */}
           <div>
-            <p className="font-display font-bold text-sm mb-4 text-white">Support</p>
+            <p className="font-display font-bold text-sm mb-4 text-white">Administration</p>
             <ul className="space-y-2.5 text-xs">
-              <li><a href="#" className="hover:text-white transition">Contact</a></li>
-              <li><a href="#" className="hover:text-white transition">Testimonials</a></li>
+              <li><a href="#about" className="hover:text-white transition">About the University</a></li>
+              <li><a href="#faculties" className="hover:text-white transition">Academic Programs</a></li>
+              <li><a href="#campus-life" className="hover:text-white transition">Campus Facilities</a></li>
+              <li><a href="#campus-life" className="hover:text-white transition">Career Guidance Unit</a></li>
+              <li><a href="#" className="hover:text-white transition">Emergency Hotline</a></li>
             </ul>
           </div>
+
         </div>
 
-        <div className="border-t border-white/10 py-6 text-center text-xs text-slate-500">
-          © 2026 UniLearn LMS. All rights reserved.
+        <div className="border-t border-white/10 py-6 text-center text-xs text-slate-500 max-w-[1400px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 UniLearn University. All rights reserved. Registered with Ministry of Higher Education.</p>
+          <div className="flex items-center gap-6">
+            <a href="#" className="hover:text-slate-300 transition">Academic Integrity</a>
+            <a href="#" className="hover:text-slate-300 transition">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-300 transition">Terms of Enrollment</a>
+          </div>
         </div>
       </footer>
+
+      {/* ─── Poster Lightbox Modal ─── */}
+      {selectedPosterModal && (
+        <div
+          onClick={() => setSelectedPosterModal(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-2xl w-full bg-[var(--surface)] rounded-3xl border border-[var(--glass-border)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-high)]">
+              <p className="font-display font-bold text-sm text-[var(--on-surface)] truncate pr-4">
+                {selectedPosterModal.title}
+              </p>
+              <button
+                onClick={() => setSelectedPosterModal(null)}
+                className="w-8 h-8 rounded-full bg-[var(--surface-container)] hover:bg-[var(--surface-container-highest)] text-[var(--on-surface)] flex items-center justify-center transition shrink-0"
+              >
+                <i className="ti ti-x text-sm"></i>
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex items-center justify-center bg-black/30">
+              <img
+                src={selectedPosterModal.url}
+                alt={selectedPosterModal.title}
+                className="max-h-[72vh] w-auto rounded-xl object-contain shadow-2xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
