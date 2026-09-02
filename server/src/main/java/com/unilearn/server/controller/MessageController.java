@@ -42,4 +42,9 @@ public class MessageController {
     public ResponseEntity<List<MessageResponse>> getUnreadForUser(@AuthenticationPrincipal User principal) {
         return ResponseEntity.ok(messageService.getUnreadMessages(principal.getUserId()));
     }
+
+    @GetMapping("/contacts")
+    public ResponseEntity<List<com.unilearn.server.dto.response.ContactResponse>> getContacts(@AuthenticationPrincipal User principal) {
+        return ResponseEntity.ok(messageService.getContacts(principal.getUserId()));
+    }
 }

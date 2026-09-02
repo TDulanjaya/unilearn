@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 interface SidebarProps {
   role: "admin" | "hod";
@@ -13,6 +14,7 @@ interface SidebarProps {
 
 export default function Sidebar({ role, name, sub }: SidebarProps) {
   const pathname = usePathname();
+  const { logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const linksByRole = {
@@ -32,6 +34,11 @@ export default function Sidebar({ role, name, sub }: SidebarProps) {
 
   const links = linksByRole[role] || [];
   const initial = name ? name.charAt(0) : "U";
+
+  const handleLogout = () => {
+    setIsOpen(false);
+    logout();
+  };
 
   const renderNavContent = () => (
     <div className="flex flex-col justify-between h-full">
@@ -81,14 +88,13 @@ export default function Sidebar({ role, name, sub }: SidebarProps) {
       </div>
 
       <div className="pt-4 border-t border-[var(--outline-variant)]">
-        <Link
-          href="/login"
-          onClick={() => setIsOpen(false)}
-          className="sidebar-link text-[var(--error)] hover:bg-[var(--error-container)]"
+        <button
+          onClick={handleLogout}
+          className="sidebar-link w-full text-left text-[var(--error)] hover:bg-[var(--error-container)]/30"
         >
           <i className="ti ti-logout text-lg"></i>
           <span>Logout</span>
-        </Link>
+        </button>
       </div>
     </div>
   );

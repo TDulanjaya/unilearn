@@ -20,37 +20,66 @@ interface TeachingSlot {
   enrolledStudents: { id: string; name: string; indexNo: string }[];
 }
 
-function checkSlotLiveStatus(slotTimeStr: string, dayOfWeek: string) {
+function getSlotScheduleStatus(slotTimeStr: string, dayOfWeek: string) {
   const now = new Date();
-  const currentDay = now.toLocaleDateString("en-US", { weekday: "long" });
-  const isTodayMatch =
-    currentDay.toLowerCase() === dayOfWeek.toLowerCase() ||
-    dayOfWeek.toLowerCase().startsWith(currentDay.toLowerCase());
+  const currentDayIndex = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const currentDayName = dayNames[currentDayIndex];
+
+  const dayMap: Record<string, number> = {
+    sun: 0, sunday: 0, suns: 0,
+    mon: 1, monday: 1, mons: 1,
+    tue: 2, tuesday: 2, tues: 2,
+    wed: 3, wednesday: 3, weds: 3,
+    thu: 4, thursday: 4, thus: 4, thur: 4, thurs: 4,
+    fri: 5, friday: 5, fris: 5,
+    sat: 6, saturday: 6, sats: 6,
+  };
+
+  const cleanDay = (dayOfWeek || "").toLowerCase().trim();
+  const slotDayIndex = dayMap[cleanDay] !== undefined ? dayMap[cleanDay] : -1;
+  const isToday = slotDayIndex === currentDayIndex;
 
   const parts = slotTimeStr.split("-").map((s) => s.trim());
-  if (parts.length < 2) return { isLive: false, note: "QR opens 10 min before class starts" };
-
   const parseMinutes = (tStr: string) => {
+    if (!tStr) return 0;
     const [h, m] = tStr.split(":").map(Number);
     return isNaN(h) || isNaN(m) ? 0 : h * 60 + m;
   };
 
-  const startMin = parseMinutes(parts[0]);
-  const endMin = parseMinutes(parts[1]);
+  if (!isToday) {
+    const isPastDay = slotDayIndex !== -1 && slotDayIndex < currentDayIndex;
+    return {
+      isToday: false,
+      canGenerateQr: false,
+      statusLabel: isPastDay ? `Completed (${dayOfWeek})` : `Scheduled (${dayOfWeek})`,
+      badgeStyle: "bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]",
+      reason: `QR generation is only available on ${dayOfWeek} during class.`,
+    };
+  }
+
+  // It IS Today!
+  const startMin = parts.length >= 2 ? parseMinutes(parts[0]) : 0;
+  const endMin = parts.length >= 2 ? parseMinutes(parts[1]) : 1440;
   const currentMin = now.getHours() * 60 + now.getMinutes();
 
-  if (!isTodayMatch) {
-    return { isLive: false, note: "QR opens 10 min before class starts" };
+  if (currentMin > endMin + 30) {
+    return {
+      isToday: true,
+      canGenerateQr: false,
+      statusLabel: "Class Ended Today",
+      badgeStyle: "bg-red-500/10 text-red-400 border border-red-500/20",
+      reason: "Class duration for today has ended.",
+    };
   }
 
-  if (currentMin < startMin - 10) {
-    return { isLive: false, note: "QR opens 10 min before class starts" };
-  }
-  if (currentMin > endMin) {
-    return { isLive: false, note: "Class has ended" };
-  }
-
-  return { isLive: true, note: "" };
+  return {
+    isToday: true,
+    canGenerateQr: true,
+    statusLabel: "Live Today",
+    badgeStyle: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+    reason: "",
+  };
 }
 
 export default function LecturerSchedulePage() {
@@ -213,6 +242,17 @@ export default function LecturerSchedulePage() {
     }
   };
 
+  const now = new Date();
+  const currentDayName = now.toLocaleDateString("en-US", { weekday: "long" });
+  const todaySlots = teachingSlots.filter((slot) => {
+    const status = getSlotScheduleStatus(slot.time, slot.day);
+    return status.isToday;
+  });
+  const upcomingSlots = teachingSlots.filter((slot) => {
+    const status = getSlotScheduleStatus(slot.time, slot.day);
+    return !status.isToday;
+  });
+
   if (isLoadingSlots || offeringsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
@@ -230,18 +270,23 @@ export default function LecturerSchedulePage() {
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
-              Teaching Schedule & Attendance
-            </h1>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
+                Teaching Schedule & Attendance
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[var(--tertiary)]/15 text-[var(--tertiary)] border border-[var(--tertiary)]/30">
+                Today: {currentDayName}
+              </span>
+            </div>
             <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm">
-              Weekly lecture slots, live rotating QR code generator, and manual attendance rosters.
+              Live QR code attendance generation is active for today's classes only.
             </p>
           </div>
 
           <div className="flex items-center gap-3 bg-[var(--surface-container-low)] p-2.5 px-4 rounded-2xl border border-[var(--outline-variant)] self-start sm:self-auto">
             <div className="flex flex-col">
               <span className="text-xs font-bold text-[var(--on-surface)]">Preview Mode</span>
-              <span className="text-[10px] text-[var(--outline)]">Bypass time-gating for demo</span>
+              <span className="text-[10px] text-[var(--outline)]">Override time-lock for testing</span>
             </div>
             <button
               onClick={() => setPreviewMode(!previewMode)}
@@ -254,34 +299,44 @@ export default function LecturerSchedulePage() {
           </div>
         </div>
 
+        {/* 1. TODAY'S CLASSES SECTION */}
         <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
             <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
-              <i className="ti ti-calendar-event text-[var(--tertiary)] text-xl"></i>
-              Weekly Teaching Slots
+              <i className="ti ti-qrcode text-emerald-400 text-xl"></i>
+              Today's Classes ({todaySlots.length}) — {currentDayName}
             </h3>
           </div>
 
           <div className="space-y-4">
-            {teachingSlots.length === 0 ? (
-              <p className="p-6 text-center text-xs text-[var(--on-surface-variant)] italic">
-                No teaching slots scheduled for your courses.
-              </p>
+            {todaySlots.length === 0 ? (
+              <div className="p-8 text-center rounded-xl border border-dashed border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50">
+                <i className="ti ti-calendar-off text-3xl text-[var(--on-surface-variant)] mb-2 block opacity-60"></i>
+                <p className="text-xs text-[var(--on-surface-variant)] font-medium">
+                  No teaching slots scheduled for today ({currentDayName}).
+                </p>
+                <p className="text-[11px] text-[var(--outline)] mt-0.5">
+                  QR attendance codes will activate automatically on scheduled class days.
+                </p>
+              </div>
             ) : (
-              teachingSlots.map((slot) => {
+              todaySlots.map((slot) => {
                 const isAttendanceSaved = savedSlotIds[slot.id];
-                const liveStatus = checkSlotLiveStatus(slot.time, slot.day);
-                const canGenerateQr = previewMode || liveStatus.isLive;
+                const slotStatus = getSlotScheduleStatus(slot.time, slot.day);
+                const canGenerateQr = previewMode || slotStatus.canGenerateQr;
 
                 return (
                   <div
                     key={slot.id}
-                    className="p-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)]/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
+                    className="p-4 border border-emerald-500/30 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors shadow-sm"
                   >
                     <div>
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="badge badge-accent font-bold">{slot.courseCode}</span>
                         <span className="badge badge-gray">{slot.type}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${slotStatus.badgeStyle}`}>
+                          {slotStatus.statusLabel}
+                        </span>
                         {isAttendanceSaved && (
                           <span className="badge badge-success text-[10px] font-bold">
                             <i className="ti ti-check"></i> Attendance Saved
@@ -294,11 +349,15 @@ export default function LecturerSchedulePage() {
                       <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--on-surface-variant)] mt-0.5">
                         <span>
                           <i className="ti ti-clock text-[var(--tertiary)] mr-1"></i>
-                          {slot.day}s · {slot.time}
+                          {slot.day} · {slot.time}
                         </span>
                         <span>
                           <i className="ti ti-map-pin text-[var(--tertiary)] mr-1"></i>
                           {slot.venue}
+                        </span>
+                        <span>
+                          <i className="ti ti-users text-[var(--tertiary)] mr-1"></i>
+                          {slot.enrolledStudents.length} Students
                         </span>
                       </div>
                     </div>
@@ -307,7 +366,8 @@ export default function LecturerSchedulePage() {
                       <button
                         onClick={() => handleGenerateQr(slot)}
                         disabled={!canGenerateQr}
-                        className="btn-primary text-xs !py-1.5 shadow-sm disabled:opacity-40 flex items-center gap-1"
+                        className="btn-primary text-xs !py-1.5 shadow-md disabled:opacity-40 flex items-center gap-1.5"
+                        title={canGenerateQr ? "Open live rotating QR code for students" : slotStatus.reason}
                       >
                         <i className="ti ti-qrcode text-sm"></i> Generate QR
                       </button>
@@ -317,6 +377,87 @@ export default function LecturerSchedulePage() {
                         className="btn-secondary text-xs !py-1.5 flex items-center gap-1"
                       >
                         <i className="ti ti-user-check text-sm"></i> Manual Roster
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* 2. OTHER WEEKLY SCHEDULE SECTION */}
+        <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
+            <h3 className="font-display font-bold text-base text-[var(--on-surface)] flex items-center gap-2">
+              <i className="ti ti-calendar-event text-[var(--tertiary)] text-lg"></i>
+              Other Weekly Teaching Slots ({upcomingSlots.length})
+            </h3>
+            <span className="text-[11px] text-[var(--on-surface-variant)]">
+              Reference view · QR generation opens on respective days
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {upcomingSlots.length === 0 ? (
+              <p className="p-4 text-center text-xs text-[var(--on-surface-variant)] italic">
+                All assigned slots are scheduled for today.
+              </p>
+            ) : (
+              upcomingSlots.map((slot) => {
+                const isAttendanceSaved = savedSlotIds[slot.id];
+                const slotStatus = getSlotScheduleStatus(slot.time, slot.day);
+                const canGenerateQr = previewMode;
+
+                return (
+                  <div
+                    key={slot.id}
+                    className="p-3.5 border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/30 opacity-80 hover:opacity-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-opacity"
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="badge badge-accent font-bold opacity-80">{slot.courseCode}</span>
+                        <span className="badge badge-gray">{slot.type}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]">
+                          {slot.day}
+                        </span>
+                        {isAttendanceSaved && (
+                          <span className="badge badge-success text-[10px] font-bold">
+                            <i className="ti ti-check"></i> Attendance Saved
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="font-semibold text-xs text-[var(--on-surface)]">{slot.courseTitle}</p>
+
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-[var(--on-surface-variant)] mt-0.5">
+                        <span>
+                          <i className="ti ti-clock opacity-60 mr-1"></i>
+                          {slot.day} · {slot.time}
+                        </span>
+                        <span>
+                          <i className="ti ti-map-pin opacity-60 mr-1"></i>
+                          {slot.venue}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleGenerateQr(slot)}
+                        disabled={!canGenerateQr}
+                        className="btn-secondary text-xs !py-1 disabled:opacity-30 flex items-center gap-1 cursor-not-allowed disabled:cursor-not-allowed"
+                        title={previewMode ? "Preview Mode active" : `QR code is only available on ${slot.day}s`}
+                      >
+                        <i className="ti ti-lock text-xs"></i> Only on {slot.day}
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenAttendance(slot)}
+                        className="btn-secondary text-xs !py-1 flex items-center gap-1 opacity-70 hover:opacity-100"
+                        title="View enrolled students roster"
+                      >
+                        <i className="ti ti-users text-xs"></i> Roster
                       </button>
                     </div>
                   </div>

@@ -29,15 +29,15 @@ export default function AdminExamSchedulingPage() {
 
   const apiExams: ScheduledExam[] = Array.isArray(rawExams) && rawExams.length > 0
     ? rawExams.map((e: any) => ({
-        id: String(e.examId),
-        courseCode: e.courseCode || "SE308.3",
-        courseTitle: e.title || e.courseName || "Scheduled Exam",
-        batch: "CS2023-A",
-        date: e.startTime ? new Date(e.startTime).toISOString().split("T")[0] : "2026-08-15",
-        startTime: e.startTime ? new Date(e.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "09:00",
-        endTime: e.endTime ? new Date(e.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "11:00",
-        venue: e.location || "Main Exam Hall A",
-        supervisor: "Dr. K. Perera",
+        id: String(e.examId || `exam-${Math.random()}`),
+        courseCode: e.courseCode || "SE201",
+        courseTitle: e.title || e.courseName || (e.courseCode ? `${e.courseCode} Exam` : "Scheduled Exam"),
+        batch: e.batchName || e.batch || "SE Batch 2024",
+        date: e.examDate ? String(e.examDate) : (e.date ? String(e.date) : "2025-03-25"),
+        startTime: e.startTime ? String(e.startTime).substring(0, 5) : "10:00",
+        endTime: e.endTime ? String(e.endTime).substring(0, 5) : "11:00",
+        venue: e.venue || e.location || "Main Exam Hall A",
+        supervisor: e.scheduledByName || "Dr. Chathura Senanayake",
       }))
     : INITIAL_SCHEDULED_EXAMS;
 

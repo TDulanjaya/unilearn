@@ -17,21 +17,11 @@ interface UserProfile {
   status: string;
 }
 
-interface SecuritySession {
-  id: string;
-  device: string;
-  location: string;
-  ipAddress: string;
-  lastActive: string;
-  isCurrent: boolean;
-}
-
 export default function ProfilePage() {
   const { user } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
@@ -39,9 +29,6 @@ export default function ProfilePage() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
-  const [sessions, setSessions] = useState<SecuritySession[]>([
-    { id: "1", device: "Chrome / Windows 11", location: "Colombo, Sri Lanka", ipAddress: "192.168.1.15", lastActive: "Just Now", isCurrent: true },
-  ]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -49,9 +36,7 @@ export default function ProfilePage() {
         const data = await api.get<UserProfile>("/api/v1/profile/me");
         setProfile(data);
         if (data) {
-          const parts = data.fullName ? data.fullName.split(" ") : ["", ""];
-          setFirstName(parts[0] || "");
-          setLastName(parts.slice(1).join(" ") || "");
+          setFullName(data.fullName || user?.fullName || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
           if (data.photoUrl) {
@@ -63,7 +48,7 @@ export default function ProfilePage() {
       }
     }
     loadProfile();
-  }, []);
+  }, [user]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -121,11 +106,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleTerminateSession = (id: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    showToast("Security session terminated.");
-  };
-
   const isAdmin = user?.role === "staff_admin";
 
   return (
@@ -160,7 +140,7 @@ export default function ProfilePage() {
                 <img src={avatarPreview} alt="Avatar" className="w-24 h-24 rounded-full object-cover shadow-md border-2 border-[var(--tertiary)]" />
               ) : (
                 <div className="avatar w-24 h-24 text-3xl mx-auto font-extrabold shadow-sm flex items-center justify-center">
-                  {firstName.charAt(0) || "U"}
+                  {fullName.charAt(0) || "U"}
                 </div>
               )}
               <button
@@ -173,7 +153,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <h2 className="font-display font-bold text-xl text-[var(--on-surface)]">{firstName} {lastName}</h2>
+              <h2 className="font-display font-bold text-xl text-[var(--on-surface)]">{fullName}</h2>
               <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">Role: {profile?.role?.toUpperCase() || user?.role?.toUpperCase()}</p>
               <span className="badge badge-accent mt-2">UniLearn Member</span>
             </div>
@@ -199,25 +179,13 @@ export default function ProfilePage() {
               </div>
               <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
-                      First Name
+                      Full Name
                     </label>
                     <input
                       type="text"
-                      value={firstName}
-                      disabled={!isAdmin}
-                      readOnly={!isAdmin}
-                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] disabled:opacity-75 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={lastName}
+                      value={fullName}
                       disabled={!isAdmin}
                       readOnly={!isAdmin}
                       className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] disabled:opacity-75 disabled:cursor-not-allowed"
@@ -257,38 +225,6 @@ export default function ProfilePage() {
                   </div>
                 )}
               </form>
-            </div>
-
-            <div className="card p-6 space-y-4 shadow-md bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
-                <div>
-                  <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
-                    <i className="ti ti-device-laptop text-[var(--tertiary)]"></i> Active Security Sessions
-                  </h3>
-                  <p className="text-xs text-[var(--on-surface-variant)]">Manage active login sessions across mobile, desktop, and web devices.</p>
-                </div>
-                <span className="badge badge-accent text-[10px] font-bold">{sessions.length} Active Sessions</span>
-              </div>
-
-              <div className="space-y-3">
-                {sessions.map((s) => (
-                  <div key={s.id} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold text-xs text-[var(--on-surface)]">{s.device}</p>
-                        {s.isCurrent && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Current Device</span>}
-                      </div>
-                      <p className="text-[11px] text-[var(--on-surface-variant)] mt-0.5">{s.location} · IP: {s.ipAddress} · Last Active: {s.lastActive}</p>
-                    </div>
-
-                    {!s.isCurrent && (
-                      <button onClick={() => handleTerminateSession(s.id)} className="btn-secondary text-xs !py-1 text-red-500 self-start sm:self-auto">
-                        <i className="ti ti-power"></i> Terminate
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>

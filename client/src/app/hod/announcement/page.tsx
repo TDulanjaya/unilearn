@@ -64,12 +64,40 @@ export default function HodAnnouncement() {
     },
   });
 
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post("/api/v1/announcements", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["announcements", departmentId] });
       reset();
+      alert("Announcement broadcasted successfully!");
     },
+    onError: (err: any) => alert("Failed to broadcast: " + err.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: any }) =>
+      api.put(`/api/v1/announcements/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements", departmentId] });
+      setEditingAnnouncementId(null);
+      alert("Announcement updated successfully!");
+    },
+    onError: (err: any) => alert("Failed to update: " + err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/v1/announcements/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements", departmentId] });
+      setConfirmDeleteId(null);
+      alert("Announcement deleted successfully!");
+    },
+    onError: (err: any) => alert("Failed to delete: " + err.message),
   });
 
   const onSubmit = async (data: AnnouncementFormData) => {
@@ -273,20 +301,136 @@ export default function HodAnnouncement() {
                   No announcements broadcasted yet.
                 </div>
               ) : (
-                publishedList.map((ann: any) => (
-                  <div key={ann.announcementId} className="p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-                        {ann.scope}
-                      </span>
-                      <span className="text-[10px] text-[var(--outline)]">
-                        {new Date(ann.postedAt).toLocaleDateString()}
-                      </span>
+                publishedList.map((ann: any) => {
+                  const isEditing = editingAnnouncementId === ann.announcementId;
+                  const isConfirmingDelete = confirmDeleteId === ann.announcementId;
+
+                  if (isEditing) {
+                    return (
+                      <form
+                        key={ann.announcementId}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          updateMutation.mutate({
+                            id: ann.announcementId,
+                            body: {
+                              scope: "department",
+                              departmentId: departmentId,
+                              title: editTitle.trim(),
+                              content: editContent.trim(),
+                              postedByUserId: user?.userId,
+                            },
+                          });
+                        }}
+                        className="p-3.5 border border-[var(--tertiary)] rounded-xl bg-[var(--surface-container-low)] space-y-2"
+                      >
+                        <p className="text-xs font-bold text-[var(--on-surface)]">Edit Announcement</p>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="w-full text-xs p-2 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+                          placeholder="Title"
+                          required
+                        />
+                        <textarea
+                          rows={3}
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="w-full text-xs p-2 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+                          placeholder="Content"
+                          required
+                        />
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingAnnouncementId(null)}
+                            className="btn-secondary text-xs !py-1 !px-2.5"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={updateMutation.isPending}
+                            className="btn-primary text-xs !py-1 !px-3 shadow"
+                          >
+                            {updateMutation.isPending ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  }
+
+                  if (isConfirmingDelete) {
+                    return (
+                      <div
+                        key={ann.announcementId}
+                        className="p-3.5 border border-red-500/30 rounded-xl bg-red-500/10 space-y-2 text-xs"
+                      >
+                        <p className="text-red-500 font-semibold">Delete "{ann.title}"?</p>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2.5 py-1 rounded-lg bg-[var(--surface-container-high)] text-[var(--on-surface)] hover:bg-[var(--surface-container)] text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteMutation.mutate(ann.announcementId)}
+                            disabled={deleteMutation.isPending}
+                            className="px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 text-xs"
+                          >
+                            {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={ann.announcementId}
+                      className="group p-3.5 border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-low)] space-y-2 hover:border-[var(--tertiary)]/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                          {ann.scope}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-[var(--outline)]">
+                            {new Date(ann.postedAt).toLocaleDateString()}
+                          </span>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAnnouncementId(ann.announcementId);
+                                setEditTitle(ann.title);
+                                setEditContent(ann.content);
+                              }}
+                              className="p-1 rounded hover:bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] hover:text-[var(--tertiary)] transition-colors"
+                              title="Edit Announcement"
+                            >
+                              <i className="ti ti-pencil text-xs"></i>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(ann.announcementId)}
+                              className="p-1 rounded hover:bg-red-500/10 text-[var(--on-surface-variant)] hover:text-red-500 transition-colors"
+                              title="Delete Announcement"
+                            >
+                              <i className="ti ti-trash text-xs"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="font-bold text-xs text-[var(--on-surface)]">{ann.title}</p>
+                      <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">{ann.content}</p>
                     </div>
-                    <p className="font-bold text-xs text-[var(--on-surface)]">{ann.title}</p>
-                    <p className="text-xs text-[var(--on-surface-variant)]">{ann.content}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

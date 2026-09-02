@@ -25,7 +25,7 @@ function LoginFormContent() {
   const { login } = useAuth();
 
   const [isForgot, setIsForgot] = useState(false);
-  const [resetEmail, setResetEmail] = useState("user.s@uni.edu");
+  const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(
@@ -40,8 +40,8 @@ function LoginFormContent() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "user.s@uni.edu",
-      password: "password123",
+      email: "",
+      password: "",
     },
   });
 

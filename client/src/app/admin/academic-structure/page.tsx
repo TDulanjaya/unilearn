@@ -145,6 +145,12 @@ export default function Page() {
     ? departmentsData
     : departmentsData?.dataList || departmentsData?.content || [];
 
+  const [editingFaculty, setEditingFaculty] = useState<any | null>(null);
+  const [confirmDeleteFacultyId, setConfirmDeleteFacultyId] = useState<number | null>(null);
+
+  const [editingDept, setEditingDept] = useState<any | null>(null);
+  const [confirmDeleteDeptId, setConfirmDeleteDeptId] = useState<number | null>(null);
+
   const createFacultyMutation = useMutation({
     mutationFn: (body: { name: string; code: string }) => api.post("/api/v1/faculties", body),
     onSuccess: () => {
@@ -155,6 +161,29 @@ export default function Page() {
       showToast("Faculty created successfully.");
     },
     onError: (err: any) => showToast(err.message || "Failed to create faculty", "error"),
+  });
+
+  const updateFacultyMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: { name: string; code: string } }) =>
+      api.put(`/api/v1/faculties/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["faculties"] });
+      setEditingFaculty(null);
+      showToast("Faculty updated successfully.");
+    },
+    onError: (err: any) => showToast(err.message || "Failed to update faculty", "error"),
+  });
+
+  const deleteFacultyMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/v1/faculties/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["faculties"] });
+      queryClient.invalidateQueries({ queryKey: ["allDepartments"] });
+      setSelectedFacultyId(null);
+      setConfirmDeleteFacultyId(null);
+      showToast("Faculty deleted successfully.");
+    },
+    onError: (err: any) => showToast(err.message || "Failed to delete faculty", "error"),
   });
 
   const createDeptMutation = useMutation({
@@ -169,6 +198,29 @@ export default function Page() {
       showToast("Department created successfully.");
     },
     onError: (err: any) => showToast(err.message || "Failed to create department", "error"),
+  });
+
+  const updateDeptMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: { name: string; code: string; facultyId: number; hodUserId?: number | null } }) =>
+      api.put(`/api/v1/departments/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments", selectedFacultyId] });
+      queryClient.invalidateQueries({ queryKey: ["allDepartments"] });
+      setEditingDept(null);
+      showToast("Department updated successfully.");
+    },
+    onError: (err: any) => showToast(err.message || "Failed to update department", "error"),
+  });
+
+  const deleteDeptMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/v1/departments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments", selectedFacultyId] });
+      queryClient.invalidateQueries({ queryKey: ["allDepartments"] });
+      setConfirmDeleteDeptId(null);
+      showToast("Department deleted successfully.");
+    },
+    onError: (err: any) => showToast(err.message || "Failed to delete department", "error"),
   });
 
   const selectedFaculty = faculties.find((f: any) => f.facultyId === selectedFacultyId);
@@ -198,8 +250,9 @@ export default function Page() {
   const [newCourseCredits, setNewCourseCredits] = useState("4");
   const [newCourseDept, setNewCourseDept] = useState(departmentOptions[0] || "Software Engineering");
   const [newCourseVersion, setNewCourseVersion] = useState("v1");
-  const [editingCourseCode, setEditingCourseCode] = useState<string | null>(null);
-  const [editCourseDept, setEditCourseDept] = useState(departmentOptions[0] || "Software Engineering");
+
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [confirmDeleteCourseId, setConfirmDeleteCourseId] = useState<number | null>(null);
 
   const createCourseMutation = useMutation({
     mutationFn: (body: any) => api.post("/api/v1/courses", body),
@@ -218,10 +271,20 @@ export default function Page() {
       api.put(`/api/v1/courses/${id}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      setEditingCourseCode(null);
+      setEditingCourse(null);
       showToast("Course updated successfully.");
     },
     onError: (err: any) => showToast(err.message || "Failed to update course", "error"),
+  });
+
+  const deleteCourseMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/v1/courses/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      setConfirmDeleteCourseId(null);
+      showToast("Course deleted successfully.");
+    },
+    onError: (err: any) => showToast(err.message || "Failed to delete course", "error"),
   });
 
   const handleCreateCourse = (e: React.FormEvent) => {
@@ -241,22 +304,22 @@ export default function Page() {
     });
   };
 
-  const handleUpdateCourseDept = (code: string, newDeptName: string) => {
-    const course = courses.find((c) => c.code === code);
-    if (!course || !course.courseId) return;
+  const handleSaveEditCourse = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCourse || !editingCourse.courseId) return;
 
-    const matchedDept = allDepartments.find((d: any) => d.name === newDeptName);
-    const deptId = matchedDept ? matchedDept.departmentId : course.departmentId;
+    const matchedDept = allDepartments.find((d: any) => d.name === editingCourse.department) || allDepartments[0];
+    const deptId = matchedDept ? matchedDept.departmentId : editingCourse.departmentId;
 
     updateCourseMutation.mutate({
-      id: course.courseId,
+      id: editingCourse.courseId,
       body: {
-        code: course.code,
-        name: course.title,
-        title: course.title,
-        creditHours: course.credits,
+        code: editingCourse.code.trim(),
+        name: editingCourse.title.trim(),
+        title: editingCourse.title.trim(),
+        creditHours: Number(editingCourse.credits) || 4,
         departmentId: deptId,
-        syllabusVersion: course.version,
+        syllabusVersion: editingCourse.version || "v1",
       },
     });
   };
@@ -806,20 +869,126 @@ export default function Page() {
                 {isLoadingFaculties && (
                   <p className="text-xs text-[var(--on-surface-variant)]">Loading faculties...</p>
                 )}
-                {faculties.map((fac: any) => (
-                  <div
-                    key={fac.facultyId}
-                    onClick={() => setSelectedFacultyId(fac.facultyId)}
-                    className={`border rounded-xl px-4 py-3 text-sm font-semibold cursor-pointer transition-colors ${
-                      selectedFacultyId === fac.facultyId
-                        ? "border-[var(--outline-variant)] bg-[var(--surface-container)] text-[var(--tertiary)] shadow-sm"
-                        : "border-[var(--outline-variant)] text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
-                    }`}
-                  >
-                    {fac.name}
-                    {fac.code && <span className="ml-2 text-[10px] opacity-60">({fac.code})</span>}
-                  </div>
-                ))}
+                {faculties.map((fac: any) => {
+                  const isEditing = editingFaculty?.facultyId === fac.facultyId;
+                  const isConfirmingDelete = confirmDeleteFacultyId === fac.facultyId;
+
+                  if (isEditing) {
+                    return (
+                      <form
+                        key={fac.facultyId}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          updateFacultyMutation.mutate({
+                            id: fac.facultyId,
+                            body: {
+                              name: editingFaculty.name.trim(),
+                              code: editingFaculty.code.trim(),
+                            },
+                          });
+                        }}
+                        className="p-3 rounded-xl border border-[var(--tertiary)] bg-[var(--surface-container-low)] space-y-2"
+                      >
+                        <p className="text-xs font-bold text-[var(--on-surface)]">Edit Faculty</p>
+                        <input
+                          type="text"
+                          value={editingFaculty.name}
+                          onChange={(e) => setEditingFaculty({ ...editingFaculty, name: e.target.value })}
+                          className="w-full text-xs"
+                          placeholder="Faculty Name"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={editingFaculty.code}
+                          onChange={(e) => setEditingFaculty({ ...editingFaculty, code: e.target.value })}
+                          className="w-full text-xs"
+                          placeholder="Faculty Code"
+                          required
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditingFaculty(null)}
+                            className="btn-secondary text-xs !py-1"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={updateFacultyMutation.isPending}
+                            className="btn-primary text-xs !py-1"
+                          >
+                            {updateFacultyMutation.isPending ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  }
+
+                  if (isConfirmingDelete) {
+                    return (
+                      <div
+                        key={fac.facultyId}
+                        className="p-3 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center justify-between text-xs"
+                      >
+                        <span className="text-red-500 font-medium">Delete faculty "{fac.name}"?</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteFacultyId(null)}
+                            className="px-2 py-1 rounded bg-[var(--surface-container-high)] text-[var(--on-surface)] hover:bg-[var(--surface-container)]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteFacultyMutation.mutate(fac.facultyId)}
+                            disabled={deleteFacultyMutation.isPending}
+                            className="px-2 py-1 rounded bg-red-600 text-white font-bold hover:bg-red-700"
+                          >
+                            {deleteFacultyMutation.isPending ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={fac.facultyId}
+                      className={`group border rounded-xl px-4 py-3 text-sm font-semibold cursor-pointer transition-colors flex items-center justify-between ${
+                        selectedFacultyId === fac.facultyId
+                          ? "border-[var(--outline-variant)] bg-[var(--surface-container)] text-[var(--tertiary)] shadow-sm"
+                          : "border-[var(--outline-variant)] text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
+                      }`}
+                      onClick={() => setSelectedFacultyId(fac.facultyId)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{fac.name}</span>
+                        {fac.code && <span className="text-[10px] opacity-60">({fac.code})</span>}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setEditingFaculty({ facultyId: fac.facultyId, name: fac.name, code: fac.code || "" })}
+                          className="p-1 rounded hover:bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] hover:text-[var(--tertiary)] transition-colors"
+                          title="Edit Faculty"
+                        >
+                          <i className="ti ti-pencil text-sm"></i>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteFacultyId(fac.facultyId)}
+                          className="p-1 rounded hover:bg-red-500/10 text-[var(--on-surface-variant)] hover:text-red-500 transition-colors"
+                          title="Delete Faculty"
+                        >
+                          <i className="ti ti-trash text-sm"></i>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
                 {!isLoadingFaculties && faculties.length === 0 && (
                   <p className="text-xs text-[var(--on-surface-variant)] italic">
                     No faculties found. Add one above.
@@ -897,17 +1066,145 @@ export default function Page() {
                 {isLoadingDepts && (
                   <p className="text-xs text-[var(--on-surface-variant)]">Loading departments...</p>
                 )}
-                {departments.map((dept: any) => (
-                  <div
-                    key={dept.departmentId}
-                    className="flex items-center justify-between border border-[var(--outline-variant)] rounded-xl px-4 py-3 text-sm text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] transition-colors"
-                  >
-                    <span className="font-semibold">{dept.name}</span>
-                    <span className="text-xs text-[var(--on-surface-variant)]">
-                      {dept.hodUserName || "No HOD assigned"}
-                    </span>
-                  </div>
-                ))}
+                {departments.map((dept: any) => {
+                  const isEditing = editingDept?.departmentId === dept.departmentId;
+                  const isConfirmingDelete = confirmDeleteDeptId === dept.departmentId;
+
+                  if (isEditing) {
+                    return (
+                      <form
+                        key={dept.departmentId}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          updateDeptMutation.mutate({
+                            id: dept.departmentId,
+                            body: {
+                              name: editingDept.name.trim(),
+                              code: editingDept.code.trim(),
+                              facultyId: selectedFacultyId || dept.facultyId || 1,
+                              hodUserId: editingDept.hodUserId ? Number(editingDept.hodUserId) : null,
+                            },
+                          });
+                        }}
+                        className="p-3 rounded-xl border border-[var(--tertiary)] bg-[var(--surface-container-low)] space-y-2"
+                      >
+                        <p className="text-xs font-bold text-[var(--on-surface)]">Edit Department</p>
+                        <input
+                          type="text"
+                          value={editingDept.name}
+                          onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
+                          className="w-full text-xs"
+                          placeholder="Department Name"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={editingDept.code}
+                          onChange={(e) => setEditingDept({ ...editingDept, code: e.target.value })}
+                          className="w-full text-xs"
+                          placeholder="Department Code"
+                          required
+                        />
+                        <div>
+                          <label className="block text-[11px] text-[var(--on-surface-variant)] mb-1">Assigned HOD</label>
+                          <select
+                            value={editingDept.hodUserId || ""}
+                            onChange={(e) => setEditingDept({ ...editingDept, hodUserId: e.target.value ? Number(e.target.value) : null })}
+                            className="w-full text-xs !py-1.5"
+                          >
+                            <option value="">No HOD Assigned</option>
+                            {allUsers
+                              .filter((u: any) => u.role === "hod_dean" || u.role === "lecturer" || u.role === "staff_admin")
+                              .map((u: any) => (
+                                <option key={u.userId || u.id} value={u.userId || u.id}>
+                                  {u.fullName || u.name} ({u.role})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditingDept(null)}
+                            className="btn-secondary text-xs !py-1"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={updateDeptMutation.isPending}
+                            className="btn-primary text-xs !py-1"
+                          >
+                            {updateDeptMutation.isPending ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  }
+
+                  if (isConfirmingDelete) {
+                    return (
+                      <div
+                        key={dept.departmentId}
+                        className="p-3 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center justify-between text-xs"
+                      >
+                        <span className="text-red-500 font-medium">Delete department "{dept.name}"?</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteDeptId(null)}
+                            className="px-2 py-1 rounded bg-[var(--surface-container-high)] text-[var(--on-surface)] hover:bg-[var(--surface-container)]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteDeptMutation.mutate(dept.departmentId)}
+                            disabled={deleteDeptMutation.isPending}
+                            className="px-2 py-1 rounded bg-red-600 text-white font-bold hover:bg-red-700"
+                          >
+                            {deleteDeptMutation.isPending ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={dept.departmentId}
+                      className="group flex items-center justify-between border border-[var(--outline-variant)] rounded-xl px-4 py-3 text-sm text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{dept.name}</span>
+                        {dept.code && <span className="text-[10px] opacity-60">({dept.code})</span>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-[var(--on-surface-variant)]">
+                          {dept.hodUserName || "No HOD assigned"}
+                        </span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => setEditingDept({ departmentId: dept.departmentId, name: dept.name, code: dept.code || "", hodUserId: dept.hodUserId || null })}
+                            className="p-1 rounded hover:bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] hover:text-[var(--tertiary)] transition-colors"
+                            title="Edit Department"
+                          >
+                            <i className="ti ti-pencil text-sm"></i>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteDeptId(dept.departmentId)}
+                            className="p-1 rounded hover:bg-red-500/10 text-[var(--on-surface-variant)] hover:text-red-500 transition-colors"
+                            title="Delete Department"
+                          >
+                            <i className="ti ti-trash text-sm"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
                 {!isLoadingDepts && departments.length === 0 && selectedFacultyId && (
                   <p className="text-xs text-[var(--on-surface-variant)] italic">
                     No departments in this faculty. Add one above.
@@ -977,6 +1274,88 @@ export default function Page() {
               </button>
             </form>
 
+            {/* Course Edit Modal / Panel */}
+            {editingCourse && (
+              <div className="mb-6 p-4 rounded-2xl border border-[var(--tertiary)] bg-[var(--surface-container-low)] shadow-lg">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--outline-variant)]">
+                  <h4 className="font-bold text-sm text-[var(--on-surface)]">Edit Course: {editingCourse.code}</h4>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCourse(null)}
+                    className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] text-xs"
+                  >
+                    <i className="ti ti-x"></i>
+                  </button>
+                </div>
+                <form onSubmit={handleSaveEditCourse} className="space-y-3">
+                  <div className="grid sm:grid-cols-5 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-[var(--on-surface-variant)] mb-1">Code</label>
+                      <input
+                        type="text"
+                        value={editingCourse.code}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, code: e.target.value })}
+                        className="w-full text-xs"
+                        required
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] text-[var(--on-surface-variant)] mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={editingCourse.title}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, title: e.target.value })}
+                        className="w-full text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-[var(--on-surface-variant)] mb-1">Department</label>
+                      <select
+                        value={editingCourse.department}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, department: e.target.value })}
+                        className="w-full text-xs"
+                      >
+                        {departmentOptions.map((d: string) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-[var(--on-surface-variant)] mb-1">Credits</label>
+                      <input
+                        type="number"
+                        value={editingCourse.credits}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, credits: Number(e.target.value) || 1 })}
+                        className="w-full text-xs"
+                        min="1"
+                        max="30"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingCourse(null)}
+                      className="btn-secondary text-xs !py-1.5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updateCourseMutation.isPending}
+                      className="btn-primary text-xs !py-1.5 shadow"
+                    >
+                      {updateCourseMutation.isPending ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
@@ -991,49 +1370,61 @@ export default function Page() {
                 </thead>
                 <tbody className="divide-y divide-[var(--outline-variant)]">
                   {courses.map((c) => {
-                    const isEditing = editingCourseCode === c.code;
+                    const isConfirmingDelete = confirmDeleteCourseId === c.courseId;
+
                     return (
-                      <tr key={c.code} className="table-row transition-colors">
+                      <tr key={c.code} className="table-row transition-colors hover:bg-[var(--surface-container-lowest)]">
                         <td className="py-3 px-3 font-semibold text-[var(--on-surface)]">{c.code}</td>
                         <td className="py-3 px-3 text-[var(--on-surface)]">{c.title}</td>
                         <td className="py-3 px-3">
-                          {isEditing ? (
-                            <select
-                              value={editCourseDept}
-                              onChange={(e) => handleUpdateCourseDept(c.code, e.target.value)}
-                              className="text-xs !py-1"
-                            >
-                              {departmentOptions.map((d: string) => (
-                                <option key={d} value={d}>
-                                  {d}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)] text-[10px]">
-                              {c.department}
-                            </span>
-                          )}
+                          <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)] text-[10px]">
+                            {c.department}
+                          </span>
                         </td>
                         <td className="py-3 px-3 text-[var(--on-surface-variant)]">{c.credits}</td>
                         <td className="py-3 px-3">
                           <span className="badge badge-accent">{c.version}</span>
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isEditing) {
-                                setEditingCourseCode(null);
-                              } else {
-                                setEditingCourseCode(c.code);
-                                setEditCourseDept(c.department);
-                              }
-                            }}
-                            className="btn-secondary text-[11px] !py-1 !px-2"
-                          >
-                            {isEditing ? "Done" : "Edit Dept"}
-                          </button>
+                          {isConfirmingDelete ? (
+                            <div className="flex items-center justify-end gap-1.5 text-xs">
+                              <span className="text-red-500 font-medium mr-1">Confirm delete?</span>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteCourseId(null)}
+                                className="px-2 py-0.5 rounded bg-[var(--surface-container)] text-[var(--on-surface)] text-[11px]"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => c.courseId && deleteCourseMutation.mutate(c.courseId)}
+                                disabled={deleteCourseMutation.isPending}
+                                className="px-2 py-0.5 rounded bg-red-600 text-white font-bold text-[11px] hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setEditingCourse(c)}
+                                className="btn-secondary text-[11px] !py-1 !px-2.5 flex items-center gap-1"
+                                title="Edit Course"
+                              >
+                                <i className="ti ti-pencil text-xs"></i> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => c.courseId && setConfirmDeleteCourseId(c.courseId)}
+                                className="p-1.5 rounded-lg border border-red-500/20 text-red-500 hover:bg-red-500/10 transition-colors"
+                                title="Delete Course"
+                              >
+                                <i className="ti ti-trash text-xs"></i>
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

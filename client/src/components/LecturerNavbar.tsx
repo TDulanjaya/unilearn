@@ -1,13 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LecturerNavbar() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  const displayName = user?.fullName || "Lecturer";
+  const displayInitials = displayName.charAt(0).toUpperCase();
+  const displaySub = user?.email || "Lecturer Portal";
 
   const links = [
     { href: "/lecturer/dashboard", label: "Dashboard" },
@@ -18,6 +26,22 @@ export default function LecturerNavbar() {
     { href: "/lecturer/announcement", label: "Announcement" },
     { href: "/lecturer/analytics", label: "Analytics" },
   ];
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setIsAccountOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    setIsOpen(false);
+    setIsAccountOpen(false);
+    logout();
+  };
 
   return (
     <header className="glass sticky top-0 z-40 border-b border-[var(--glass-border)] px-4 sm:px-8 py-3">
@@ -59,15 +83,66 @@ export default function LecturerNavbar() {
             <i className="ti ti-message-dots text-xl"></i>
           </Link>
           <ThemeToggle />
-          <Link href="/profile" className="flex items-center gap-2 pl-2 border-l border-[var(--outline-variant)]">
-            <div className="avatar w-8 h-8 text-xs">KP</div>
-            <span className="text-xs font-semibold text-[var(--on-surface)] hidden sm:inline">Dr. K. Perera</span>
-          </Link>
+
+          <div className="relative hidden sm:block" ref={accountRef}>
+            <button
+              onClick={() => setIsAccountOpen(!isAccountOpen)}
+              className="flex items-center gap-2 pl-2 border-l border-[var(--outline-variant)] hover:opacity-80 transition-opacity"
+              aria-label="Account menu"
+            >
+              <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
+              <span className="text-xs font-semibold text-[var(--on-surface)] hidden lg:inline">{displayName}</span>
+              <i className="ti ti-chevron-down text-xs text-[var(--on-surface-variant)]"></i>
+            </button>
+
+            {isAccountOpen && (
+              <div className="absolute right-0 mt-2 w-56 glass rounded-2xl border border-[var(--glass-border)] shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
+                <Link
+                  href="/profile"
+                  onClick={() => setIsAccountOpen(false)}
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[var(--surface-container-low)] transition-colors"
+                >
+                  <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
+                    <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
+                  </div>
+                </Link>
+                <div className="my-1 border-t border-[var(--outline-variant)]"></div>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsAccountOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--on-surface)] rounded-xl hover:bg-[var(--surface-container-low)] transition-colors"
+                >
+                  <i className="ti ti-user text-base text-[var(--tertiary)]"></i>
+                  <span>Profile Settings</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--error)] rounded-xl hover:bg-[var(--error-container)]/30 transition-colors text-left"
+                >
+                  <i className="ti ti-logout text-base"></i>
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {isOpen && (
         <nav className="md:hidden pt-3 pb-2 mt-2 border-t border-[var(--glass-border)] flex flex-col space-y-1">
+          <Link
+            href="/profile"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-container-low)] mb-2"
+          >
+            <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
+              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
+            </div>
+          </Link>
           {links.map((link) => {
             const isActive = pathname === link.href;
             return (
@@ -81,6 +156,15 @@ export default function LecturerNavbar() {
               </Link>
             );
           })}
+          <div className="pt-2 border-t border-[var(--outline-variant)]">
+            <button
+              onClick={handleLogout}
+              className="sidebar-link w-full text-left text-[var(--error)] hover:bg-[var(--error-container)]/30"
+            >
+              <i className="ti ti-logout text-lg"></i>
+              <span>Logout</span>
+            </button>
+          </div>
         </nav>
       )}
     </header>
