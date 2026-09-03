@@ -39,6 +39,29 @@ import { api } from "@/lib/api";
 
 const VALID_ROLES = ["Student", "Lecturer", "Guest Lecturer", "HOD/Dean", "Staff/Admin"];
 
+function formatRoleFromBackend(r: string): string {
+  if (!r) return "Student";
+  const normalized = r.trim().toUpperCase().replace(/[\s\/-]+/g, "_");
+  switch (normalized) {
+    case "STUDENT":
+      return "Student";
+    case "LECTURER":
+      return "Lecturer";
+    case "GUEST_LECTURER":
+      return "Guest Lecturer";
+    case "HOD_DEAN":
+    case "HOD":
+    case "DEAN":
+      return "HOD/Dean";
+    case "STAFF_ADMIN":
+    case "ADMIN":
+    case "STAFF":
+      return "Staff/Admin";
+    default:
+      return r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
+  }
+}
+
 export default function UserManagementPage() {
   const queryClient = useQueryClient();
 
@@ -72,7 +95,7 @@ export default function UserManagementPage() {
         fullName: u.fullName || "",
         email: u.email || "",
         phone: u.phone || "N/A",
-        role: u.role || "Student",
+        role: formatRoleFromBackend(u.role),
         department: u.departmentName || "Software Eng.",
         status: u.active ? "Active" : "Locked",
       }))
@@ -151,13 +174,19 @@ function generateSmartPassword(name: string, role: string): string {
   };
 
   const mapRoleToBackend = (r: string) => {
-    switch (r) {
-      case "Student": return "STUDENT";
-      case "Lecturer": return "LECTURER";
-      case "Guest Lecturer": return "GUEST_LECTURER";
-      case "HOD/Dean": return "HOD_DEAN";
-      case "Staff/Admin": return "STAFF_ADMIN";
-      default: return r.toUpperCase();
+    if (!r) return "STUDENT";
+    const normalized = r.trim().toUpperCase().replace(/[\s\/-]+/g, "_");
+    switch (normalized) {
+      case "STUDENT": return "STUDENT";
+      case "LECTURER": return "LECTURER";
+      case "GUEST_LECTURER": return "GUEST_LECTURER";
+      case "HOD_DEAN":
+      case "HOD":
+      case "DEAN": return "HOD_DEAN";
+      case "STAFF_ADMIN":
+      case "ADMIN":
+      case "STAFF": return "STAFF_ADMIN";
+      default: return normalized;
     }
   };
 
@@ -395,9 +424,10 @@ function generateSmartPassword(name: string, role: string): string {
     showToast(`Password reset link dispatched to ${editingUser.email}.`);
   };
 
-  const filteredUsers = users.filter(
-    (u) => roleFilter === "All roles" || u.role === roleFilter
-  );
+  const filteredUsers = users.filter((u) => {
+    if (roleFilter === "All roles" || roleFilter === "ALL") return true;
+    return formatRoleFromBackend(u.role) === roleFilter;
+  });
 
   const columns = [
     {
@@ -414,11 +444,26 @@ function generateSmartPassword(name: string, role: string): string {
     },
     {
       header: "System Role",
-      accessor: (row: UserRecord) => (
-        <span className={`badge ${row.role === "Student" ? "badge-accent" : row.role === "HOD/Dean" ? "badge-danger" : row.role === "Guest Lecturer" ? "badge-warning" : "badge-gray"}`}>
-          {row.role}
-        </span>
-      ),
+      accessor: (row: UserRecord) => {
+        const displayRole = formatRoleFromBackend(row.role);
+        return (
+          <span
+            className={`badge ${
+              displayRole === "Student"
+                ? "badge-accent"
+                : displayRole === "HOD/Dean"
+                ? "badge-danger"
+                : displayRole === "Guest Lecturer"
+                ? "badge-warning"
+                : displayRole === "Lecturer"
+                ? "badge-secondary"
+                : "badge-gray"
+            }`}
+          >
+            {displayRole}
+          </span>
+        );
+      },
     },
     {
       header: "Department / Batch",
@@ -442,7 +487,7 @@ function generateSmartPassword(name: string, role: string): string {
       accessor: (row: UserRecord) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setEditingUser(row)}
+            onClick={() => setEditingUser({ ...row, role: formatRoleFromBackend(row.role) })}
             className="btn-secondary text-xs !py-1 flex items-center gap-1"
           >
             <i className="ti ti-edit"></i> Edit Profile & Role
