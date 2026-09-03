@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
-// @Component - DataSeeder is disabled.
+// @Component - DataSeeder is disabled for existing hosted database.
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements CommandLineRunner {
@@ -28,7 +28,16 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-
+        if (userRepository.count() == 0) {
+            seedAcademicStructureIfMissing();
+            seedIfMissing("admin@uni.edu", "System Administrator", "admin123", "STAFF_ADMIN", "0770000000");
+            seedIfMissing("hod@uni.edu", "Prof. Kamal Perera", "admin123", "HOD_DEAN", "0770000001");
+            seedIfMissing("lecturer@uni.edu", "Dr. Samantha Silva", "admin123", "LECTURER", "0770000002");
+            seedIfMissing("student@uni.edu", "Alex Fernando", "admin123", "STUDENT", "0770000003");
+            log.info("UniLearn DataSeeder: default accounts ready.");
+        } else {
+            log.info("UniLearn DataSeeder: existing database detected ({} users). Skipping seeder.", userRepository.count());
+        }
     }
 
     private void seedAcademicStructureIfMissing() {

@@ -49,6 +49,7 @@ interface EventItem {
   description: string;
   venue: string;
   eventDate: string;
+  rawDate?: string;
   capacity?: number;
   posterUrl?: string;
 }
@@ -192,10 +193,13 @@ export default function EventsEnrollmentPage() {
     description: e.description || "",
     venue: e.venue || "Main Auditorium",
     eventDate: e.eventDate ? new Date(e.eventDate).toLocaleString() : "Upcoming",
+    rawDate: e.eventDate,
     capacity: e.capacity,
     posterUrl: e.posterUrl,
   }));
 
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [existingPosterUrl, setExistingPosterUrl] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState("");
   const [eventDesc, setEventDesc] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -204,6 +208,52 @@ export default function EventsEnrollmentPage() {
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterPreview, setPosterPreview] = useState<string | null>(null);
   const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+
+  const formatForDateTimeInput = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const handleStartEdit = (ev: EventItem) => {
+    setEditingEventId(ev.id);
+    setEventTitle(ev.title);
+    setEventDesc(ev.description || "");
+    setEventVenue(ev.venue || "Main Auditorium");
+    setEventCapacity(ev.capacity ? String(ev.capacity) : "");
+    setEventDate(formatForDateTimeInput(ev.rawDate));
+    setExistingPosterUrl(ev.posterUrl || null);
+    if (ev.posterUrl) {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const fullUrl =
+        ev.posterUrl.startsWith("http") && !ev.posterUrl.includes("gateway.storjshare.io")
+          ? ev.posterUrl
+          : `${apiBase.replace(/\/+$/, "")}/${
+              ev.posterUrl.includes("gateway.storjshare.io")
+                ? "api/v1/files/download/events_" + ev.posterUrl.substring(ev.posterUrl.lastIndexOf("/") + 1)
+                : ev.posterUrl.replace(/^\/+/, "")
+            }`;
+      setPosterPreview(fullUrl);
+    } else {
+      setPosterPreview(null);
+    }
+    setPosterFile(null);
+    document.getElementById("event-form-card")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEventId(null);
+    setEventTitle("");
+    setEventDesc("");
+    setEventDate("");
+    setEventVenue("");
+    setEventCapacity("");
+    setPosterFile(null);
+    setPosterPreview(null);
+    setExistingPosterUrl(null);
+  };
 
   const handlePosterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -219,22 +269,27 @@ export default function EventsEnrollmentPage() {
   const handleRemovePoster = () => {
     setPosterFile(null);
     setPosterPreview(null);
+    setExistingPosterUrl(null);
   };
 
   const createEventMutation = useMutation({
     mutationFn: (body: any) => api.post("/api/v1/events", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["upcomingEvents"] });
-      setEventTitle("");
-      setEventDesc("");
-      setEventDate("");
-      setEventVenue("");
-      setEventCapacity("");
-      setPosterFile(null);
-      setPosterPreview(null);
+      handleCancelEdit();
       showToast("Event & Poster published successfully!");
     },
     onError: (err: any) => showToast(err.message || "Failed to publish event", "error"),
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: any }) => api.put(`/api/v1/events/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["upcomingEvents"] });
+      handleCancelEdit();
+      showToast("Event updated successfully!");
+    },
+    onError: (err: any) => showToast(err.message || "Failed to update event", "error"),
   });
 
   const deleteEventMutation = useMutation({
@@ -246,7 +301,7 @@ export default function EventsEnrollmentPage() {
     onError: (err: any) => showToast(err.message || "Failed to delete event", "error"),
   });
 
-  const handleCreateEvent = async (e: React.FormEvent) => {
+  const handleCreateOrUpdateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle.trim() || !eventDate) {
       showToast("Please enter title and date for the event", "error");
@@ -270,15 +325,21 @@ export default function EventsEnrollmentPage() {
       setIsUploadingPoster(false);
     }
 
-    createEventMutation.mutate({
+    const payload = {
       title: eventTitle.trim(),
       description: eventDesc.trim(),
       venue: eventVenue.trim() || "Main Auditorium",
       eventDate: new Date(eventDate).toISOString(),
       capacity: eventCapacity ? parseInt(eventCapacity, 10) : undefined,
-      posterUrl: uploadedPosterUrl || undefined,
+      posterUrl: uploadedPosterUrl || existingPosterUrl || undefined,
       createdByStaffId: currentUser?.userId || 1,
-    });
+    };
+
+    if (editingEventId) {
+      updateEventMutation.mutate({ id: editingEventId, body: payload });
+    } else {
+      createEventMutation.mutate(payload);
+    }
   };
 
   // --- Announcements Tab State & Queries ---
@@ -880,17 +941,38 @@ export default function EventsEnrollmentPage() {
         {/* TAB 2: EVENTS */}
         {activeTab === "events" && (
           <div className="grid lg:grid-cols-2 gap-6">
-            <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-4">
+            <div id="event-form-card" className={`card p-6 border transition-all rounded-2xl shadow-xl space-y-4 ${
+              editingEventId ? "border-amber-500/50 bg-slate-900/90 ring-2 ring-amber-500/20" : "border-slate-700/50 bg-slate-900/60 backdrop-blur-md"
+            }`}>
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <h3 className="font-display font-bold text-lg text-white flex items-center gap-2">
-                  <i className="ti ti-calendar-plus text-cyan-400" /> Create Campus Event
+                  {editingEventId ? (
+                    <>
+                      <i className="ti ti-edit text-amber-400" /> Edit Campus Event
+                    </>
+                  ) : (
+                    <>
+                      <i className="ti ti-calendar-plus text-cyan-400" /> Create Campus Event
+                    </>
+                  )}
                 </h3>
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-500/30">
-                  Backblaze B2 Storage
-                </span>
+                <div className="flex items-center gap-2">
+                  {editingEventId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                  <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-500/30">
+                    Backblaze B2 Storage
+                  </span>
+                </div>
               </div>
 
-              <form onSubmit={handleCreateEvent} className="space-y-4">
+              <form onSubmit={handleCreateOrUpdateEvent} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Event Title *</label>
                   <input
@@ -970,25 +1052,45 @@ export default function EventsEnrollmentPage() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={createEventMutation.isPending || isUploadingPoster}
-                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 transition-all shadow-md shadow-cyan-500/20 flex items-center gap-2"
-                >
-                  {isUploadingPoster ? (
-                    <>
-                      <i className="ti ti-loader animate-spin" /> Uploading poster to Backblaze...
-                    </>
-                  ) : createEventMutation.isPending ? (
-                    <>
-                      <i className="ti ti-loader animate-spin" /> Publishing event...
-                    </>
-                  ) : (
-                    <>
-                      <i className="ti ti-calendar-plus" /> Publish Event
-                    </>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={createEventMutation.isPending || updateEventMutation.isPending || isUploadingPoster}
+                    className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
+                      editingEventId
+                        ? "text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-amber-500/20"
+                        : "text-slate-950 bg-cyan-400 hover:bg-cyan-300 shadow-cyan-500/20"
+                    }`}
+                  >
+                    {isUploadingPoster ? (
+                      <>
+                        <i className="ti ti-loader animate-spin" /> Uploading poster...
+                      </>
+                    ) : createEventMutation.isPending || updateEventMutation.isPending ? (
+                      <>
+                        <i className="ti ti-loader animate-spin" /> Saving changes...
+                      </>
+                    ) : editingEventId ? (
+                      <>
+                        <i className="ti ti-check" /> Save & Update Event
+                      </>
+                    ) : (
+                      <>
+                        <i className="ti ti-calendar-plus" /> Publish Event
+                      </>
+                    )}
+                  </button>
+
+                  {editingEventId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
                   )}
-                </button>
+                </div>
               </form>
             </div>
 
@@ -1003,38 +1105,72 @@ export default function EventsEnrollmentPage() {
                   {eventsList.map((ev) => (
                     <div
                       key={ev.id}
-                      className="rounded-2xl border border-slate-800 bg-slate-950/60 overflow-hidden group hover:border-slate-700 transition-all"
+                      className="relative rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden group hover:border-cyan-500/40 transition-all min-h-[220px] p-5 flex flex-col justify-between shadow-xl"
                     >
-                      {ev.posterUrl && (
-                        <div className="relative h-44 w-full overflow-hidden bg-slate-900">
-                          <img
-                            src={ev.posterUrl.startsWith("http") ? ev.posterUrl : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${ev.posterUrl.startsWith("/") ? "" : "/"}${ev.posterUrl}`}
-                            alt={ev.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
-                        </div>
+                      {/* Full Background Image */}
+                      {ev.posterUrl ? (
+                        <img
+                          src={
+                            ev.posterUrl.startsWith("http") && !ev.posterUrl.includes("gateway.storjshare.io")
+                              ? ev.posterUrl
+                              : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${
+                                  ev.posterUrl.startsWith("/") ? "" : "/"
+                                }${
+                                  ev.posterUrl.includes("gateway.storjshare.io")
+                                    ? "api/v1/files/download/events_" + ev.posterUrl.substring(ev.posterUrl.lastIndexOf("/") + 1)
+                                    : ev.posterUrl
+                                }`
+                          }
+                          alt={ev.title}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            target.src = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop";
+                          }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950" />
                       )}
-                      <div className="p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-bold text-base text-white group-hover:text-cyan-300 transition-colors">
-                            {ev.title}
-                          </h4>
+
+                      {/* Dark Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />
+
+                      {/* Top Action Row */}
+                      <div className="relative z-10 flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-cyan-950/90 text-cyan-300 border border-cyan-500/40 backdrop-blur-md">
+                          Campus Event
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleStartEdit(ev)}
+                            title="Edit Event"
+                            className="text-amber-400 hover:text-amber-300 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 transition-colors"
+                          >
+                            <i className="ti ti-edit text-sm" />
+                          </button>
                           <button
                             onClick={() => deleteEventMutation.mutate(ev.id)}
                             title="Delete Event"
-                            className="text-slate-500 hover:text-rose-400 p-1 rounded-lg transition-colors"
+                            className="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 transition-colors"
                           >
                             <i className="ti ti-trash text-sm" />
                           </button>
                         </div>
-                        {ev.description && <p className="text-xs text-slate-400 line-clamp-2">{ev.description}</p>}
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-900">
+                      </div>
+
+                      {/* Bottom Text Info */}
+                      <div className="relative z-10 space-y-1.5 mt-auto pt-4">
+                        <h4 className="font-bold text-base text-white group-hover:text-cyan-300 transition-colors">
+                          {ev.title}
+                        </h4>
+                        {ev.description && <p className="text-xs text-slate-300 line-clamp-2">{ev.description}</p>}
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-white/10">
                           <span className="text-cyan-400 font-semibold flex items-center gap-1">
                             <i className="ti ti-clock" /> {ev.eventDate}
                           </span>
                           <span className="flex items-center gap-1">
-                            <i className="ti ti-map-pin" /> {ev.venue}
+                            <i className="ti ti-map-pin text-cyan-400" /> {ev.venue}
                           </span>
                         </div>
                       </div>

@@ -66,8 +66,11 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EntryNotFoundException("Event not found with ID: " + eventId));
 
-        StaffAdmin createdBy = staffAdminRepository.findById(request.getCreatedByStaffId())
-                .orElseThrow(() -> new EntryNotFoundException("StaffAdmin not found with ID: " + request.getCreatedByStaffId()));
+        StaffAdmin createdBy = event.getCreatedBy();
+        if (request.getCreatedByStaffId() != null) {
+            createdBy = staffAdminRepository.findById(request.getCreatedByStaffId())
+                    .orElse(event.getCreatedBy() != null ? event.getCreatedBy() : staffAdminRepository.findAll().stream().findFirst().orElse(null));
+        }
 
         Faculty faculty = null;
         if (request.getFacultyId() != null) {

@@ -19,10 +19,17 @@ interface EventDisplayItem {
 
 function resolvePosterUrl(url?: string): string {
   if (!url) return "";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  
+  if (url.includes("gateway.storjshare.io") || url.includes("backblazeb2.com")) {
+    const filename = url.substring(url.lastIndexOf("/") + 1);
+    return `${apiBase.replace(/\/+$/, "")}/api/v1/files/download/events_${filename}`;
+  }
+
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
     return url;
   }
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
   return `${apiBase.replace(/\/+$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
@@ -90,57 +97,27 @@ const FACULTIES_DATA = [
   },
 ];
 
-// Academic Events
-const UPCOMING_EVENTS = [
-  {
-    day: "28",
-    month: "AUG",
-    time: "09:00 AM - 04:30 PM",
-    venue: "Main Convocation Hall & Live Stream",
-    title: "Fall 2026 University Open Day & Degree Fair",
-    desc: "Meet faculty deans, explore state-of-the-art campus labs, and receive instant on-the-spot admission evaluations.",
-    category: "Admissions",
-  },
-  {
-    day: "04",
-    month: "SEP",
-    time: "02:00 PM - 06:00 PM",
-    venue: "Auditorium Complex 1",
-    title: "International Symposium on Advances in Applied Computing (ISAAC 2026)",
-    desc: "Keynote addresses by leading scholars from industry and global research institutes on generative AI and quantum algorithms.",
-    category: "Conference",
-  },
-  {
-    day: "12",
-    month: "SEP",
-    time: "10:00 AM - 01:00 PM",
-    venue: "Student Activity Center",
-    title: "Semester 2 New Undergraduate Orientation & Induction",
-    desc: "Official welcome for enrolled students, campus library walkthroughs, student union societies registration, and LMS access.",
-    category: "Orientation",
-  },
-];
-
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedFaculty, setSelectedFaculty] = useState<string>("computing");
-  const [liveEvents, setLiveEvents] = useState<EventDisplayItem[]>(UPCOMING_EVENTS);
+  const [liveEvents, setLiveEvents] = useState<EventDisplayItem[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [selectedPosterModal, setSelectedPosterModal] = useState<{ title: string; url: string } | null>(null);
 
   useEffect(() => {
     async function fetchUpcomingEvents() {
+      setIsLoadingEvents(true);
       try {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
         const res = await fetch(`${apiBase.replace(/\/+$/, "")}/api/v1/events/upcoming?size=6`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const items = Array.isArray(data) ? data : data?.content || data?.dataList || [];
-        if (items.length > 0) {
+        if (res.ok) {
+          const data = await res.json();
+          const items = Array.isArray(data) ? data : data?.dataList || data?.content || [];
           const parsed: EventDisplayItem[] = items.map((e: any) => {
             const rawDate = e.eventDate || e.startDateTime || "";
-            let day = "28";
-            let month = "AUG";
-            let time = "09:00 AM - 04:00 PM";
+            let day = "01";
+            let month = "EVENT";
+            let time = "";
             if (rawDate) {
               const d = new Date(rawDate);
               if (!isNaN(d.getTime())) {
@@ -155,16 +132,20 @@ export default function Home() {
               month,
               time,
               venue: e.venue || "University Main Campus",
-              title: e.name || e.title || "Academic Event",
+              title: e.title || e.name || "Academic Event",
               desc: e.description || "",
               category: e.facultyName || "Campus Event",
               posterUrl: e.posterUrl || "",
             };
           });
           setLiveEvents(parsed);
+        } else {
+          setLiveEvents([]);
         }
       } catch {
-        // Keep fallback UPCOMING_EVENTS
+        setLiveEvents([]);
+      } finally {
+        setIsLoadingEvents(false);
       }
     }
     fetchUpcomingEvents();
@@ -213,17 +194,10 @@ export default function Home() {
           <div className="flex items-center gap-2.5 shrink-0">
             <Link
               href="/login"
-              className="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] border border-[var(--outline-variant)] transition flex items-center gap-1.5 whitespace-nowrap"
+              className="btn-primary text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl shadow-md font-bold whitespace-nowrap flex items-center gap-1.5"
             >
-              <i className="ti ti-user-circle text-base text-[var(--tertiary)]"></i>
+              <i className="ti ti-user-circle text-base"></i>
               <span>Portal Sign In</span>
-            </Link>
-            <Link
-              href="/login"
-              className="btn-primary text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl shadow-md font-bold whitespace-nowrap hidden sm:inline-flex items-center gap-1.5"
-            >
-              <span>Apply Now</span>
-              <i className="ti ti-arrow-right text-xs"></i>
             </Link>
             <ThemeToggle />
           </div>
@@ -462,81 +436,100 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-              {liveEvents.map((evt, idx) => (
-                <div
-                  key={evt.id || idx}
-                  className="glass rounded-3xl p-5 border border-[var(--glass-border)] shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between space-y-4 group overflow-hidden"
-                >
-                  <div className="space-y-4">
-                    {/* Event Poster Image (if uploaded by admin) */}
+            {isLoadingEvents ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className="rounded-3xl min-h-[380px] bg-[var(--surface-container-high)]/30 animate-pulse border border-[var(--outline-variant)]/40 p-6 flex flex-col justify-between"
+                  />
+                ))}
+              </div>
+            ) : liveEvents.length > 0 ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                {liveEvents.map((evt, idx) => (
+                  <div
+                    key={evt.id || idx}
+                    className="relative rounded-3xl overflow-hidden min-h-[420px] p-6 border border-white/15 shadow-2xl hover:shadow-cyan-500/10 hover:border-cyan-500/40 transition-all duration-500 flex flex-col justify-between group cursor-pointer"
+                    onClick={() => evt.posterUrl && setSelectedPosterModal({ title: evt.title, url: resolvePosterUrl(evt.posterUrl) })}
+                  >
+                    {/* Full Background Image */}
                     {evt.posterUrl ? (
-                      <div
-                        onClick={() => setSelectedPosterModal({ title: evt.title, url: resolvePosterUrl(evt.posterUrl) })}
-                        className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden cursor-pointer bg-slate-900 border border-[var(--outline-variant)]/60 shadow-inner group/poster"
-                      >
-                        <img
-                          src={resolvePosterUrl(evt.posterUrl)}
-                          alt={evt.title}
-                          className="w-full h-full object-cover group-hover/poster:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-end justify-between p-3.5">
-                          <span className="text-[11px] font-bold text-white flex items-center gap-1.5 bg-black/60 px-3 py-1 rounded-lg backdrop-blur-md">
-                            <i className="ti ti-zoom-in text-sm text-[#4cd7f6]"></i>
-                            <span>View Full Poster</span>
-                          </span>
-                        </div>
-                      </div>
-                    ) : null}
+                      <img
+                        src={resolvePosterUrl(evt.posterUrl)}
+                        alt={evt.title}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.onerror = null;
+                          target.src = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop";
+                        }}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950" />
+                    )}
 
-                    {/* Date badge & Category */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[var(--surface-container-high)] border border-[var(--outline-variant)] flex flex-col items-center justify-center font-bold shrink-0 text-[var(--tertiary)] p-2">
-                        <span className="text-lg leading-none">{evt.day}</span>
-                        <span className="text-[10px] tracking-wider uppercase mt-0.5">{evt.month}</span>
+                    {/* High-Contrast Gradient Backdrop Overlays */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/40 group-hover:from-slate-950/95 group-hover:via-slate-950/70 transition-colors duration-300" />
+
+                    {/* Top Layer: Badges & Category */}
+                    <div className="relative z-10 flex items-start justify-between gap-3">
+                      {/* Date Badge */}
+                      <div className="bg-slate-950/70 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-2xl flex flex-col items-center justify-center font-bold text-cyan-300 shadow-lg">
+                        <span className="text-xl leading-none font-black">{evt.day}</span>
+                        <span className="text-[10px] tracking-wider uppercase mt-0.5 text-slate-300">{evt.month}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--tertiary-container)]/40 text-[var(--tertiary)] inline-block truncate max-w-full">
-                          {evt.category}
+
+                      {/* Category Tag */}
+                      <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-xl bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 backdrop-blur-md shadow-md">
+                        {evt.category}
+                      </span>
+                    </div>
+
+                    {/* Bottom Layer: Content & Venue Overlaid on Image */}
+                    <div className="relative z-10 space-y-3 mt-auto pt-6">
+                      {evt.time && (
+                        <p className="text-xs text-cyan-400 flex items-center gap-1.5 font-bold tracking-wide">
+                          <i className="ti ti-clock text-sm"></i>
+                          <span>{evt.time}</span>
+                        </p>
+                      )}
+
+                      <h3 className="font-display font-extrabold text-xl text-white leading-snug drop-shadow-md group-hover:text-cyan-300 transition-colors">
+                        {evt.title}
+                      </h3>
+
+                      {evt.desc && (
+                        <p className="text-slate-300 text-xs leading-relaxed line-clamp-2 drop-shadow">
+                          {evt.desc}
+                        </p>
+                      )}
+
+                      <div className="pt-3 border-t border-white/15 text-xs text-slate-300 flex items-center justify-between font-medium">
+                        <span className="flex items-center gap-1.5 truncate max-w-[70%]">
+                          <i className="ti ti-map-pin text-cyan-400 shrink-0"></i>
+                          <span className="truncate">{evt.venue}</span>
                         </span>
-                        {evt.time && (
-                          <p className="text-xs text-[var(--on-surface-variant)] mt-1 flex items-center gap-1 font-medium">
-                            <i className="ti ti-clock text-xs text-[var(--tertiary)]"></i>
-                            <span>{evt.time}</span>
-                          </p>
+                        {evt.posterUrl && (
+                          <span className="text-[11px] font-bold text-cyan-400 group-hover:underline flex items-center gap-1 shrink-0 bg-white/10 px-2.5 py-1 rounded-lg backdrop-blur-sm border border-white/10">
+                            <i className="ti ti-zoom-in text-xs"></i>
+                            <span>Poster</span>
+                          </span>
                         )}
                       </div>
                     </div>
-
-                    <h3 className="font-display font-bold text-base text-[var(--on-surface)] leading-snug group-hover:text-[var(--tertiary)] transition-colors">
-                      {evt.title}
-                    </h3>
-
-                    {evt.desc && (
-                      <p className="text-[var(--on-surface-variant)] text-xs leading-relaxed line-clamp-3">
-                        {evt.desc}
-                      </p>
-                    )}
                   </div>
-
-                  <div className="pt-3 border-t border-[var(--outline-variant)]/60 text-xs text-[var(--on-surface-variant)] flex items-center justify-between font-medium">
-                    <span className="flex items-center gap-1 truncate max-w-[70%]">
-                      <i className="ti ti-map-pin text-[var(--tertiary)] shrink-0"></i>
-                      <span className="truncate">{evt.venue}</span>
-                    </span>
-                    {evt.posterUrl && (
-                      <button
-                        onClick={() => setSelectedPosterModal({ title: evt.title, url: resolvePosterUrl(evt.posterUrl) })}
-                        className="text-[11px] font-bold text-[var(--tertiary)] hover:underline flex items-center gap-1 shrink-0"
-                      >
-                        <i className="ti ti-photo text-xs"></i>
-                        <span>Poster</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 rounded-3xl bg-[var(--surface-container-high)]/30 border border-[var(--outline-variant)]/40 max-w-md mx-auto p-8 space-y-3">
+                <i className="ti ti-calendar-event text-4xl text-[var(--on-surface-variant)] opacity-60" />
+                <p className="text-base font-bold text-[var(--on-surface)]">No Upcoming Events</p>
+                <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+                  There are currently no events scheduled. Real campus events published in the system will appear here.
+                </p>
+              </div>
+            )}
 
           </div>
         </section>
@@ -608,82 +601,108 @@ export default function Home() {
 
       </main>
 
-      {/* ─── Authentic University Footer ───────────────────────────────────── */}
-      <footer className="bg-[#050e18] text-slate-400 border-t border-white/10">
-        <div className="max-w-[1400px] mx-auto px-6 py-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-10 text-sm">
+      {/* ─── Personal Developer & Campus LMS Footer ─────────────────────────── */}
+      <footer className="bg-[#050e18] text-slate-400 border-t border-white/10 relative overflow-hidden">
+        <div className="max-w-[1400px] mx-auto px-6 py-12">
           
-          {/* Col 1: University Identity */}
-          <div className="space-y-4 md:col-span-2">
-            <Logo />
-            <p className="text-xs leading-relaxed text-slate-400 max-w-sm">
-              UniLearn University is an accredited national higher education institute committed to transformative research, undergraduate excellence, and future leadership development.
-            </p>
-            <div className="text-xs text-slate-400 space-y-1 pt-1">
-              <p className="font-semibold text-slate-300">University Main Campus:</p>
-              <p>128 University Park Boulevard, Faculty Quadrant</p>
-              <p>Colombo 00700, Sri Lanka</p>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-8 border-b border-white/10">
+            {/* Left: UniLearn Campus LMS Identity (6 cols) */}
+            <div className="space-y-4 md:col-span-6">
+              <div className="flex items-center gap-3">
+                <Logo />
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">
+                  Campus Learning &amp; Management System
+                </span>
+              </div>
+
+              <p className="text-xs leading-relaxed text-slate-400 max-w-md">
+                UniLearn is a full-stack University &amp; Learning Management System engineered with modern web technologies to manage academic courses, student enrollments, exam grading, and campus events.
+              </p>
+
+              {/* Circular Social Media Icons */}
+              <div className="flex items-center gap-2.5 pt-1">
+                <a
+                  href="#"
+                  className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700/60 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 flex items-center justify-center transition shadow-lg hover:scale-105"
+                  aria-label="Facebook"
+                >
+                  <i className="ti ti-brand-facebook text-lg"></i>
+                </a>
+                <a
+                  href="#"
+                  className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700/60 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 flex items-center justify-center transition shadow-lg hover:scale-105"
+                  aria-label="X (Twitter)"
+                >
+                  <i className="ti ti-brand-x text-lg"></i>
+                </a>
+                <a
+                  href="#"
+                  className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700/60 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 flex items-center justify-center transition shadow-lg hover:scale-105"
+                  aria-label="Instagram"
+                >
+                  <i className="ti ti-brand-instagram text-lg"></i>
+                </a>
+                <a
+                  href="#"
+                  className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700/60 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 flex items-center justify-center transition shadow-lg hover:scale-105"
+                  aria-label="LinkedIn"
+                >
+                  <i className="ti ti-brand-linkedin text-lg"></i>
+                </a>
+                <a
+                  href="#"
+                  className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700/60 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 flex items-center justify-center transition shadow-lg hover:scale-105"
+                  aria-label="YouTube"
+                >
+                  <i className="ti ti-brand-youtube text-lg"></i>
+                </a>
+              </div>
             </div>
-            <div className="flex items-center gap-2 pt-2">
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="Facebook">
-                <i className="ti ti-brand-facebook text-sm"></i>
-              </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="Twitter">
-                <i className="ti ti-brand-x text-sm"></i>
-              </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="LinkedIn">
-                <i className="ti ti-brand-linkedin text-sm"></i>
-              </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition" aria-label="YouTube">
-                <i className="ti ti-brand-youtube text-sm"></i>
-              </a>
+
+            {/* Middle: Vertical Faculties List (3 cols) */}
+            <div className="md:col-span-3">
+              <p className="font-display font-bold text-sm mb-3.5 text-white">Faculties</p>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <a href="#faculties" className="hover:text-cyan-300 transition">
+                    Faculty of Computing
+                  </a>
+                </li>
+                <li>
+                  <a href="#faculties" className="hover:text-cyan-300 transition">
+                    Faculty of Business
+                  </a>
+                </li>
+                <li>
+                  <a href="#faculties" className="hover:text-cyan-300 transition">
+                    Faculty of Engineering
+                  </a>
+                </li>
+                <li>
+                  <a href="#faculties" className="hover:text-cyan-300 transition">
+                    Faculty of Applied Sciences
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Right: Platform Navigation (3 cols) */}
+            <div className="md:col-span-3">
+              <p className="font-display font-bold text-sm mb-3.5 text-white">Platform</p>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#about" className="hover:text-cyan-300 transition">Overview</a></li>
+                <li><a href="#events" className="hover:text-cyan-300 transition">Campus Events</a></li>
+                <li><a href="#campus-life" className="hover:text-cyan-300 transition">Campus Life</a></li>
+                <li><Link href="/login" className="hover:text-cyan-300 transition">Portals &amp; Sign In</Link></li>
+              </ul>
             </div>
           </div>
 
-          {/* Col 2: Academic Faculties */}
-          <div>
-            <p className="font-display font-bold text-sm mb-4 text-white">Academics</p>
-            <ul className="space-y-2.5 text-xs">
-              <li><a href="#faculties" className="hover:text-white transition">Faculty of Computing</a></li>
-              <li><a href="#faculties" className="hover:text-white transition">Faculty of Business</a></li>
-              <li><a href="#faculties" className="hover:text-white transition">Faculty of Engineering</a></li>
-              <li><a href="#faculties" className="hover:text-white transition">Faculty of Applied Sciences</a></li>
-              <li><a href="#faculties" className="hover:text-white transition">Postgraduate Studies</a></li>
-            </ul>
+          {/* Bottom Copyright */}
+          <div className="pt-6 text-center text-xs text-slate-500">
+            <p>© 2026 Thisara Dulanjaya. All rights reserved.</p>
           </div>
 
-          {/* Col 3: Quick Portals */}
-          <div>
-            <p className="font-display font-bold text-sm mb-4 text-white">Portals &amp; Resources</p>
-            <ul className="space-y-2.5 text-xs">
-              <li><Link href="/login" className="hover:text-white transition">Student LMS Portal</Link></li>
-              <li><Link href="/login" className="hover:text-white transition">Faculty Gateway</Link></li>
-              <li><Link href="/login" className="hover:text-white transition">Exam &amp; Gradebook</Link></li>
-              <li><a href="#campus-life" className="hover:text-white transition">24/7 Digital Library</a></li>
-              <li><a href="#events" className="hover:text-white transition">Academic Calendar</a></li>
-            </ul>
-          </div>
-
-          {/* Col 4: University Governance & Info */}
-          <div>
-            <p className="font-display font-bold text-sm mb-4 text-white">Administration</p>
-            <ul className="space-y-2.5 text-xs">
-              <li><a href="#about" className="hover:text-white transition">About the University</a></li>
-              <li><a href="#faculties" className="hover:text-white transition">Academic Programs</a></li>
-              <li><a href="#campus-life" className="hover:text-white transition">Campus Facilities</a></li>
-              <li><a href="#campus-life" className="hover:text-white transition">Career Guidance Unit</a></li>
-              <li><a href="#" className="hover:text-white transition">Emergency Hotline</a></li>
-            </ul>
-          </div>
-
-        </div>
-
-        <div className="border-t border-white/10 py-6 text-center text-xs text-slate-500 max-w-[1400px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 UniLearn University. All rights reserved. Registered with Ministry of Higher Education.</p>
-          <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-slate-300 transition">Academic Integrity</a>
-            <a href="#" className="hover:text-slate-300 transition">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-300 transition">Terms of Enrollment</a>
-          </div>
         </div>
       </footer>
 
@@ -713,6 +732,11 @@ export default function Home() {
                 src={selectedPosterModal.url}
                 alt={selectedPosterModal.title}
                 className="max-h-[72vh] w-auto rounded-xl object-contain shadow-2xl"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.onerror = null;
+                  target.src = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop";
+                }}
               />
             </div>
           </div>

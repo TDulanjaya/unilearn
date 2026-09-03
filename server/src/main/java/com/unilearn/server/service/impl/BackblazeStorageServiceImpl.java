@@ -92,7 +92,17 @@ public class BackblazeStorageServiceImpl implements StorageService {
         String safePrefix = (folder != null && !folder.isBlank()) ? folder.trim().replaceAll("[^a-zA-Z0-9_-]", "") + "/" : "";
         String uniqueFileName = safePrefix + UUID.randomUUID() + extension;
 
-        // Try Backblaze B2 if initialized
+        // 1. Store locally first to guarantee direct and immediate browser loading
+        String localFileName = uniqueFileName.replace("/", "_");
+        try {
+            Path targetPath = localUploadDir.resolve(localFileName);
+            Files.write(targetPath, file.getBytes());
+            log.info("Saved file locally at uploads/{}", localFileName);
+        } catch (IOException e) {
+            log.error("Failed to write file locally", e);
+        }
+
+        // 2. Also back up to cloud S3 storage (Backblaze / Storj) if configured
         if (s3Client != null) {
             try {
                 PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -102,26 +112,14 @@ public class BackblazeStorageServiceImpl implements StorageService {
                         .build();
 
                 s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-                
-                String publicUrl = String.format("%s/%s/%s", endpoint.replaceAll("/+$", ""), bucketName, uniqueFileName);
-                log.info("Successfully uploaded file to Backblaze B2: {}", publicUrl);
-                return publicUrl;
+                log.info("Successfully backed up file to cloud S3 bucket: {}", uniqueFileName);
             } catch (Exception e) {
-                log.error("Backblaze B2 upload failed, falling back to local file storage: {}", e.getMessage());
+                log.warn("Cloud S3 backup skipped: {}", e.getMessage());
             }
         }
 
-        // Fallback to local storage
-        try {
-            Path targetPath = localUploadDir.resolve(uniqueFileName.replace("/", "_"));
-            Files.write(targetPath, file.getBytes());
-            String localUrl = "/api/v1/files/download/" + targetPath.getFileName().toString();
-            log.info("Saved file locally at: {}", localUrl);
-            return localUrl;
-        } catch (IOException e) {
-            log.error("Failed to store file locally", e);
-            throw new RuntimeException("Failed to upload file: " + e.getMessage());
-        }
+        String localUrl = "/api/v1/files/download/" + localFileName;
+        return localUrl;
     }
 
     @Override

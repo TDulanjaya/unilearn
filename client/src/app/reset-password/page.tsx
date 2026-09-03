@@ -107,7 +107,7 @@ function ResetPasswordFormContent() {
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Enter new password"
                   required
                   className="w-full pl-3.5 pr-10 py-2.5 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] focus:outline-none focus:border-[var(--tertiary)]"
                 />
@@ -131,7 +131,7 @@ function ResetPasswordFormContent() {
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Confirm new password"
                   required
                   className="w-full pl-3.5 pr-10 py-2.5 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] focus:outline-none focus:border-[var(--tertiary)]"
                 />

@@ -35,6 +35,26 @@ cd server
 
 ---
 
+## Running with Docker (Entire Stack)
+
+To run the frontend, backend, and MySQL database altogether in Docker containers:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:8080](http://localhost:8080)
+- **MySQL Database**: `localhost:3306` (pre-seeded with `unilearn_db.sql`)
+
+To stop all containers:
+
+```bash
+docker compose down
+```
+
+---
+
 ## Tech Stack
 
 - **Frontend**: Next.js, React, Tailwind CSS, TypeScript

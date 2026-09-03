@@ -121,7 +121,7 @@ function LoginFormContent() {
                 <input
                   type="email"
                   {...register("email")}
-                  placeholder="student@uni.edu"
+                  placeholder="Enter your email address"
                   className={`w-full px-3.5 py-2.5 text-xs rounded-xl border bg-[var(--surface-container-lowest)] focus:outline-none transition-colors ${
                     errors.email
                       ? "border-red-500 focus:border-red-500"
@@ -152,7 +152,7 @@ function LoginFormContent() {
                   <input
                     type={showPassword ? "text" : "password"}
                     {...register("password")}
-                    placeholder="••••••••"
+                    placeholder="Enter your password"
                     className={`w-full pl-3.5 pr-10 py-2.5 text-xs rounded-xl border bg-[var(--surface-container-lowest)] focus:outline-none transition-colors ${
                       errors.password
                         ? "border-red-500 focus:border-red-500"
@@ -214,7 +214,7 @@ function LoginFormContent() {
                     type="email"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="student@uni.edu"
+                    placeholder="Enter your registered email"
                     required
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] focus:outline-none focus:border-[var(--tertiary)]"
                   />
