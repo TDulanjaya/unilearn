@@ -2,6 +2,7 @@
 import React, { createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export interface CourseOffering {
   offeringId: number;
@@ -84,6 +85,7 @@ function mapSlotDto(dto: any): TimetableSlot {
 
 export function AcademicDataProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+  const { token } = useAuth();
 
   const {
     data: rawOfferings = [],
@@ -94,6 +96,7 @@ export function AcademicDataProvider({ children }: { children: React.ReactNode }
   } = useQuery({
     queryKey: ["courseOfferings"],
     queryFn: () => api.get<any[]>("/api/v1/course-offerings"),
+    enabled: !!token,
   });
 
   const {
@@ -105,6 +108,7 @@ export function AcademicDataProvider({ children }: { children: React.ReactNode }
   } = useQuery({
     queryKey: ["timetableSlots"],
     queryFn: () => api.get<any[]>("/api/v1/timetable-slots"),
+    enabled: !!token,
   });
 
   const offerings: CourseOffering[] = Array.isArray(rawOfferings)

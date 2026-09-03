@@ -77,7 +77,12 @@ export async function apiFetch<T = any>(
     }
 
     clearAuth();
-    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/" &&
+      !window.location.pathname.startsWith("/login") &&
+      !window.location.pathname.startsWith("/reset-password")
+    ) {
       window.location.href = "/login";
     }
     throw new Error("Unauthorized access. Redirecting to login...");
