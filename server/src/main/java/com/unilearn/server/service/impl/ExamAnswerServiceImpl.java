@@ -59,9 +59,7 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
         if (existingOpt.isPresent()) {
             answer = existingOpt.get();
             answer.setAnswerText(text);
-            if (request.getMarksAwarded() != null) {
-                answer.setMarksAwarded(request.getMarksAwarded());
-            }
+            // Marks can only be set by lecturer via gradeAnswer
         } else {
             answer = examAnswerMapper.toExamAnswer(request, attempt, question);
         }

@@ -54,6 +54,7 @@ public class UserServiceImpl implements UserService {
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
     private final MessageRepository messageRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
@@ -199,6 +200,19 @@ public class UserServiceImpl implements UserService {
         } else if ("hod_dean".equals(role)) {
             hodDeanAssignmentRepository.deleteAll(hodDeanAssignmentRepository.findByUser_UserId(userId));
         }
+
+        // Unlink HOD or Dean role if assigned to department or faculty
+        departmentRepository.findByHod_UserId(userId).ifPresent(d -> {
+            d.setHod(null);
+            departmentRepository.save(d);
+        });
+        facultyRepository.findByDean_UserId(userId).ifPresent(f -> {
+            f.setDean(null);
+            facultyRepository.save(f);
+        });
+
+        // Clean up examiners table if user has examiner record
+        jdbcTemplate.update("DELETE FROM examiners WHERE examiner_id = ?", userId);
 
         // Delete audit logs, notifications and messages
         auditLogRepository.deleteAll(auditLogRepository.findByUser_UserId(userId));

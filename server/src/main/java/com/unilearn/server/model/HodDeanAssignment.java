@@ -49,4 +49,8 @@ public class HodDeanAssignment {
     private Boolean active = true;
 
     private LocalDate endDate;
+
+    // Stores role before promotion so revoke can restore it
+    @Column(length = 20)
+    private String previousRole;
 }

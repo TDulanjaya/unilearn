@@ -65,30 +65,41 @@ export default function EventsEnrollmentPage() {
   const queryClient = useQueryClient();
   const currentUser = getUser();
 
-  // Navigation State
+  // Active tab navigation
   const [activeTab, setActiveTab] = useState<"wizard" | "events" | "announcements">("wizard");
 
-  // Global Toast
+  // Toast notification
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4500);
   };
 
-  // --- Wizard State ---
+  // Wizard state
   const [enrollStep, setEnrollStep] = useState<1 | 2 | 3>(1);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
-  const [selectedOfferingId, setSelectedOfferingId] = useState<number | null>(null);
+  const [selectedOfferingIds, setSelectedOfferingIds] = useState<number[]>([]);
   const [batchSearch, setBatchSearch] = useState("");
   const [offeringSearch, setOfferingSearch] = useState("");
   const [enrollResult, setEnrollResult] = useState<{
+    totalOfferings?: number;
     totalStudents?: number;
     newlyEnrolled?: number;
     alreadyEnrolled?: number;
+    skippedCapacity?: number;
     message?: string;
+    perOffering?: Array<{
+      offeringId: number;
+      courseLabel?: string;
+      totalStudents?: number;
+      newlyEnrolled?: number;
+      alreadyEnrolled?: number;
+      skippedCapacity?: number;
+      message?: string;
+    }>;
   } | null>(null);
 
-  // --- Live Queries for Wizard ---
+  // Fetch batches
   const { data: rawBatches, isLoading: batchesLoading } = useQuery({
     queryKey: ["batches"],
     queryFn: () => api.get<any>("/api/v1/batches"),
@@ -108,6 +119,7 @@ export default function EventsEnrollmentPage() {
     enrollmentYear: b.enrollmentYear,
   }));
 
+  // Fetch course offerings
   const { data: rawOfferings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["courseOfferings"],
     queryFn: () => api.get<any>("/api/v1/course-offerings"),
@@ -153,14 +165,32 @@ export default function EventsEnrollmentPage() {
     status: s.status || "ACTIVE",
   }));
 
-  // Selected Object References
   const selectedBatch = batches.find((b) => b.batchId === selectedBatchId);
-  const selectedOffering = offerings.find((o) => o.offeringId === selectedOfferingId);
+  const selectedOfferings = offerings.filter((o) => selectedOfferingIds.includes(o.offeringId));
 
-  // Bulk Enrollment Mutation
+  // Toggle selection for an offering
+  const toggleOfferingSelection = (offeringId: number) => {
+    setSelectedOfferingIds((prev) =>
+      prev.includes(offeringId) ? prev.filter((id) => id !== offeringId) : [...prev, offeringId]
+    );
+  };
+
+  // Select all filtered offerings
+  const selectAllFilteredOfferings = () => {
+    setSelectedOfferingIds((prev) => {
+      const ids = filteredOfferings.map((o) => o.offeringId);
+      const merged = new Set([...prev, ...ids]);
+      return Array.from(merged);
+    });
+  };
+
+  // Clear selections
+  const clearOfferingSelection = () => setSelectedOfferingIds([]);
+
+  // Bulk enrollment mutation
   const bulkEnrollMutation = useMutation({
-    mutationFn: ({ batchId, offeringId }: { batchId: number; offeringId: number }) =>
-      api.post<any>(`/api/v1/enrollments/batch/${batchId}/offering/${offeringId}`, {}),
+    mutationFn: ({ batchId, offeringIds }: { batchId: number; offeringIds: number[] }) =>
+      api.post<any>(`/api/v1/enrollments/batch/${batchId}`, { offeringIds }),
     onSuccess: (data) => {
       setEnrollResult(data);
       queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
@@ -173,11 +203,11 @@ export default function EventsEnrollmentPage() {
   });
 
   const handleExecuteBulkEnroll = () => {
-    if (!selectedBatchId || !selectedOfferingId) return;
-    bulkEnrollMutation.mutate({ batchId: selectedBatchId, offeringId: selectedOfferingId });
+    if (!selectedBatchId || selectedOfferingIds.length === 0) return;
+    bulkEnrollMutation.mutate({ batchId: selectedBatchId, offeringIds: selectedOfferingIds });
   };
 
-  // --- Events Tab State & Queries ---
+  // Events query
   const { data: rawEvents } = useQuery({
     queryKey: ["upcomingEvents"],
     queryFn: () => api.get<any>("/api/v1/events/upcoming"),
@@ -342,7 +372,7 @@ export default function EventsEnrollmentPage() {
     }
   };
 
-  // --- Announcements Tab State & Queries ---
+  // Announcements query
   const { data: rawAnnouncements } = useQuery({
     queryKey: ["announcements"],
     queryFn: () => api.get<any>("/api/v1/announcements/me?scope=INSTITUTION&scopeId=1"),
@@ -387,7 +417,7 @@ export default function EventsEnrollmentPage() {
     });
   };
 
-  // Filtered lists
+  // Search filters
   const filteredBatches = batches.filter(
     (b) =>
       b.name.toLowerCase().includes(batchSearch.toLowerCase()) ||
@@ -473,10 +503,10 @@ export default function EventsEnrollmentPage() {
         {/* TAB 1: BATCH ENROLLMENT WIZARD */}
         {activeTab === "wizard" && (
           <div className="space-y-6">
-            {/* Step Indicator Progress Header */}
+            {/* Step Progress Header */}
             <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl">
               <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
-                {/* Step 1 Pill */}
+                {/* Step 1 */}
                 <button
                   onClick={() => setEnrollStep(1)}
                   className={`flex flex-col sm:flex-row items-center gap-2.5 p-3 rounded-xl transition-all text-left ${
@@ -506,14 +536,14 @@ export default function EventsEnrollmentPage() {
                   </div>
                 </button>
 
-                {/* Step 2 Pill */}
+                {/* Step 2 */}
                 <button
                   onClick={() => selectedBatchId && setEnrollStep(2)}
                   disabled={!selectedBatchId}
                   className={`flex flex-col sm:flex-row items-center gap-2.5 p-3 rounded-xl transition-all text-left ${
                     enrollStep === 2
                       ? "bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 ring-2 ring-cyan-500/20"
-                      : selectedOfferingId
+                      : selectedOfferingIds.length > 0
                       ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 cursor-pointer"
                       : "opacity-60 text-slate-400 disabled:cursor-not-allowed"
                   }`}
@@ -522,25 +552,29 @@ export default function EventsEnrollmentPage() {
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md ${
                       enrollStep === 2
                         ? "bg-cyan-500 text-slate-950"
-                        : selectedOfferingId
+                        : selectedOfferingIds.length > 0
                         ? "bg-emerald-500 text-slate-950"
                         : "bg-slate-800 text-slate-400"
                     }`}
                   >
-                    {selectedOfferingId && enrollStep > 2 ? "✓" : "2"}
+                    {selectedOfferingIds.length > 0 && enrollStep > 2 ? "✓" : "2"}
                   </span>
                   <div className="overflow-hidden">
                     <p className="text-[11px] font-bold uppercase tracking-wider">Step 2</p>
                     <p className="text-xs sm:text-sm font-black truncate">
-                      {selectedOffering ? selectedOffering.courseCode : "Select Course Offering"}
+                      {selectedOfferingIds.length === 0
+                        ? "Select Course Offering(s)"
+                        : selectedOfferingIds.length === 1
+                        ? selectedOfferings[0]?.courseCode
+                        : `${selectedOfferingIds.length} offerings selected`}
                     </p>
                   </div>
                 </button>
 
-                {/* Step 3 Pill */}
+                {/* Step 3 */}
                 <button
-                  onClick={() => selectedBatchId && selectedOfferingId && setEnrollStep(3)}
-                  disabled={!selectedBatchId || !selectedOfferingId}
+                  onClick={() => selectedBatchId && selectedOfferingIds.length > 0 && setEnrollStep(3)}
+                  disabled={!selectedBatchId || selectedOfferingIds.length === 0}
                   className={`flex flex-col sm:flex-row items-center gap-2.5 p-3 rounded-xl transition-all text-left ${
                     enrollStep === 3
                       ? "bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 ring-2 ring-cyan-500/20"
@@ -574,7 +608,7 @@ export default function EventsEnrollmentPage() {
                       Select Target Student Batch
                     </h2>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Choose which academic batch you want to bulk enroll into a course offering.
+                      Choose which academic batch you want to bulk enroll into course offerings.
                     </p>
                   </div>
                   <div className="relative w-full sm:w-72">
@@ -649,7 +683,7 @@ export default function EventsEnrollmentPage() {
                   </div>
                 )}
 
-                {/* Batch Selection Action Bar */}
+                {/* Batch Action Bar */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-800">
                   <div className="text-xs text-slate-400">
                     {selectedBatch ? (
@@ -672,7 +706,7 @@ export default function EventsEnrollmentPage() {
               </div>
             )}
 
-            {/* STEP 2: SELECT COURSE OFFERING */}
+            {/* STEP 2: SELECT COURSE OFFERING(S) */}
             {enrollStep === 2 && (
               <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
@@ -681,22 +715,43 @@ export default function EventsEnrollmentPage() {
                       <span className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs">
                         2
                       </span>
-                      Select Course Offering
+                      Select Course Offering(s)
                     </h2>
                     <p className="text-xs text-slate-400 mt-0.5">
                       Target Batch: <span className="text-cyan-400 font-bold">{selectedBatch?.name}</span> ({selectedBatch?.departmentName})
+                      {" · "}
+                      <span className="text-emerald-400 font-bold">
+                        {selectedOfferingIds.length} offering{selectedOfferingIds.length === 1 ? "" : "s"} selected
+                      </span>
                     </p>
                   </div>
-                  <div className="relative w-full sm:w-72">
-                    <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none z-10" />
-                    <input
-                      type="text"
-                      placeholder="Search course code or title..."
-                      value={offeringSearch}
-                      onChange={(e) => setOfferingSearch(e.target.value)}
-                      style={{ paddingLeft: "2.5rem" }}
-                      className="w-full bg-slate-950/70 border border-slate-700 rounded-xl !pl-10 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                    />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-72">
+                      <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none z-10" />
+                      <input
+                        type="text"
+                        placeholder="Search course code or title..."
+                        value={offeringSearch}
+                        onChange={(e) => setOfferingSearch(e.target.value)}
+                        style={{ paddingLeft: "2.5rem" }}
+                        className="w-full bg-slate-950/70 border border-slate-700 rounded-xl !pl-10 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={selectAllFilteredOfferings}
+                      className="px-3 py-2 rounded-xl text-[11px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-500/30 hover:bg-cyan-900/50 transition-all whitespace-nowrap"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearOfferingSelection}
+                      disabled={selectedOfferingIds.length === 0}
+                      className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+                    >
+                      Clear
+                    </button>
                   </div>
                 </div>
 
@@ -722,11 +777,13 @@ export default function EventsEnrollmentPage() {
                 ) : (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredOfferings.map((off) => {
-                      const isSelected = selectedOfferingId === off.offeringId;
+                      const isSelected = selectedOfferingIds.includes(off.offeringId);
                       return (
                         <div
                           key={off.offeringId}
-                          onClick={() => setSelectedOfferingId(off.offeringId)}
+                          onClick={() => toggleOfferingSelection(off.offeringId)}
+                          role="checkbox"
+                          aria-checked={isSelected}
                           className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between group ${
                             isSelected
                               ? "border-cyan-500 bg-cyan-950/30 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-950/50"
@@ -738,13 +795,18 @@ export default function EventsEnrollmentPage() {
                               <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-500/30">
                                 {off.courseCode}
                               </span>
-                              {isSelected ? (
-                                <span className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center text-xs font-black">
+                              <span className="flex items-center gap-2">
+                                <span className="text-[11px] text-slate-500">{off.semesterName}</span>
+                                <span
+                                  className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black border transition-all ${
+                                    isSelected
+                                      ? "bg-cyan-500 border-cyan-500 text-slate-950"
+                                      : "bg-transparent border-slate-600 text-transparent"
+                                  }`}
+                                >
                                   ✓
                                 </span>
-                              ) : (
-                                <span className="text-[11px] text-slate-500">{off.semesterName}</span>
-                              )}
+                              </span>
                             </div>
                             <h3 className="font-black text-base text-white group-hover:text-cyan-300 transition-colors">
                               {off.courseTitle}
@@ -767,7 +829,7 @@ export default function EventsEnrollmentPage() {
                   </div>
                 )}
 
-                {/* Offering Selection Action Bar */}
+                {/* Offering Action Bar */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-800">
                   <button
                     onClick={() => setEnrollStep(1)}
@@ -776,18 +838,21 @@ export default function EventsEnrollmentPage() {
                     <i className="ti ti-arrow-left" /> Back to Batches
                   </button>
                   <button
-                    onClick={() => selectedOfferingId && setEnrollStep(3)}
-                    disabled={!selectedOfferingId}
+                    onClick={() => selectedOfferingIds.length > 0 && setEnrollStep(3)}
+                    disabled={selectedOfferingIds.length === 0}
                     className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
                   >
-                    <span>Next: Review & Confirm</span>
+                    <span>
+                      Next: Review & Confirm
+                      {selectedOfferingIds.length > 0 ? ` (${selectedOfferingIds.length})` : ""}
+                    </span>
                     <i className="ti ti-arrow-right" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STEP 3: REVIEW & CONFIRM BULK ENROLLMENT */}
+            {/* STEP 3: REVIEW & CONFIRM */}
             {enrollStep === 3 && (
               <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-6">
                 <div className="pb-4 border-b border-slate-800">
@@ -809,7 +874,11 @@ export default function EventsEnrollmentPage() {
                       <i className="ti ti-circle-check text-lg text-emerald-400" />
                       <span>{enrollResult.message}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 pt-2 text-xs border-t border-emerald-500/20">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs border-t border-emerald-500/20">
+                      <div>
+                        <span className="text-emerald-500 block font-semibold">Offerings:</span>
+                        <span className="font-bold text-white text-sm">{enrollResult.totalOfferings ?? selectedOfferingIds.length}</span>
+                      </div>
                       <div>
                         <span className="text-emerald-500 block font-semibold">Total Students:</span>
                         <span className="font-bold text-white text-sm">{enrollResult.totalStudents}</span>
@@ -823,10 +892,24 @@ export default function EventsEnrollmentPage() {
                         <span className="font-bold text-slate-300 text-sm">{enrollResult.alreadyEnrolled}</span>
                       </div>
                     </div>
+
+                    {/* Breakdown for multiple offerings */}
+                    {enrollResult.perOffering && enrollResult.perOffering.length > 1 && (
+                      <div className="pt-3 border-t border-emerald-500/20 space-y-1.5">
+                        {enrollResult.perOffering.map((po) => (
+                          <div key={po.offeringId} className="flex items-center justify-between text-[11px] bg-emerald-950/30 rounded-lg px-3 py-1.5">
+                            <span className="font-semibold text-emerald-200">{po.courseLabel || `Offering #${po.offeringId}`}</span>
+                            <span className="text-emerald-400">
+                              +{po.newlyEnrolled} new · {po.alreadyEnrolled} already{po.skippedCapacity ? ` · ${po.skippedCapacity} skipped (capacity)` : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Enrollment Matrix Overview Cards */}
+                {/* Selected Details Overview */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   {/* Batch Card */}
                   <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
@@ -841,18 +924,26 @@ export default function EventsEnrollmentPage() {
                     </div>
                   </div>
 
-                  {/* Course Offering Card */}
+                  {/* Offering(s) Card */}
                   <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
                     <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-purple-950 text-purple-400 border border-purple-500/30">
-                      Target Course Offering
+                      Target Course Offering{selectedOfferings.length === 1 ? "" : "s"} ({selectedOfferings.length})
                     </span>
-                    <h3 className="font-black text-lg text-white">
-                      {selectedOffering?.courseCode} - {selectedOffering?.courseTitle}
-                    </h3>
-                    <div className="text-xs text-slate-400 space-y-1">
-                      <p><b>Lecturer:</b> {selectedOffering?.lecturerName}</p>
-                      <p><b>Semester:</b> {selectedOffering?.semesterName}</p>
-                      <p><b>Offering ID:</b> #{selectedOffering?.offeringId}</p>
+                    <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+                      {selectedOfferings.map((so) => (
+                        <div key={so.offeringId} className="pb-2 border-b border-slate-800/60 last:border-0 last:pb-0">
+                          <h3 className="font-black text-sm text-white">
+                            {so.courseCode} - {so.courseTitle}
+                          </h3>
+                          <div className="text-[11px] text-slate-400">
+                            <span>{so.lecturerName}</span>
+                            {" · "}
+                            <span>{so.semesterName}</span>
+                            {" · "}
+                            <span>Offering #{so.offeringId}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -909,7 +1000,7 @@ export default function EventsEnrollmentPage() {
                       onClick={() => {
                         setEnrollStep(1);
                         setSelectedBatchId(null);
-                        setSelectedOfferingId(null);
+                        setSelectedOfferingIds([]);
                         setEnrollResult(null);
                       }}
                       className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all"
@@ -918,7 +1009,7 @@ export default function EventsEnrollmentPage() {
                     </button>
                     <button
                       onClick={handleExecuteBulkEnroll}
-                      disabled={bulkEnrollMutation.isPending}
+                      disabled={bulkEnrollMutation.isPending || selectedOfferingIds.length === 0}
                       className="px-6 py-2.5 rounded-xl text-xs font-black text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 disabled:opacity-40 transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2"
                     >
                       {bulkEnrollMutation.isPending ? (
@@ -928,6 +1019,7 @@ export default function EventsEnrollmentPage() {
                       ) : (
                         <>
                           <i className="ti ti-user-check text-sm" /> Confirm Bulk Batch Enrollment
+                          {selectedOfferingIds.length > 1 ? ` (${selectedOfferingIds.length} offerings)` : ""}
                         </>
                       )}
                     </button>
@@ -985,7 +1077,7 @@ export default function EventsEnrollmentPage() {
                   />
                 </div>
 
-                {/* Event Poster Upload Zone */}
+                {/* Poster Upload */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Event Poster Image (Uploaded to Backblaze B2)
@@ -1107,7 +1199,7 @@ export default function EventsEnrollmentPage() {
                       key={ev.id}
                       className="relative rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden group hover:border-cyan-500/40 transition-all min-h-[220px] p-5 flex flex-col justify-between shadow-xl"
                     >
-                      {/* Full Background Image */}
+                      {/* Background Image */}
                       {ev.posterUrl ? (
                         <img
                           src={
@@ -1133,7 +1225,7 @@ export default function EventsEnrollmentPage() {
                         <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950" />
                       )}
 
-                      {/* Dark Gradient Overlay */}
+                      {/* Gradient Overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />
 
                       {/* Top Action Row */}
@@ -1159,7 +1251,7 @@ export default function EventsEnrollmentPage() {
                         </div>
                       </div>
 
-                      {/* Bottom Text Info */}
+                      {/* Details */}
                       <div className="relative z-10 space-y-1.5 mt-auto pt-4">
                         <h4 className="font-bold text-base text-white group-hover:text-cyan-300 transition-colors">
                           {ev.title}

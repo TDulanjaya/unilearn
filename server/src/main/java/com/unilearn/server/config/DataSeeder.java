@@ -5,12 +5,15 @@ import com.unilearn.server.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
-// @Component - DataSeeder is disabled for existing hosted database.
+// Only runs when enabled and database has no users
+@Component
+@ConditionalOnProperty(name = "app.seed-default-admin", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements CommandLineRunner {
@@ -30,13 +33,15 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) throws Exception {
         if (userRepository.count() == 0) {
             seedAcademicStructureIfMissing();
-            seedIfMissing("admin@uni.edu", "System Administrator", "admin123", "STAFF_ADMIN", "0770000000");
-            seedIfMissing("hod@uni.edu", "Prof. Kamal Perera", "admin123", "HOD_DEAN", "0770000001");
-            seedIfMissing("lecturer@uni.edu", "Dr. Samantha Silva", "admin123", "LECTURER", "0770000002");
-            seedIfMissing("student@uni.edu", "Alex Fernando", "admin123", "STUDENT", "0770000003");
+            // Lowercase role and status values to satisfy DB check constraints
+            seedIfMissing("admin@uni.edu", "System Administrator", "admin123", "staff_admin", "0770000000");
+            seedIfMissing("hod@uni.edu", "Prof. Kamal Perera", "admin123", "hod_dean", "0770000001");
+            seedIfMissing("lecturer@uni.edu", "Dr. Samantha Silva", "admin123", "lecturer", "0770000002");
+            seedIfMissing("student@uni.edu", "Alex Fernando", "admin123", "student", "0770000003");
             log.info("UniLearn DataSeeder: default accounts ready.");
+            log.warn("UniLearn DataSeeder: change default admin password after initial login.");
         } else {
-            log.info("UniLearn DataSeeder: existing database detected ({} users). Skipping seeder.", userRepository.count());
+            log.info("UniLearn DataSeeder: existing users found ({}). Skipping seed.", userRepository.count());
         }
     }
 
@@ -90,12 +95,11 @@ public class DataSeeder implements CommandLineRunner {
                     .passwordHash(passwordEncoder.encode(rawPassword))
                     .phone(phone)
                     .role(role)
-                    .status("ACTIVE")
+                    .status("active")
                     .build();
             User saved = userRepository.save(user);
             log.info("Seeded default user: {}", email);
 
-            // Create extension rows
             String roleName = role.toUpperCase();
             var dept = departmentRepository.findAll().stream().findFirst().orElse(null);
             var batch = batchRepository.findAll().stream().findFirst().orElse(null);
@@ -125,7 +129,7 @@ public class DataSeeder implements CommandLineRunner {
                 if (!staffAdminRepository.existsById(saved.getUserId())) {
                     StaffAdmin staffAdmin = StaffAdmin.builder()
                             .user(saved)
-                            .scopeLevel("INSTITUTION")
+                            .scopeLevel("institution")
                             .department(dept)
                             .build();
                     staffAdminRepository.save(staffAdmin);

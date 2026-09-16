@@ -5,12 +5,9 @@ import com.unilearn.server.dto.response.EventRegistrationResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing event registrations.
- */
 public interface EventRegistrationService {
 
-    EventRegistrationResponse registerForEvent(EventRegistrationCreateRequestDTO request);
+    EventRegistrationResponse registerForEvent(EventRegistrationCreateRequestDTO request, Long studentId);
 
     void cancelRegistration(Long eventId, Long studentId);
 

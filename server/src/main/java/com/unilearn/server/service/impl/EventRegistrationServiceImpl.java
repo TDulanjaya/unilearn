@@ -30,18 +30,21 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
 
     @Override
     @Transactional
-    public EventRegistrationResponse registerForEvent(EventRegistrationCreateRequestDTO request) {
+    public EventRegistrationResponse registerForEvent(EventRegistrationCreateRequestDTO request, Long studentId) {
         if (request == null) {
             throw new ValidationException("EventRegistration request cannot be null");
+        }
+        if (studentId == null) {
+            throw new ValidationException("Student ID is required");
         }
 
         Event event = eventRepository.findById(request.getEventId())
                 .orElseThrow(() -> new EntryNotFoundException("Event not found with ID: " + request.getEventId()));
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + studentId));
 
-        if (eventRegistrationRepository.existsByEvent_EventIdAndStudent_StudentId(request.getEventId(), request.getStudentId())) {
+        if (eventRegistrationRepository.existsByEvent_EventIdAndStudent_StudentId(request.getEventId(), studentId)) {
             throw new com.unilearn.server.exception.DuplicateEntryException("Student is already registered for this event");
         }
 

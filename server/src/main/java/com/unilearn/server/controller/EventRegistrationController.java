@@ -23,17 +23,17 @@ public class EventRegistrationController {
 
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    // TODO: Enforce self-only registration via authenticated principal
     public ResponseEntity<EventRegistrationResponse> registerForEvent(
             @PathVariable Long eventId,
+            @AuthenticationPrincipal User principal,
             @Valid @RequestBody EventRegistrationCreateRequestDTO request) {
+        // Use logged-in user id to prevent IDOR
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(eventRegistrationService.registerForEvent(request));
+                .body(eventRegistrationService.registerForEvent(request, principal.getUserId()));
     }
 
     @DeleteMapping("/{registrationId}")
     @PreAuthorize("hasRole('STUDENT')")
-    // TODO: Enforce self-only unregistration
     public ResponseEntity<Void> unregister(@PathVariable Long eventId,
                                            @PathVariable Long registrationId,
                                            @AuthenticationPrincipal User principal) {

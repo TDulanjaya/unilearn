@@ -2,6 +2,7 @@ package com.unilearn.server.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,10 +38,11 @@ public class UserRequest {
     private String photoUrl;
 
     @NotBlank(message = "Role is required")
-    @Size(max = 20, message = "Role must not exceed 20 characters")
+    @Pattern(regexp = "^(?i)(STUDENT|LECTURER|HOD_DEAN|STAFF_ADMIN|GUEST_LECTURER|EXAMINER)$",
+            message = "Role must be one of: STUDENT, LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER, EXAMINER")
     private String role;
 
-    @Size(max = 20, message = "Status must not exceed 20 characters")
+    @Pattern(regexp = "^(?i)(active|inactive|suspended)$", message = "Status must be one of: active, inactive, suspended")
     private String status;
 
     private Long departmentId;

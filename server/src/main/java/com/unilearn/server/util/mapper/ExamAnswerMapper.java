@@ -20,7 +20,7 @@ public class ExamAnswerMapper {
                 .attempt(attempt)
                 .question(question)
                 .answerText(text)
-                .marksAwarded(request.getMarksAwarded())
+                // Do not assign marks from student submission
                 .build();
     }
 

@@ -1,5 +1,6 @@
 package com.unilearn.server.controller;
 
+import com.unilearn.server.dto.request.enrollment.BatchEnrollRequest;
 import com.unilearn.server.dto.request.enrollment.EnrollmentCreateRequestDTO;
 import com.unilearn.server.dto.response.EnrollmentResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
@@ -65,11 +66,21 @@ public class EnrollmentController {
         return ResponseEntity.ok(enrollmentService.getEnrollmentsByOffering(offeringId, pageable));
     }
 
+    // Single offering batch enroll (kept for backward compatibility)
     @PostMapping("/batch/{batchId}/offering/{offeringId}")
     @PreAuthorize("hasRole('STAFF_ADMIN')")
     public ResponseEntity<java.util.Map<String, Object>> enrollBatch(
             @PathVariable Long batchId,
             @PathVariable Long offeringId) {
         return ResponseEntity.ok(enrollmentService.enrollBatch(batchId, offeringId));
+    }
+
+    // Enroll a batch into one or more offerings
+    @PostMapping("/batch/{batchId}")
+    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    public ResponseEntity<java.util.Map<String, Object>> enrollBatchMultiple(
+            @PathVariable Long batchId,
+            @Valid @RequestBody BatchEnrollRequest request) {
+        return ResponseEntity.ok(enrollmentService.enrollBatchMultiple(batchId, request.getOfferingIds()));
     }
 }

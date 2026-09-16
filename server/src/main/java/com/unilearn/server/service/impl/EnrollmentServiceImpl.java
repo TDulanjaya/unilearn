@@ -19,7 +19,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -44,10 +47,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
+        // Prevent duplicate enrollments
         if (enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(request.getStudentId(), request.getOfferingId())) {
             throw new com.unilearn.server.exception.DuplicateEntryException("Student is already enrolled in this course offering");
         }
 
+        if (offering.getBatch() != null && student.getBatch() != null
+                && !offering.getBatch().getBatchId().equals(student.getBatch().getBatchId())) {
+            throw new ValidationException("Student's batch does not match this course offering's batch");
+        }
+
+        // Check capacity limit
         if (offering.getCapacity() != null) {
             long currentCount = courseOfferingRepository.countEnrollmentsByOfferingId(request.getOfferingId());
             if (currentCount >= offering.getCapacity()) {
@@ -137,7 +147,60 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional
-    public java.util.Map<String, Object> enrollBatch(Long batchId, Long offeringId) {
+    public Map<String, Object> enrollBatch(Long batchId, Long offeringId) {
+        if (offeringId == null) {
+            throw new ValidationException("Offering ID is required");
+        }
+        return enrollBatchIntoOneOffering(batchId, offeringId);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> enrollBatchMultiple(Long batchId, List<Long> offeringIds) {
+        if (batchId == null) {
+            throw new ValidationException("Batch ID is required");
+        }
+        if (offeringIds == null || offeringIds.isEmpty()) {
+            throw new ValidationException("At least one offering ID is required");
+        }
+
+        // Remove any duplicates while keeping selection order
+        List<Long> distinctOfferingIds = offeringIds.stream().distinct().toList();
+
+        List<Map<String, Object>> perOffering = new ArrayList<>();
+        int totalStudents = 0;
+        int newlyEnrolled = 0;
+        int alreadyEnrolled = 0;
+        int skippedCapacity = 0;
+
+        for (Long offeringId : distinctOfferingIds) {
+            Map<String, Object> result = enrollBatchIntoOneOffering(batchId, offeringId);
+            perOffering.add(result);
+            totalStudents = Math.max(totalStudents, (int) result.getOrDefault("totalStudents", 0));
+            newlyEnrolled += (int) result.getOrDefault("newlyEnrolled", 0);
+            alreadyEnrolled += (int) result.getOrDefault("alreadyEnrolled", 0);
+            skippedCapacity += (int) result.getOrDefault("skippedCapacity", 0);
+        }
+
+        String message = distinctOfferingIds.size() == 1
+                ? (String) perOffering.get(0).get("message")
+                : String.format("Enrolled batch into %d offering(s): %d newly enrolled, %d already enrolled%s",
+                        distinctOfferingIds.size(), newlyEnrolled, alreadyEnrolled,
+                        skippedCapacity > 0 ? String.format(", %d skipped (capacity)", skippedCapacity) : "");
+
+        Map<String, Object> aggregate = new LinkedHashMap<>();
+        aggregate.put("totalOfferings", distinctOfferingIds.size());
+        aggregate.put("totalStudents", totalStudents);
+        aggregate.put("newlyEnrolled", newlyEnrolled);
+        aggregate.put("alreadyEnrolled", alreadyEnrolled);
+        aggregate.put("skippedCapacity", skippedCapacity);
+        aggregate.put("message", message);
+        aggregate.put("perOffering", perOffering);
+        return aggregate;
+    }
+
+    // Helper to enroll all students of a batch into one offering with capacity check
+    private Map<String, Object> enrollBatchIntoOneOffering(Long batchId, Long offeringId) {
         if (batchId == null || offeringId == null) {
             throw new ValidationException("Batch ID and Offering ID are required");
         }
@@ -146,21 +209,38 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .orElseThrow(() -> new EntryNotFoundException("Course Offering not found with ID: " + offeringId));
 
         List<Student> students = studentRepository.findByBatch_BatchId(batchId);
+        String courseLabel = offering.getCourse() != null ? offering.getCourse().getCode() : "offering #" + offeringId;
+
         if (students.isEmpty()) {
-            return java.util.Map.of(
-                    "totalStudents", 0,
-                    "newlyEnrolled", 0,
-                    "alreadyEnrolled", 0,
-                    "message", "No students found in the selected batch."
-            );
+            Map<String, Object> empty = new LinkedHashMap<>();
+            empty.put("offeringId", offeringId);
+            empty.put("courseLabel", courseLabel);
+            empty.put("totalStudents", 0);
+            empty.put("newlyEnrolled", 0);
+            empty.put("alreadyEnrolled", 0);
+            empty.put("skippedCapacity", 0);
+            empty.put("message", "No students found in the selected batch.");
+            return empty;
         }
+
+        long currentCount = offering.getCapacity() != null
+                ? courseOfferingRepository.countEnrollmentsByOfferingId(offeringId)
+                : 0;
 
         int newlyEnrolled = 0;
         int alreadyEnrolled = 0;
+        int skippedCapacity = 0;
 
         for (Student student : students) {
+            // Skip if student is already in this offering
             if (enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(student.getStudentId(), offeringId)) {
                 alreadyEnrolled++;
+                continue;
+            }
+
+            // Stop enrolling if class is full
+            if (offering.getCapacity() != null && currentCount >= offering.getCapacity()) {
+                skippedCapacity++;
                 continue;
             }
 
@@ -172,15 +252,23 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                     .build();
             enrollmentRepository.save(enrollment);
             newlyEnrolled++;
+            currentCount++;
         }
 
-        String courseLabel = offering.getCourse() != null ? offering.getCourse().getCode() : "offering #" + offeringId;
-        return java.util.Map.of(
-                "totalStudents", students.size(),
-                "newlyEnrolled", newlyEnrolled,
-                "alreadyEnrolled", alreadyEnrolled,
-                "message", String.format("Successfully enrolled %d student(s) into %s (Already enrolled: %d)",
-                        newlyEnrolled, courseLabel, alreadyEnrolled)
-        );
+        String message = skippedCapacity > 0
+                ? String.format("Enrolled %d student(s) into %s (already enrolled: %d, skipped — capacity reached: %d)",
+                        newlyEnrolled, courseLabel, alreadyEnrolled, skippedCapacity)
+                : String.format("Successfully enrolled %d student(s) into %s (Already enrolled: %d)",
+                        newlyEnrolled, courseLabel, alreadyEnrolled);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("offeringId", offeringId);
+        result.put("courseLabel", courseLabel);
+        result.put("totalStudents", students.size());
+        result.put("newlyEnrolled", newlyEnrolled);
+        result.put("alreadyEnrolled", alreadyEnrolled);
+        result.put("skippedCapacity", skippedCapacity);
+        result.put("message", message);
+        return result;
     }
 }

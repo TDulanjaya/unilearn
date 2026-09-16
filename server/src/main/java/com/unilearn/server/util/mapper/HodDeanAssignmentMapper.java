@@ -22,6 +22,7 @@ public class HodDeanAssignmentMapper {
                 .faculty(faculty)
                 .department(department)
                 .active(true)
+                .previousRole(user != null ? user.getRole() : null)
                 .build();
     }
 

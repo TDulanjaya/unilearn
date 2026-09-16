@@ -73,7 +73,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/health", "/api/health", "/api/v1/health", "/api/v1/health/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/files/download/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/events/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()

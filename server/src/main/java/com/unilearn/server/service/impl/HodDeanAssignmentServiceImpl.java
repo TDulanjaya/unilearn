@@ -72,6 +72,11 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
 
         HodDeanAssignment assignment = hodDeanAssignmentMapper.toHodDeanAssignment(request, user, faculty, department);
         HodDeanAssignment saved = hodDeanAssignmentRepository.save(assignment);
+
+        // Update role so authorities match the new assignment
+        user.setRole("hod_dean");
+        userRepository.save(user);
+
         return hodDeanAssignmentMapper.toHodDeanAssignmentResponse(saved);
     }
 
@@ -90,6 +95,15 @@ public class HodDeanAssignmentServiceImpl implements HodDeanAssignmentService {
         assignment.setEndDate(endDate);
 
         HodDeanAssignment updated = hodDeanAssignmentRepository.save(assignment);
+
+        // Revert user role back to previous role or default to lecturer
+        User user = assignment.getUser();
+        if (user != null) {
+            String restoreTo = assignment.getPreviousRole() != null ? assignment.getPreviousRole() : "lecturer";
+            user.setRole(restoreTo);
+            userRepository.save(user);
+        }
+
         return hodDeanAssignmentMapper.toHodDeanAssignmentResponse(updated);
     }
 
