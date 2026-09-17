@@ -51,6 +51,6 @@ public class HodDeanAssignment {
     private LocalDate endDate;
 
     // Stores role before promotion so revoke can restore it
-    @Column(length = 20)
+    @jakarta.persistence.Transient
     private String previousRole;
 }

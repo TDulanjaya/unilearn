@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/DataTable";
 import FileDropzone from "@/components/FileDropzone";
+import { useAuth } from "@/context/AuthContext";
 
 interface UserRecord {
   id: string;
@@ -12,6 +13,7 @@ interface UserRecord {
   phone?: string;
   role: string;
   department?: string;
+  facultyName?: string;
   batch?: string;
   studentNumber?: string;
   designation?: string;
@@ -38,11 +40,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 const VALID_ROLES = ["Student", "Lecturer", "Guest Lecturer", "HOD/Dean", "Staff/Admin"];
+const FILTER_ROLES = ["Super Admin", "Staff/Admin", "Student", "Lecturer", "Guest Lecturer", "HOD/Dean"];
 
 function formatRoleFromBackend(r: string): string {
   if (!r) return "Student";
   const normalized = r.trim().toUpperCase().replace(/[\s\/-]+/g, "_");
   switch (normalized) {
+    case "SUPER_ADMIN":
+      return "Super Admin";
     case "STUDENT":
       return "Student";
     case "LECTURER":
@@ -64,6 +69,8 @@ function formatRoleFromBackend(r: string): string {
 
 export default function UserManagementPage() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role?.toLowerCase() === "super_admin";
 
   const { data: usersResponse, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["users"],
@@ -96,8 +103,10 @@ export default function UserManagementPage() {
         email: u.email || "",
         phone: u.phone || "N/A",
         role: formatRoleFromBackend(u.role),
-        department: u.departmentName || "Software Eng.",
-        status: u.active ? "Active" : "Locked",
+        department: u.departmentName || (u.facultyName ? u.facultyName : (u.role?.toLowerCase() === "super_admin" ? "Institution Wide" : "—")),
+        facultyName: u.facultyName,
+        scopeLevel: u.scopeLevel,
+        status: (u.active ?? (u.status?.toLowerCase() === "active")) ? "Active" : "Locked",
       }))
     : INITIAL_USERS;
 
@@ -110,7 +119,6 @@ export default function UserManagementPage() {
   const [roleFilter, setRoleFilter] = useState("All roles");
   const [toastMessage, setToastMessage] = useState("");
 
-  
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [editPassword, setEditPassword] = useState("");
@@ -135,6 +143,7 @@ function generateSmartPassword(name: string, role: string): string {
   const [newPassword, setNewPassword] = useState("");
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [newRole, setNewRole] = useState("Student");
+  const [adminScope, setAdminScope] = useState<"INSTITUTION" | "FACULTY">("INSTITUTION");
   
   const [selectedDeptId, setSelectedDeptId] = useState<string>("");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
@@ -165,7 +174,6 @@ function generateSmartPassword(name: string, role: string): string {
     setNewPassword(generated);
   };
 
-  
   const [parsedRows, setParsedRows] = useState<CsvValidationRow[] | null>(null);
 
   const showToast = (msg: string) => {
@@ -177,6 +185,7 @@ function generateSmartPassword(name: string, role: string): string {
     if (!r) return "STUDENT";
     const normalized = r.trim().toUpperCase().replace(/[\s\/-]+/g, "_");
     switch (normalized) {
+      case "SUPER_ADMIN": return "SUPER_ADMIN";
       case "STUDENT": return "STUDENT";
       case "LECTURER": return "LECTURER";
       case "GUEST_LECTURER": return "GUEST_LECTURER";
@@ -257,7 +266,12 @@ function generateSmartPassword(name: string, role: string): string {
       payload.departmentId = Number(selectedDeptId) || null;
       payload.designation = designation;
     } else if (roleName === "STAFF_ADMIN") {
-      payload.departmentId = Number(selectedDeptId) || null;
+      if (adminScope === "FACULTY") {
+        payload.facultyId = Number(selectedFacultyId) || null;
+        payload.scopeType = "FACULTY";
+      } else {
+        payload.scopeType = "INSTITUTION";
+      }
     } else if (roleName === "HOD_DEAN") {
       payload.scopeType = scopeType;
       if (scopeType === "department") {
@@ -270,13 +284,17 @@ function generateSmartPassword(name: string, role: string): string {
     try {
       const createdRes: any = await createMutation.mutateAsync(payload);
 
+      const facultyObj = facultiesList.find((f: any) => String(f.facultyId) === String(selectedFacultyId));
       const deptObj = departmentsList.find((d: any) => String(d.departmentId) === String(selectedDeptId));
+      const isStaffFaculty = roleName === "STAFF_ADMIN" && adminScope === "FACULTY";
       const newUser: UserRecord = {
         id: String(createdRes?.userId || Date.now()),
         fullName: createdRes?.fullName || newFullName.trim(),
         email: createdRes?.email || newEmail.trim(),
         role: newRole,
-        department: deptObj ? deptObj.name : "N/A",
+        department: isStaffFaculty && facultyObj ? facultyObj.name : (deptObj ? deptObj.name : "N/A"),
+        facultyName: isStaffFaculty && facultyObj ? facultyObj.name : undefined,
+        scopeLevel: roleName === "STAFF_ADMIN" ? adminScope : undefined,
         status: "Active",
       };
 
@@ -357,6 +375,7 @@ function generateSmartPassword(name: string, role: string): string {
   };
 
   const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
+  const [conflictUser, setConflictUser] = useState<UserRecord | null>(null);
 
   const handleSaveEdit = async () => {
     if (!editingUser) return;
@@ -398,7 +417,18 @@ function generateSmartPassword(name: string, role: string): string {
         showToast(`User ${user.fullName} deleted successfully from database.`);
       } catch (err: any) {
         console.error("Failed to delete user in backend:", err);
-        showToast(`Error: ${err.message || "Failed to delete user."}`);
+        const isReferenced = err.message && (
+          err.message.includes("references it") ||
+          err.message.includes("Deactivate it instead") ||
+          err.message.includes("can't be deleted") ||
+          err.message.includes("409")
+        );
+        if (isReferenced) {
+          setDeletingUser(null);
+          setConflictUser(user);
+        } else {
+          showToast(`Error: ${err.message || "Failed to delete user."}`);
+        }
       }
     }
   };
@@ -446,6 +476,27 @@ function generateSmartPassword(name: string, role: string): string {
       header: "System Role",
       accessor: (row: UserRecord) => {
         const displayRole = formatRoleFromBackend(row.role);
+        if (displayRole === "Super Admin") {
+          return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">
+              <i className="ti ti-crown text-xs"></i>
+              Super Admin
+            </span>
+          );
+        }
+        if (displayRole === "Staff/Admin") {
+          const facultyTag = row.facultyName
+            ? `Admin (${row.facultyName})`
+            : row.scopeLevel === "FACULTY"
+            ? "Faculty Admin"
+            : "Institution Admin";
+          return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+              <i className="ti ti-shield text-xs"></i>
+              {facultyTag}
+            </span>
+          );
+        }
         return (
           <span
             className={`badge ${
@@ -484,38 +535,48 @@ function generateSmartPassword(name: string, role: string): string {
     },
     {
       header: "Actions",
-      accessor: (row: UserRecord) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setEditingUser({ ...row, role: formatRoleFromBackend(row.role) })}
-            className="btn-secondary text-xs !py-1 flex items-center gap-1"
-          >
-            <i className="ti ti-edit"></i> Edit Profile & Role
-          </button>
-          {row.status === "Active" && (
+      accessor: (row: UserRecord) => {
+        const isRowSuperAdmin = row.role === "Super Admin" || row.role?.toLowerCase() === "super_admin";
+        if (isRowSuperAdmin) {
+          return (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-400 px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/25">
+              <i className="ti ti-lock"></i> Protected Account
+            </span>
+          );
+        }
+        return (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => handleDeactivateUser(row)}
-              className="px-2.5 py-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-xs font-bold transition-colors flex items-center gap-1"
-              title="Deactivate Account (Recommended)"
+              onClick={() => setEditingUser({ ...row, role: formatRoleFromBackend(row.role) })}
+              className="btn-secondary text-xs !py-1 flex items-center gap-1"
             >
-              <i className="ti ti-power"></i> Deactivate
+              <i className="ti ti-edit"></i> Edit Profile & Role
             </button>
-          )}
-          <button
-            onClick={() => setDeletingUser(row)}
-            className="px-2.5 py-1 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-bold transition-colors flex items-center gap-1"
-            title="Delete User"
-          >
-            <i className="ti ti-trash"></i> Delete
-          </button>
-        </div>
-      ),
+            {row.status === "Active" && (
+              <button
+                onClick={() => handleDeactivateUser(row)}
+                className="px-2.5 py-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-xs font-bold transition-colors flex items-center gap-1"
+                title="Deactivate Account (Recommended)"
+              >
+                <i className="ti ti-power"></i> Deactivate
+              </button>
+            )}
+            <button
+              onClick={() => setDeletingUser(row)}
+              className="px-2.5 py-1 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-bold transition-colors flex items-center gap-1"
+              title="Delete User"
+            >
+              <i className="ti ti-trash"></i> Delete
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--background)] text-[var(--on-background)]">
-      <Sidebar role="admin" name="R. Jayawardena" sub="Staff Admin · Institution-wide" />
+      <Sidebar role="admin" />
       <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full space-y-6">
         {toastMessage && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce" style={{ minWidth: '320px', boxShadow: '0 8px 32px rgba(16,185,129,0.4)' }}>
@@ -541,7 +602,7 @@ function generateSmartPassword(name: string, role: string): string {
               className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
             >
               <option value="All roles">Filter: All Roles</option>
-              {VALID_ROLES.map((r) => (
+              {FILTER_ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
@@ -595,48 +656,116 @@ function generateSmartPassword(name: string, role: string): string {
                     onChange={(e) => setNewRole(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
                   >
-                    {VALID_ROLES.map((r) => (
+                    {(isSuperAdmin ? VALID_ROLES : VALID_ROLES.filter((r) => r !== "Staff/Admin")).map((r) => (
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
                 </div>
 
-                {newRole === "HOD/Dean" && scopeType === "faculty" ? (
-                  <div>
-                    <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Faculty</label>
-                    <select
-                      value={selectedFacultyId}
-                      onChange={(e) => setSelectedFacultyId(e.target.value)}
-                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
-                      required
-                    >
-                      <option value="">Select Faculty</option>
-                      {facultiesList.map((f: any) => (
-                        <option key={f.facultyId} value={f.facultyId}>
-                          {f.name} ({f.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Department</label>
-                    <select
-                      value={selectedDeptId}
-                      onChange={(e) => setSelectedDeptId(e.target.value)}
-                      className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
-                      required
-                    >
-                      <option value="">Select Department</option>
-                      {departmentsList.map((d: any) => (
-                        <option key={d.departmentId} value={d.departmentId}>
-                          {d.name} ({d.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {newRole !== "Staff/Admin" && (
+                  newRole === "HOD/Dean" && scopeType === "faculty" ? (
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Faculty</label>
+                      <select
+                        value={selectedFacultyId}
+                        onChange={(e) => setSelectedFacultyId(e.target.value)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                        required
+                      >
+                        <option value="">Select Faculty</option>
+                        {facultiesList.map((f: any) => (
+                          <option key={f.facultyId} value={f.facultyId}>
+                            {f.name} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">Department</label>
+                      <select
+                        value={selectedDeptId}
+                        onChange={(e) => setSelectedDeptId(e.target.value)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                        required
+                      >
+                        <option value="">Select Department</option>
+                        {departmentsList.map((d: any) => (
+                          <option key={d.departmentId} value={d.departmentId}>
+                            {d.name} ({d.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
                 )}
               </div>
+
+              {!isSuperAdmin && (
+                <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-500 text-[11px] font-medium flex items-center gap-2">
+                  <i className="ti ti-shield-alert text-sm shrink-0"></i>
+                  <span>Administrator provisioning is restricted to Super Administrator.</span>
+                </div>
+              )}
+
+              {newRole === "Staff/Admin" && isSuperAdmin && (
+                <div className="p-3.5 rounded-xl border border-blue-500/30 bg-blue-500/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold text-blue-400 flex items-center gap-1.5">
+                      <i className="ti ti-shield-lock text-sm"></i> Staff Administrator Scope & Faculty Assignment
+                    </p>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      Super Admin Authorized
+                    </span>
+                  </div>
+
+                  <div className="flex gap-4 p-2 bg-[var(--surface-container-lowest)] rounded-xl border border-[var(--outline-variant)]">
+                    <label className="flex items-center gap-1.5 text-xs text-[var(--on-surface)] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="adminScopeType"
+                        value="INSTITUTION"
+                        checked={adminScope === "INSTITUTION"}
+                        onChange={() => setAdminScope("INSTITUTION")}
+                        className="radio"
+                      />
+                      Institution Administrator (Campus-wide)
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-[var(--on-surface)] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="adminScopeType"
+                        value="FACULTY"
+                        checked={adminScope === "FACULTY"}
+                        onChange={() => setAdminScope("FACULTY")}
+                        className="radio"
+                      />
+                      Faculty Administrator
+                    </label>
+                  </div>
+
+                  {adminScope === "FACULTY" && (
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1 text-[var(--on-surface-variant)]">
+                        Target Faculty (e.g. Faculty of Computing)
+                      </label>
+                      <select
+                        value={selectedFacultyId}
+                        onChange={(e) => setSelectedFacultyId(e.target.value)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                        required
+                      >
+                        <option value="">Select Target Faculty</option>
+                        {facultiesList.map((f: any) => (
+                          <option key={f.facultyId} value={f.facultyId}>
+                            {f.name} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {newRole === "Student" && (
                 <div className="p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)]/50 space-y-2">
@@ -865,15 +994,21 @@ function generateSmartPassword(name: string, role: string): string {
 
               <div>
                 <label className="block font-semibold mb-1 text-[var(--on-surface)]">System Role</label>
-                <select
-                  value={editingUser.role}
-                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
-                >
-                  {VALID_ROLES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+                {editingUser.role === "Super Admin" ? (
+                  <div className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 font-bold text-xs flex items-center gap-1.5">
+                    <i className="ti ti-crown"></i> Super Administrator (Fixed Role)
+                  </div>
+                ) : (
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
+                  >
+                    {(isSuperAdmin ? VALID_ROLES : VALID_ROLES.filter((r) => r !== "Staff/Admin")).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="p-3.5 rounded-xl border border-[var(--tertiary)]/30 bg-[var(--surface-container-low)] space-y-2.5">
@@ -921,18 +1056,73 @@ function generateSmartPassword(name: string, role: string): string {
 
       {deletingUser && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-sm w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-red-500/30">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-red-500/30">
             <div className="flex items-center gap-3 text-red-500">
               <i className="ti ti-alert-triangle text-2xl"></i>
-              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Confirm Delete User</h3>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Manage User Account</h3>
             </div>
             <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
-              Are you sure you want to permanently delete <b>{deletingUser.fullName}</b> ({deletingUser.email})? This action cannot be undone.
+              Choose an action for <b>{deletingUser.fullName}</b> ({deletingUser.email}):
             </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
+
+            <div className="p-3.5 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--primary)]">
+                <i className="ti ti-shield-check"></i> Recommended: Deactivate Account
+              </div>
+              <p className="text-[11px] text-[var(--on-surface-variant)] leading-relaxed">
+                Deactivating immediately disables login and locks access while safely preserving all historical academic records (exams, grades, announcements).
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
               <button onClick={() => setDeletingUser(null)} className="btn-secondary text-xs">Cancel</button>
-              <button onClick={() => handleDeleteUser(deletingUser)} className="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 shadow-md">
-                Delete Account
+              <button
+                onClick={() => {
+                  const target = deletingUser;
+                  setDeletingUser(null);
+                  handleDeactivateUser(target);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-[var(--primary)] text-white text-xs font-bold hover:opacity-90 shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <i className="ti ti-user-off"></i> Deactivate Account
+              </button>
+              <button
+                onClick={() => handleDeleteUser(deletingUser)}
+                className="px-3.5 py-2 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <i className="ti ti-trash"></i> Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conflictUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-amber-500/40">
+            <div className="flex items-center gap-3 text-amber-500">
+              <i className="ti ti-database-exclamation text-2xl"></i>
+              <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Linked Records Detected</h3>
+            </div>
+            <div className="text-xs text-[var(--on-surface-variant)] space-y-2 leading-relaxed">
+              <p>
+                <b>{conflictUser.fullName}</b> cannot be permanently deleted because active or historical academic records in the database still reference this account.
+              </p>
+              <p className="text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 p-2.5 rounded-lg border border-amber-500/20">
+                To protect relational integrity and keep academic records intact, you can <b>Deactivate</b> this account instead. This immediately revokes system login privileges and locks the account.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
+              <button onClick={() => setConflictUser(null)} className="btn-secondary text-xs">Dismiss</button>
+              <button
+                onClick={() => {
+                  const target = conflictUser;
+                  setConflictUser(null);
+                  handleDeactivateUser(target);
+                }}
+                className="px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-xs font-bold hover:opacity-90 shadow-md flex items-center gap-1.5"
+              >
+                <i className="ti ti-user-off"></i> Deactivate Account Now
               </button>
             </div>
           </div>

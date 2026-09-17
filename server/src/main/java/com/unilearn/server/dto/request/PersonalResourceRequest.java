@@ -18,7 +18,7 @@ import lombok.ToString;
 @Builder
 public class PersonalResourceRequest {
 
-    @NotNull(message = "Student ID is required")
+    // Derived from JWT principal in controller
     private Long studentId;
 
     @NotNull(message = "Offering ID is required")

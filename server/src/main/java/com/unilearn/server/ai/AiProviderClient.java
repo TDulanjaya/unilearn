@@ -34,10 +34,10 @@ public class AiProviderClient {
 
     public AiProviderClient(
             @Value("${gemini.api.key:${GEMINI_API_KEY:}}") String apiKey,
-            @Value("${gemini.api.model:${GEMINI_API_MODEL:gemini-2.5-flash}}") String apiModel,
+            @Value("${gemini.api.model:${GEMINI_API_MODEL:gemini-3.6-flash}}") String apiModel,
             @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper) {
         this.apiKey = apiKey != null ? apiKey.trim() : "";
-        this.apiModel = apiModel != null && !apiModel.isBlank() ? apiModel.trim() : "gemini-2.5-flash";
+        this.apiModel = apiModel != null && !apiModel.isBlank() ? apiModel.trim() : "gemini-3.6-flash";
         this.restTemplate = new RestTemplate();
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
     }

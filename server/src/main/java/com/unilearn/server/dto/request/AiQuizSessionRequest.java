@@ -19,8 +19,7 @@ import lombok.ToString;
 @Builder
 public class AiQuizSessionRequest {
 
-    @NotNull(message = "Student ID is required")
-    @Positive(message = "Student ID must be positive")
+    // Derived from JWT principal in controller
     private Long studentId;
 
     @NotNull(message = "Offering ID is required")

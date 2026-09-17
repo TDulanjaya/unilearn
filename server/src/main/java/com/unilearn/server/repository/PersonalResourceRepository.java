@@ -16,4 +16,6 @@ public interface PersonalResourceRepository extends JpaRepository<PersonalResour
     Page<PersonalResource> findByStudent_StudentId(Long studentId, Pageable pageable);
 
     List<PersonalResource> findByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId);
+
+    Page<PersonalResource> findByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId, Pageable pageable);
 }

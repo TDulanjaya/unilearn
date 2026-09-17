@@ -180,7 +180,19 @@ export default function LecturerSchedulePage() {
   const handleSaveQrAttendance = async (updatedAttendance: Record<string, AttendanceStatus>) => {
     if (!activeQrSession) return;
     try {
-      await closeSessionMutation.mutateAsync(Number(activeQrSession.id));
+      const sessionId = Number(activeQrSession.id);
+      const records = Object.entries(updatedAttendance).map(([studentId, status]) => ({
+        studentId: Number(studentId),
+        status,
+      }));
+
+      if (records.length > 0) {
+        await bulkMarkMutation.mutateAsync({
+          sessionId,
+          records,
+        });
+      }
+
       setSavedSlotIds((prev) => ({ ...prev, [activeQrSession.id]: true }));
       setActiveQrSession(null);
       alert("Attendance session saved and closed successfully!");
@@ -211,7 +223,7 @@ export default function LecturerSchedulePage() {
       const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
       const endTime = end.toTimeString().split(" ")[0];
 
-      // 1. Create temporary session
+      // 1. Create or retrieve active session for today
       const session = await startSessionMutation.mutateAsync({
         offeringId: selectedAttendanceSlot.offeringId,
         sessionDate,
@@ -230,9 +242,6 @@ export default function LecturerSchedulePage() {
         sessionId: session.sessionId,
         records,
       });
-
-      // 3. Close the session
-      await closeSessionMutation.mutateAsync(session.sessionId);
 
       setSavedSlotIds((prev) => ({ ...prev, [selectedAttendanceSlot.id]: true }));
       setSelectedAttendanceSlot(null);

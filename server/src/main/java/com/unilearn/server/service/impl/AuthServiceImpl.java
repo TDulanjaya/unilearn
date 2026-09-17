@@ -80,8 +80,17 @@ public class AuthServiceImpl implements AuthService {
         }
         String requestedRole = request.getRole() != null ? request.getRole().toUpperCase() : "";
         if (!"LECTURER".equals(requestedRole) && !"HOD_DEAN".equals(requestedRole) 
-                && !"STAFF_ADMIN".equals(requestedRole) && !"GUEST_LECTURER".equals(requestedRole)) {
-            throw new ValidationException("Role must be one of: LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER");
+                && !"STAFF_ADMIN".equals(requestedRole) && !"GUEST_LECTURER".equals(requestedRole)
+                && !"SUPER_ADMIN".equals(requestedRole)) {
+            throw new ValidationException("Role must be one of: LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER, SUPER_ADMIN");
+        }
+        if ("STAFF_ADMIN".equals(requestedRole) || "SUPER_ADMIN".equals(requestedRole)) {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
+            if (!isSuperAdmin) {
+                throw new org.springframework.security.access.AccessDeniedException("Only Super Administrator is authorized to create Administrator accounts.");
+            }
         }
         return createUserWithRole(request, requestedRole);
     }
@@ -139,11 +148,22 @@ public class AuthServiceImpl implements AuthService {
                     .isGuest("GUEST_LECTURER".equals(roleName))
                     .build();
             lecturerRepository.save(lecturer);
-        } else if ("STAFF_ADMIN".equals(roleName)) {
+        } else if ("STAFF_ADMIN".equals(roleName) || "SUPER_ADMIN".equals(roleName)) {
+            Faculty faculty = null;
+            String scope = request.getScopeType() != null ? request.getScopeType().toUpperCase() : "INSTITUTION";
+            if (request.getFacultyId() != null) {
+                faculty = facultyRepository.findById(request.getFacultyId()).orElse(null);
+                if (faculty != null) {
+                    scope = "FACULTY";
+                }
+            } else if ("DEPARTMENT".equalsIgnoreCase(request.getScopeType()) && dept != null) {
+                scope = "DEPARTMENT";
+            }
             StaffAdmin staffAdmin = StaffAdmin.builder()
                     .user(saved)
-                    .scopeLevel("INSTITUTION")
-                    .department(dept)
+                    .scopeLevel(scope)
+                    .faculty(faculty)
+                    .department("DEPARTMENT".equalsIgnoreCase(scope) ? dept : null)
                     .build();
             staffAdminRepository.save(staffAdmin);
         } else if ("HOD_DEAN".equals(roleName)) {

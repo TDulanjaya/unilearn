@@ -28,9 +28,17 @@ public class AttendanceRecordMapper {
         if (record == null) {
             throw new ValidationException("AttendanceRecord cannot be null");
         }
+        com.unilearn.server.model.CourseOffering offering = (record.getSession() != null) ? record.getSession().getCourseOffering() : null;
+        String courseCode = (offering != null && offering.getCourse() != null) ? offering.getCourse().getCode() : null;
+        String courseName = (offering != null && offering.getCourse() != null) ? offering.getCourse().getTitle() : null;
+
         return AttendanceRecordResponse.builder()
                 .recordId(record.getRecordId())
                 .sessionId(record.getSession() != null ? record.getSession().getSessionId() : null)
+                .offeringId(offering != null ? offering.getOfferingId() : null)
+                .courseCode(courseCode)
+                .courseName(courseName)
+                .sessionDate(record.getSession() != null ? record.getSession().getSessionDate() : null)
                 .studentId(record.getStudent() != null ? record.getStudent().getStudentId() : null)
                 .studentName(record.getStudent() != null && record.getStudent().getUser() != null ? record.getStudent().getUser().getFullName() : null)
                 .status(record.getStatus())

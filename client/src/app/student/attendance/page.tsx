@@ -41,11 +41,17 @@ export default function StudentAttendancePage() {
   });
 
   const courses: AttendanceCourse[] = (enrollments || []).map((e: any) => {
-    const courseRecords = attendanceRecords?.filter((r: any) => r.session?.offeringId === e.offeringId) || [];
+    const courseRecords =
+      attendanceRecords?.filter(
+        (r: any) =>
+          r.offeringId === e.offeringId ||
+          r.session?.offeringId === e.offeringId ||
+          r.courseCode === e.courseCode
+      ) || [];
     const presentRecords = courseRecords.filter((r: any) => r.status === "Present");
     const attended = presentRecords.length;
-    const total = courseRecords.length || 25; // fallback total to 25 if no sessions marked yet
-    const percentage = Math.round((attended / total) * 100);
+    const total = courseRecords.length > 0 ? courseRecords.length : 1;
+    const percentage = courseRecords.length > 0 ? Math.round((attended / total) * 100) : 0;
 
     return {
       offeringId: e.offeringId,
@@ -173,6 +179,57 @@ export default function StudentAttendancePage() {
           ))
         )}
       </div>
+
+      {attendanceRecords && attendanceRecords.length > 0 && (
+        <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-bold text-base text-[var(--on-surface)] flex items-center gap-2">
+              <i className="ti ti-history text-[var(--tertiary)]"></i>
+              Attendance Log & Verification History
+            </h3>
+            <span className="badge badge-outline text-xs">
+              {attendanceRecords.length} Record{attendanceRecords.length > 1 ? "s" : ""} Logged
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] uppercase tracking-wider text-[10px]">
+                  <th className="py-2.5 px-3">Session Date</th>
+                  <th className="py-2.5 px-3">Course / Module</th>
+                  <th className="py-2.5 px-3">Session ID</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">Verified At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--outline-variant)]">
+                {attendanceRecords.map((rec: any) => (
+                  <tr key={rec.recordId} className="hover:bg-[var(--surface-container-high)]/40 transition-colors">
+                    <td className="py-3 px-3 font-semibold text-[var(--on-surface)]">
+                      {rec.sessionDate || (rec.markedAt ? new Date(rec.markedAt).toLocaleDateString() : "Today")}
+                    </td>
+                    <td className="py-3 px-3 text-[var(--on-surface)]">
+                      <span className="font-bold mr-1">{rec.courseCode || "SE308.3"}</span>
+                      <span className="text-[var(--on-surface-variant)]">{rec.courseName || "Software Process Management"}</span>
+                    </td>
+                    <td className="py-3 px-3 font-mono text-[var(--on-surface-variant)]">
+                      #{rec.sessionId}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`badge ${rec.status === "Present" ? "badge-success" : "badge-warning"} text-[10px]`}>
+                        {rec.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-[var(--on-surface-variant)] font-mono text-[11px]">
+                      {rec.markedAt ? new Date(rec.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {isCheckInModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">

@@ -18,13 +18,13 @@ import lombok.ToString;
 @Builder
 public class AiChatMessageRequest {
 
-    @NotNull(message = "Student ID is required")
+    // Derived from JWT principal in controller
     private Long studentId;
 
     @NotNull(message = "Offering ID is required")
     private Long offeringId;
 
-    @NotBlank(message = "Role is required")
+    // Defaults to 'user' if not specified
     @Size(max = 10, message = "Role must not exceed 10 characters")
     private String role;
 

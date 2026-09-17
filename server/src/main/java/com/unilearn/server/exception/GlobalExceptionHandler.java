@@ -63,7 +63,9 @@ public class GlobalExceptionHandler {
         log.error("Data integrity violation: ", ex);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", "Conflict");
+        body.put("code", "REFERENCED_DATA_CONFLICT");
         body.put("message", "This record can't be deleted because other data still references it. Deactivate it instead.");
+        body.put("canDeactivate", true);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 

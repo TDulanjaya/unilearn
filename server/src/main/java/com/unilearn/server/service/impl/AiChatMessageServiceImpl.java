@@ -60,8 +60,8 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
         List<AiChatMessage> priorMessages = aiChatMessageRepository
                 .findByStudent_StudentIdAndCourseOffering_OfferingIdOrderByCreatedAtAsc(student.getStudentId(), offering.getOfferingId());
 
-        // 3. Fetch course material context
-        String courseContext = aiGroundingContextHelper.fetchCourseContext(offering.getOfferingId(), "full_course");
+        // 3. Fetch course material context (including student personal resources)
+        String courseContext = aiGroundingContextHelper.fetchCourseContext(offering.getOfferingId(), student.getStudentId(), "full_course");
 
         // 4. Generate grounded AI response
         String aiAnswer = aiProviderClient.generateChatAnswer(courseContext, "full_course", priorMessages, request.getContent());

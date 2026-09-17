@@ -134,20 +134,39 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
             throw new ValidationException("Session code is required");
         }
 
-        String[] parts = sessionCode.split("-");
-        if (parts.length < 2) {
-            throw new ValidationException("Invalid session code format");
+        Long sessionId = null;
+        String trimmed = sessionCode.trim();
+        if (trimmed.contains("-")) {
+            String[] parts = trimmed.split("-");
+            if (parts.length >= 2) {
+                try {
+                    sessionId = Long.parseLong(parts[1]);
+                } catch (NumberFormatException ignored) {}
+            }
+            if (sessionId == null || !attendanceSessionRepository.existsById(sessionId)) {
+                for (String part : parts) {
+                    try {
+                        long candidate = Long.parseLong(part);
+                        if (attendanceSessionRepository.existsById(candidate)) {
+                            sessionId = candidate;
+                            break;
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        } else {
+            try {
+                sessionId = Long.parseLong(trimmed);
+            } catch (NumberFormatException ignored) {}
         }
 
-        Long sessionId;
-        try {
-            sessionId = Long.parseLong(parts[1]);
-        } catch (NumberFormatException e) {
-            throw new ValidationException("Invalid session ID in code");
+        if (sessionId == null) {
+            throw new ValidationException("Invalid session code or session ID not found");
         }
 
-        AttendanceSession session = attendanceSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new EntryNotFoundException("Attendance session not found with ID: " + sessionId));
+        final Long resolvedSessionId = sessionId;
+        AttendanceSession session = attendanceSessionRepository.findById(resolvedSessionId)
+                .orElseThrow(() -> new EntryNotFoundException("Attendance session not found with ID: " + resolvedSessionId));
 
         if (!session.getSessionDate().equals(java.time.LocalDate.now())) {
             throw new ValidationException("This attendance session is not active today");
@@ -157,7 +176,7 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
                 .orElseThrow(() -> new EntryNotFoundException("Student profile not found for ID: " + studentId));
 
         // Check if already checked in
-        java.util.Optional<AttendanceRecord> existingOpt = attendanceRecordRepository.findBySession_SessionIdAndStudent_StudentId(sessionId, studentId);
+        java.util.Optional<AttendanceRecord> existingOpt = attendanceRecordRepository.findBySession_SessionIdAndStudent_StudentId(resolvedSessionId, studentId);
         if (existingOpt.isPresent()) {
             return attendanceRecordMapper.toAttendanceRecordResponse(existingOpt.get());
         }

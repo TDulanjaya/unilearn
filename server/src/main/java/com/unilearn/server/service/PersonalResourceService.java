@@ -19,4 +19,6 @@ public interface PersonalResourceService {
     PersonalResourceResponse getResourceById(Long resourceId);
 
     PageResponseDTO<PersonalResourceResponse> getResourcesByUser(Long userId, Pageable pageable);
+
+    PageResponseDTO<PersonalResourceResponse> getResourcesByStudentAndOffering(Long userId, Long offeringId, Pageable pageable);
 }

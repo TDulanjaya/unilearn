@@ -43,7 +43,10 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
                 .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getMarkedByLecturerId()));
 
         if (request.getSessionDate() != null && attendanceSessionRepository.existsByCourseOffering_OfferingIdAndSessionDate(request.getOfferingId(), request.getSessionDate())) {
-            throw new com.unilearn.server.exception.DuplicateEntryException("Attendance session already exists for offering ID " + request.getOfferingId() + " on date " + request.getSessionDate());
+            List<AttendanceSession> existing = attendanceSessionRepository.findByCourseOffering_OfferingIdAndSessionDate(request.getOfferingId(), request.getSessionDate());
+            if (!existing.isEmpty()) {
+                return attendanceSessionMapper.toAttendanceSessionResponse(existing.get(0));
+            }
         }
 
         AttendanceSession session = attendanceSessionMapper.toAttendanceSession(request, offering, lecturer);

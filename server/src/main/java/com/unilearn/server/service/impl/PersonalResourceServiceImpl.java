@@ -126,4 +126,32 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
                 .dataList(content)
                 .build();
     }
+
+    @Override
+    public PageResponseDTO<PersonalResourceResponse> getResourcesByStudentAndOffering(Long userId, Long offeringId, Pageable pageable) {
+        if (userId == null) {
+            throw new ValidationException("User ID cannot be null");
+        }
+        if (offeringId == null) {
+            throw new ValidationException("Offering ID cannot be null");
+        }
+        if (pageable == null) {
+            throw new ValidationException("Pageable parameter cannot be null");
+        }
+        if (!studentRepository.existsById(userId)) {
+            throw new EntryNotFoundException("Student not found with ID: " + userId);
+        }
+
+        Page<PersonalResource> page = personalResourceRepository
+                .findByStudent_StudentIdAndCourseOffering_OfferingId(userId, offeringId, pageable);
+        List<PersonalResourceResponse> content = page.getContent()
+                .stream()
+                .map(personalResourceMapper::toPersonalResourceResponse)
+                .toList();
+
+        return PageResponseDTO.<PersonalResourceResponse>builder()
+                .dataCount((int) page.getTotalElements())
+                .dataList(content)
+                .build();
+    }
 }

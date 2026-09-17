@@ -24,4 +24,14 @@ public class UserResponse {
     private String role;
     private String status;
     private LocalDateTime createdAt;
+    private String scopeLevel;
+    private Long facultyId;
+    private String facultyName;
+    private Long departmentId;
+    private String departmentName;
+
+    public boolean isActive() {
+        return "active".equalsIgnoreCase(status);
+    }
 }
+

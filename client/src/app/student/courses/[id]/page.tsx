@@ -52,19 +52,29 @@ function CourseHubContent() {
     enabled: !isNaN(numericId),
   });
 
-  const fallbackCourse = COURSES[courseId] || COURSES["1"];
+  const defaultFallbackCourse: Course = {
+    code: "SE308.3",
+    title: "Course Workspace",
+    lecturer: "Lecturer",
+    dept: "Department",
+    progress: 0,
+  };
+
+  const fallbackCourse: Course = COURSES[courseId] || COURSES["1"] || defaultFallbackCourse;
+
   const course: Course = offeringResponse
     ? {
-        code: offeringResponse.courseCode || fallbackCourse.code,
-        title: offeringResponse.courseName || offeringResponse.courseTitle || fallbackCourse.title,
-        lecturer: offeringResponse.primaryLecturerName || offeringResponse.lecturerName || fallbackCourse.lecturer,
-        dept: offeringResponse.departmentName || fallbackCourse.dept,
-        progress: fallbackCourse.progress,
+        code: offeringResponse.courseCode || fallbackCourse.code || "SE308.3",
+        title: offeringResponse.courseName || offeringResponse.courseTitle || fallbackCourse.title || "Course Details",
+        lecturer: offeringResponse.primaryLecturerName || offeringResponse.lecturerName || fallbackCourse.lecturer || "Lecturer",
+        dept: offeringResponse.departmentName || fallbackCourse.dept || "Department",
+        progress: offeringResponse.progress ?? fallbackCourse.progress ?? 0,
       }
     : fallbackCourse;
 
-  const mcqBank = MCQ_BANKS[course.code] || MCQ_BANKS["SE308.3"];
-  const structuredBank = STRUCTURED_BANKS[course.code] || STRUCTURED_BANKS["SE308.3"];
+  const activeCourseCode = course?.code || "SE308.3";
+  const mcqBank = (activeCourseCode && MCQ_BANKS[activeCourseCode]) || MCQ_BANKS["SE308.3"] || [];
+  const structuredBank = (activeCourseCode && STRUCTURED_BANKS[activeCourseCode]) || STRUCTURED_BANKS["SE308.3"] || [];
 
   const initialTab = (searchParams.get("tab") as CourseTab) || "materials";
   const [activeTab, setActiveTab] = useState<CourseTab>(initialTab);
@@ -235,7 +245,14 @@ function CourseHubContent() {
       )}
 
       {activeTab === "ai" && (
-        <CourseAiTab course={course} mcqBank={mcqBank} structuredBank={structuredBank} />
+        <CourseAiTab
+          course={course}
+          offeringId={numericId}
+          materialsCount={fetchedMaterials.length}
+          resourcesCount={fetchedResources.length}
+          mcqBank={mcqBank}
+          structuredBank={structuredBank}
+        />
       )}
     </main>
   );

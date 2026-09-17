@@ -38,8 +38,8 @@ public class UserRequest {
     private String photoUrl;
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(?i)(STUDENT|LECTURER|HOD_DEAN|STAFF_ADMIN|GUEST_LECTURER|EXAMINER)$",
-            message = "Role must be one of: STUDENT, LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER, EXAMINER")
+    @Pattern(regexp = "^(?i)(STUDENT|LECTURER|HOD_DEAN|STAFF_ADMIN|GUEST_LECTURER|EXAMINER|SUPER_ADMIN)$",
+            message = "Role must be one of: STUDENT, LECTURER, HOD_DEAN, STAFF_ADMIN, GUEST_LECTURER, EXAMINER, SUPER_ADMIN")
     private String role;
 
     @Pattern(regexp = "^(?i)(active|inactive|suspended)$", message = "Status must be one of: active, inactive, suspended")

@@ -49,7 +49,6 @@ public class PersonalResourceController {
             @AuthenticationPrincipal User principal,
             @PathVariable Long offeringId,
             @PageableDefault(size = 20) Pageable pageable) {
-        // Derives studentId from authenticated principal — never from client-supplied param
-        return ResponseEntity.ok(personalResourceService.getResourcesByUser(principal.getUserId(), pageable));
+        return ResponseEntity.ok(personalResourceService.getResourcesByStudentAndOffering(principal.getUserId(), offeringId, pageable));
     }
 }

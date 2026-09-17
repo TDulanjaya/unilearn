@@ -76,8 +76,8 @@ public class AiQuizSessionServiceImpl implements AiQuizSessionService {
         AiQuizSession session = aiQuizSessionMapper.toAiQuizSession(request, student, offering);
         AiQuizSession savedSession = aiQuizSessionRepository.save(session);
 
-        // Fetch grounding context for offering and scope
-        String courseContext = aiGroundingContextHelper.fetchCourseContext(request.getOfferingId(), request.getSourceScope());
+        // Fetch grounding context for offering and scope (including student personal resources)
+        String courseContext = aiGroundingContextHelper.fetchCourseContext(request.getOfferingId(), student.getStudentId(), request.getSourceScope());
 
         // Generate quiz questions using Gemini API
         List<AiProviderClient.GeneratedQuestionData> generatedDataList = aiProviderClient.generateQuizQuestions(

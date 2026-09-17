@@ -63,6 +63,16 @@ public class UserServiceImpl implements UserService {
             throw new ValidationException("User request cannot be null");
         }
 
+        String rawRole = request.getRole() != null ? request.getRole().toUpperCase() : "STUDENT";
+        if ("STAFF_ADMIN".equals(rawRole) || "SUPER_ADMIN".equals(rawRole)) {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
+            if (!isSuperAdmin) {
+                throw new org.springframework.security.access.AccessDeniedException("Only Super Administrator is authorized to create Administrator accounts.");
+            }
+        }
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
         }
@@ -105,11 +115,22 @@ public class UserServiceImpl implements UserService {
                     .isGuest("GUEST_LECTURER".equals(roleName))
                     .build();
             lecturerRepository.save(lecturer);
-        } else if ("STAFF_ADMIN".equals(roleName)) {
+        } else if ("STAFF_ADMIN".equals(roleName) || "SUPER_ADMIN".equals(roleName)) {
+            Faculty faculty = null;
+            String scope = request.getScopeType() != null ? request.getScopeType().toUpperCase() : "INSTITUTION";
+            if (request.getFacultyId() != null) {
+                faculty = facultyRepository.findById(request.getFacultyId()).orElse(null);
+                if (faculty != null) {
+                    scope = "FACULTY";
+                }
+            } else if ("DEPARTMENT".equalsIgnoreCase(request.getScopeType()) && dept != null) {
+                scope = "DEPARTMENT";
+            }
             StaffAdmin staffAdmin = StaffAdmin.builder()
                     .user(saved)
-                    .scopeLevel("INSTITUTION")
-                    .department(dept)
+                    .scopeLevel(scope)
+                    .faculty(faculty)
+                    .department("DEPARTMENT".equalsIgnoreCase(scope) ? dept : null)
                     .build();
             staffAdminRepository.save(staffAdmin);
         } else if ("HOD_DEAN".equals(roleName)) {
@@ -128,7 +149,7 @@ public class UserServiceImpl implements UserService {
             hodDeanAssignmentRepository.save(assignment);
         }
 
-        return userMapper.toUserResponse(saved);
+        return enrichUserResponse(saved);
     }
 
     @Override
@@ -153,6 +174,16 @@ public class UserServiceImpl implements UserService {
         user.setPhone(request.getPhone());
         user.setPhotoUrl(request.getPhotoUrl());
         if (request.getRole() != null) {
+            String newRoleUpper = request.getRole().toUpperCase();
+            if (("STAFF_ADMIN".equals(newRoleUpper) || "SUPER_ADMIN".equals(newRoleUpper))
+                    && !newRoleUpper.equalsIgnoreCase(user.getRole())) {
+                var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
+                if (!isSuperAdmin) {
+                    throw new org.springframework.security.access.AccessDeniedException("Only Super Administrator is authorized to assign Administrator roles.");
+                }
+            }
             user.setRole(request.getRole().toLowerCase());
         }
         if (request.getStatus() != null) {
@@ -163,7 +194,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User updated = userRepository.save(user);
-        return userMapper.toUserResponse(updated);
+        return enrichUserResponse(updated);
     }
 
     @Override
@@ -177,12 +208,30 @@ public class UserServiceImpl implements UserService {
 
         String role = user.getRole() != null ? user.getRole().toLowerCase() : "";
 
+        // Prevent deleting the Super Administrator or the sole administrator
+        if ("super_admin".equalsIgnoreCase(role)) {
+            throw new ValidationException("Cannot delete the Super Administrator account.");
+        }
+        if ("staff_admin".equalsIgnoreCase(role)) {
+            long adminCount = userRepository.findAll().stream()
+                    .filter(u -> "staff_admin".equalsIgnoreCase(u.getRole()) || "super_admin".equalsIgnoreCase(u.getRole()))
+                    .count();
+            if (adminCount <= 1) {
+                throw new ValidationException("Cannot delete the only remaining system administrator account.");
+            }
+        }
+
         // Cascade-delete all related academic records before removing the user
         if ("student".equals(role)) {
             attendanceRecordRepository.deleteAll(attendanceRecordRepository.findByStudent_StudentId(userId));
             submissionRepository.deleteAll(submissionRepository.findByStudent_StudentId(userId));
             examAttemptRepository.deleteAll(examAttemptRepository.findByStudent_StudentId(userId));
             enrollmentRepository.deleteAll(enrollmentRepository.findByStudent_StudentId(userId));
+            try {
+                jdbcTemplate.update("DELETE FROM personal_resources WHERE student_id = ?", userId);
+                jdbcTemplate.update("DELETE FROM ai_quiz_questions WHERE session_id IN (SELECT session_id FROM ai_quiz_sessions WHERE student_id = ?)", userId);
+                jdbcTemplate.update("DELETE FROM ai_quiz_sessions WHERE student_id = ?", userId);
+            } catch (Exception ignored) {}
             studentRepository.deleteById(userId);
         } else if ("lecturer".equals(role)) {
             List<com.unilearn.server.model.CourseOfferingLecturer> colList = courseOfferingLecturerRepository.findByLecturer_LecturerId(userId);
@@ -211,8 +260,39 @@ public class UserServiceImpl implements UserService {
             facultyRepository.save(f);
         });
 
-        // Clean up examiners table if user has examiner record
-        jdbcTemplate.update("DELETE FROM examiners WHERE examiner_id = ?", userId);
+        // Reassign historical parent references (exams, question banks, announcements) to fallback admin if possible
+        Long fallbackAdminId = userRepository.findAll().stream()
+                .filter(u -> ("super_admin".equalsIgnoreCase(u.getRole()) || "staff_admin".equalsIgnoreCase(u.getRole())) && !u.getUserId().equals(userId))
+                .map(User::getUserId)
+                .findFirst()
+                .orElse(null);
+
+        if (fallbackAdminId != null) {
+            try {
+                jdbcTemplate.update("UPDATE exams SET scheduled_by_user_id = ? WHERE scheduled_by_user_id = ?", fallbackAdminId, userId);
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.update("UPDATE question_banks SET created_by = ? WHERE created_by = ?", fallbackAdminId, userId);
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.update("UPDATE announcements SET posted_by = ? WHERE posted_by = ?", fallbackAdminId, userId);
+            } catch (Exception ignored) {}
+        }
+
+        // Clean up user-level auxiliary records
+        try {
+            jdbcTemplate.update("DELETE FROM examiners WHERE examiner_id = ?", userId);
+        } catch (Exception ignored) {}
+        try {
+            jdbcTemplate.update("DELETE FROM password_reset_tokens WHERE user_id = ?", userId);
+        } catch (Exception ignored) {}
+        try {
+            jdbcTemplate.update("DELETE FROM forum_posts WHERE author_id = ?", userId);
+        } catch (Exception ignored) {}
+        try {
+            jdbcTemplate.update("DELETE FROM ai_chat_messages WHERE session_id IN (SELECT session_id FROM ai_chat_sessions WHERE user_id = ?)", userId);
+            jdbcTemplate.update("DELETE FROM ai_chat_sessions WHERE user_id = ?", userId);
+        } catch (Exception ignored) {}
 
         // Delete audit logs, notifications and messages
         auditLogRepository.deleteAll(auditLogRepository.findByUser_UserId(userId));
@@ -229,7 +309,7 @@ public class UserServiceImpl implements UserService {
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
-        return userMapper.toUserResponse(user);
+        return enrichUserResponse(user);
     }
 
     @Override
@@ -240,7 +320,7 @@ public class UserServiceImpl implements UserService {
         Page<User> page = userRepository.findAll(pageable);
         List<UserResponse> content = page.getContent()
                 .stream()
-                .map(userMapper::toUserResponse)
+                .map(this::enrichUserResponse)
                 .toList();
 
         return PageResponseDTO.<UserResponse>builder()
@@ -258,9 +338,13 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
 
+        if (!active && "super_admin".equalsIgnoreCase(user.getRole())) {
+            throw new ValidationException("Cannot deactivate the Super Administrator account.");
+        }
+
         user.setStatus(active ? "active" : "inactive");
         User updated = userRepository.save(user);
-        return userMapper.toUserResponse(updated);
+        return enrichUserResponse(updated);
     }
 
     @Override
@@ -280,6 +364,41 @@ public class UserServiceImpl implements UserService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword.trim()));
         User updated = userRepository.save(user);
-        return userMapper.toUserResponse(updated);
+        return enrichUserResponse(updated);
+    }
+
+    private UserResponse enrichUserResponse(User user) {
+        UserResponse resp = userMapper.toUserResponse(user);
+        if (user.getRole() != null) {
+            String roleUpper = user.getRole().toUpperCase();
+            if ("STAFF_ADMIN".equals(roleUpper) || "SUPER_ADMIN".equals(roleUpper)) {
+                staffAdminRepository.findById(user.getUserId()).ifPresent(sa -> {
+                    resp.setScopeLevel(sa.getScopeLevel());
+                    if (sa.getFaculty() != null) {
+                        resp.setFacultyId(sa.getFaculty().getFacultyId());
+                        resp.setFacultyName(sa.getFaculty().getName());
+                    }
+                    if (sa.getDepartment() != null) {
+                        resp.setDepartmentId(sa.getDepartment().getDepartmentId());
+                        resp.setDepartmentName(sa.getDepartment().getName());
+                    }
+                });
+            } else if ("STUDENT".equals(roleUpper)) {
+                studentRepository.findById(user.getUserId()).ifPresent(s -> {
+                    if (s.getDepartment() != null) {
+                        resp.setDepartmentId(s.getDepartment().getDepartmentId());
+                        resp.setDepartmentName(s.getDepartment().getName());
+                    }
+                });
+            } else if ("LECTURER".equals(roleUpper) || "GUEST_LECTURER".equals(roleUpper)) {
+                lecturerRepository.findById(user.getUserId()).ifPresent(l -> {
+                    if (l.getDepartment() != null) {
+                        resp.setDepartmentId(l.getDepartment().getDepartmentId());
+                        resp.setDepartmentName(l.getDepartment().getName());
+                    }
+                });
+            }
+        }
+        return resp;
     }
 }

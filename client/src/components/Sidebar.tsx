@@ -8,14 +8,22 @@ import { useAuth } from "@/context/AuthContext";
 
 interface SidebarProps {
   role: "admin" | "hod";
-  name: string;
-  sub: string;
+  name?: string;
+  sub?: string;
 }
 
-export default function Sidebar({ role, name, sub }: SidebarProps) {
+export default function Sidebar({ role, name = "Administrator", sub = "Staff Admin · Institution-wide" }: SidebarProps) {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+
+  const isSuperAdmin = user?.role?.toLowerCase() === "super_admin";
+  const displayName = user?.fullName || name;
+  const displaySub = isSuperAdmin
+    ? "Super Admin · Institution-wide"
+    : user?.role
+    ? `${user.role.toUpperCase()} · Institution-wide`
+    : sub;
 
   const linksByRole = {
     admin: [
@@ -33,7 +41,7 @@ export default function Sidebar({ role, name, sub }: SidebarProps) {
   };
 
   const links = linksByRole[role] || [];
-  const initial = name ? name.charAt(0) : "U";
+  const initial = displayName ? displayName.charAt(0).toUpperCase() : "U";
 
   const handleLogout = () => {
     setIsOpen(false);
@@ -61,10 +69,17 @@ export default function Sidebar({ role, name, sub }: SidebarProps) {
 
         <div className="mb-6 px-3 py-2.5 rounded-xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)]">
           <div className="flex items-center gap-2.5">
-            <div className="avatar w-8 h-8 text-xs">{initial}</div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-[var(--on-surface)] truncate">{name}</p>
-              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{sub}</p>
+            <div className="avatar w-8 h-8 text-xs shrink-0">{initial}</div>
+            <div className="overflow-hidden flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
+                {isSuperAdmin && (
+                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/30 uppercase tracking-wider shrink-0">
+                    SUPER
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
             </div>
           </div>
         </div>
