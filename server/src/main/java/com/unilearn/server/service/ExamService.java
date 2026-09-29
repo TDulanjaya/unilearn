@@ -8,9 +8,7 @@ import com.unilearn.server.dto.response.exam.ExamListItemDTO;
 
 import java.util.List;
 
-/**
- * Service interface for managing exams.
- */
+// Exams service
 public interface ExamService {
 
     ExamResponse createExam(ExamRequest request);
@@ -28,4 +26,6 @@ public interface ExamService {
     List<ExamResponse> getExamsByOffering(Long offeringId);
 
     List<ExamListItemDTO> getExamListItemsByOffering(Long offeringId);
+
+    List<ExamResponse> getAllExams();
 }

@@ -43,9 +43,7 @@ public class AnnouncementController {
     }
 
     @GetMapping("/me")
-    // TODO: Derive userId/role/departmentId/facultyId/enrolled offerings from the authenticated
-    //       principal — never trust client-supplied IDs for whose announcements to show.
-    //       Currently using getAnnouncementsByScope as the closest available service method.
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<AnnouncementResponse>> getAnnouncementsVisibleToUser(
             @RequestParam String scope,
             @RequestParam Long scopeId,

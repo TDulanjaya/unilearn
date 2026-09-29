@@ -26,6 +26,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Not Found");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(AiServiceUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleAiServiceUnavailable(AiServiceUnavailableException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Service Unavailable");
+        body.put("message", ex.getMessage() != null ? ex.getMessage() : "AI assistant is temporarily unavailable");
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<Map<String, Object>> handleRateLimitExceeded(RateLimitExceededException ex) {
         Map<String, Object> body = new LinkedHashMap<>();
@@ -69,11 +85,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthentication(org.springframework.security.core.AuthenticationException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Unauthorized");
+        body.put("message", ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Invalid credentials");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", "Forbidden");
-        body.put("message", "Access Denied");
+        body.put("message", ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Access Denied");
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
@@ -90,6 +114,39 @@ public class GlobalExceptionHandler {
         body.put("message", "Validation failed");
         body.put("errors", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Bad Request");
+        body.put("message", "Invalid parameter value for: " + ex.getName());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Method Not Allowed");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Bad Request");
+        body.put("message", "Malformed request body or invalid data format.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(java.sql.SQLException.class)
+    public ResponseEntity<Map<String, Object>> handleSqlException(java.sql.SQLException ex) {
+        log.error("Database SQL exception caught: ", ex);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Database Error");
+        body.put("message", "A database error occurred. Please contact the system administrator.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
     @ExceptionHandler(Exception.class)

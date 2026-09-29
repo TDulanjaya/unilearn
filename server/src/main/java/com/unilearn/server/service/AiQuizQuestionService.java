@@ -4,9 +4,7 @@ import com.unilearn.server.dto.response.AiQuizQuestionResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing AI quiz questions.
- */
+// Ai quiz questions service
 public interface AiQuizQuestionService {
 
     List<AiQuizQuestionResponse> getQuestionsBySession(Long sessionId);

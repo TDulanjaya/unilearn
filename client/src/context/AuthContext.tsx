@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
-import { getToken, getUser, setUser, clearAuth, AuthUser } from "@/lib/auth";
+import { setToken, setUser, clearAuth, AuthUser } from "@/lib/auth";
 
 export interface AuthResponse {
   token: string;
@@ -12,6 +12,7 @@ export interface AuthResponse {
   email: string;
   role: string;
   status: string;
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {
@@ -20,6 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthResponse>;
   logout: () => void;
+  markPasswordChanged: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,14 +32,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const savedToken = getToken();
-    const savedUser = getUser();
+    async function restoreSession() {
+      try {
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+        const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setToken(data.accessToken);
+          setTokenState(data.accessToken);
 
-    if (savedToken && savedUser) {
-      setTokenState(savedToken);
-      setUserState(savedUser);
+          const userInfo: AuthUser = {
+            userId: data.userId,
+            fullName: data.fullName,
+            email: data.email,
+            role: data.role,
+            status: data.status,
+            token: data.accessToken,
+            mustChangePassword: data.mustChangePassword,
+          };
+          setUser(userInfo);
+          setUserState(userInfo);
+        } else {
+          clearAuth();
+          setTokenState(null);
+          setUserState(null);
+        }
+      } catch (err) {
+        clearAuth();
+        setTokenState(null);
+        setUserState(null);
+      } finally {
+        setIsLoading(false);
+      }
     }
-    setIsLoading(false);
+
+    restoreSession();
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthResponse> => {
@@ -54,8 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status: res.status,
       tokenType: res.tokenType,
       token: res.token,
+      mustChangePassword: res.mustChangePassword,
     };
 
+    setToken(res.token);
     setUser(userInfo);
     setTokenState(res.token);
     setUserState(userInfo);
@@ -63,12 +98,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      await fetch(`${BASE_URL}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     clearAuth();
+    setToken(null);
     setTokenState(null);
+    setUser(null);
     setUserState(null);
     if (typeof window !== "undefined") {
       window.location.href = "/login";
+    }
+  };
+
+  const markPasswordChanged = () => {
+    if (user) {
+      const updated: AuthUser = { ...user, mustChangePassword: false };
+      setUser(updated);
+      setUserState(updated);
     }
   };
 
@@ -80,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
+        markPasswordChanged,
       }}
     >
       {children}

@@ -22,6 +22,7 @@ import com.unilearn.server.service.AiQuizSessionService;
 import com.unilearn.server.util.mapper.AiQuizSessionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,13 +37,17 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AiQuizSessionServiceImpl implements AiQuizSessionService {
 
-    private static final int DAILY_SESSION_LIMIT = 10;
+    @Value("${ai.daily-limit.quiz:10}")
+    private int dailyQuizLimit;
+
     private static final int MAX_QUESTIONS_PER_SESSION = 50;
 
     private final AiQuizSessionRepository aiQuizSessionRepository;
     private final AiQuizQuestionRepository aiQuizQuestionRepository;
     private final StudentRepository studentRepository;
     private final CourseOfferingRepository courseOfferingRepository;
+    private final com.unilearn.server.repository.EnrollmentRepository enrollmentRepository;
+    private final com.unilearn.server.repository.ExamAttemptRepository examAttemptRepository;
     private final AiQuizSessionMapper aiQuizSessionMapper;
     private final AiProviderClient aiProviderClient;
     private final AiGroundingContextHelper aiGroundingContextHelper;
@@ -55,31 +60,47 @@ public class AiQuizSessionServiceImpl implements AiQuizSessionService {
             throw new ValidationException("AiQuizSession request cannot be null");
         }
 
-        // Daily rate limit check (FR-AI-08 / SRS 9.2 cost guardrail)
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        long todayCount = aiQuizSessionRepository.countByStudent_StudentIdAndCreatedAtGreaterThanEqual(
-                request.getStudentId(), startOfDay);
-        if (todayCount >= DAILY_SESSION_LIMIT) {
-            throw new RateLimitExceededException("Daily quiz generation limit reached (" + DAILY_SESSION_LIMIT + " sessions per day). Please try again tomorrow.");
-        }
-
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        // Cap question count at 50 per FR-AI-02
+        // verify student is enrolled
+        boolean isEnrolled = enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(
+                student.getStudentId(), offering.getOfferingId());
+        if (!isEnrolled) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                "Access denied: You must be enrolled in this course offering to generate a quiz.");
+        }
+
+        // block if exam active
+        boolean hasActiveExam = examAttemptRepository.hasActiveExamAttempt(student.getStudentId());
+        if (hasActiveExam) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                "Access denied: AI quiz generation is disabled while you have an active exam attempt in progress.");
+        }
+
+        // daily quiz session limit
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        long todayCount = aiQuizSessionRepository.countByStudent_StudentIdAndCreatedAtGreaterThanEqual(
+                request.getStudentId(), startOfDay);
+        if (todayCount >= dailyQuizLimit) {
+            throw new RateLimitExceededException("Daily quiz generation limit reached (" + dailyQuizLimit + " sessions per day). Please try again tomorrow.");
+        }
+
+        // cap question count at 50
         int count = Math.min(request.getQuestionCount() != null ? request.getQuestionCount() : 5, MAX_QUESTIONS_PER_SESSION);
         request.setQuestionCount(count);
 
         AiQuizSession session = aiQuizSessionMapper.toAiQuizSession(request, student, offering);
         AiQuizSession savedSession = aiQuizSessionRepository.save(session);
 
-        // Fetch grounding context for offering and scope (including student personal resources)
-        String courseContext = aiGroundingContextHelper.fetchCourseContext(request.getOfferingId(), student.getStudentId(), request.getSourceScope());
+        // pull course context from chunks
+        String courseContext = aiGroundingContextHelper.fetchQuizCourseContext(
+                request.getOfferingId(), student.getStudentId(), request.getSourceScope(), 10);
 
-        // Generate quiz questions using Gemini API
+        // generate questions via gemini
         List<AiProviderClient.GeneratedQuestionData> generatedDataList = aiProviderClient.generateQuizQuestions(
                 courseContext, request.getSourceScope(), request.getQuestionType(), count);
 
@@ -142,7 +163,7 @@ public class AiQuizSessionServiceImpl implements AiQuizSessionService {
                                 q.setIsCorrect(q.getCorrectAnswer().trim().equalsIgnoreCase(req.getStudentAnswer().trim()));
                             }
                         } else {
-                            // Structured questions: do NOT auto-grade (FR-AI-05)
+                            // do not auto-grade structured questions
                             q.setIsCorrect(null);
                         }
                         aiQuizQuestionRepository.save(q);

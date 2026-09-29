@@ -90,7 +90,7 @@ function LoginFormContent() {
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md glass rounded-3xl p-6 sm:p-8 border border-[var(--glass-border)] shadow-2xl">
+      <div className="w-full max-w-md glass rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-[var(--glass-border)] shadow-2xl">
         <div className="flex items-center gap-3 mb-6 justify-center">
           <Link href="/">
             <Logo />
@@ -182,6 +182,15 @@ function LoginFormContent() {
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
+
+              {process.env.NEXT_PUBLIC_REGISTRATION_ENABLED === "true" && (
+                <p className="text-center text-xs text-[var(--on-surface-variant)] mt-4">
+                  Don't have an account?{" "}
+                  <Link href="/register" className="text-[var(--tertiary)] font-semibold hover:underline">
+                    Sign up
+                  </Link>
+                </p>
+              )}
             </form>
           </div>
         ) : (

@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 export default function StudentDashboard() {
   const { user } = useAuth();
 
-  // 1. Fetch student's enrollments
+  // enrollments
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["studentEnrollments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
@@ -16,7 +16,7 @@ export default function StudentDashboard() {
 
   const enrollmentList = enrollments || [];
 
-  // 2. Fetch gradebook entries for each offering to calculate GPA
+  // grades and gpa
   const gradebookQueries = useQueries({
     queries: enrollmentList.map((e: any) => ({
       queryKey: ["gradebook", user?.userId, e.offeringId],
@@ -30,7 +30,7 @@ export default function StudentDashboard() {
     : 0;
   const currentGpa = averageScore > 0 ? (averageScore / 25).toFixed(2) : "0.00";
 
-  // 3. Fetch student's attendance records to calculate rate
+  // attendance
   const { data: attendanceRecords } = useQuery({
     queryKey: ["studentAttendance", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/attendance-records/student/${user?.userId}`),
@@ -42,7 +42,7 @@ export default function StudentDashboard() {
     ? Math.round((presentRecords.length / attendanceRecords.length) * 100) 
     : 0;
 
-  // 4. Fetch assignments for enrolled offerings
+  // assignments
   const assignmentQueries = useQueries({
     queries: enrollmentList.map((e: any) => ({
       queryKey: ["assignments", e.offeringId],
@@ -52,7 +52,7 @@ export default function StudentDashboard() {
 
   const allAssignments = assignmentQueries.flatMap((q: any) => q.data || []);
 
-  // 5. Fetch student's submissions
+  // submissions
   const { data: studentSubmissions } = useQuery({
     queryKey: ["studentSubmissions", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/submissions/student/${user?.userId}`),
@@ -62,7 +62,7 @@ export default function StudentDashboard() {
   const submittedAssignmentIds = studentSubmissions?.map((s: any) => s.assignmentId) || [];
   const pendingAssignments = allAssignments.filter((asm: any) => !submittedAssignmentIds.includes(asm.assignmentId));
 
-  // 6. Fetch scheduled exams for enrolled offerings
+  // scheduled exams
   const examQueries = useQueries({
     queries: enrollmentList.map((e: any) => ({
       queryKey: ["exams", e.offeringId],

@@ -35,7 +35,7 @@ public class MaterialController {
 
     @GetMapping("/offering/{offeringId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: STUDENT enrollment check in service layer
+    // Get materials for offering
     public ResponseEntity<PageResponseDTO<MaterialResponse>> getMaterialsByOffering(
             @PathVariable Long offeringId,
             @PageableDefault(size = 20) Pageable pageable) {

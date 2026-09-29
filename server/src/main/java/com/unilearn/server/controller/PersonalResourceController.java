@@ -15,10 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Personal resource controller — STUDENT only, always acting on the caller's own records.
- * Never accepts studentId as a path/query param (privacy protection per FR-RES-03).
- */
+// Student personal resources
 @RestController
 @RequestMapping("/api/v1/personal-resources")
 @RequiredArgsConstructor

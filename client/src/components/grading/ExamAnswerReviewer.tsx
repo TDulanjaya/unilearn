@@ -55,59 +55,63 @@ export default function ExamAnswerReviewer({
   const currentQ = questions[activeQIndex];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex flex-col p-4 sm:p-6 text-[var(--on-surface)] animate-scaleIn">
-      
-      <div className="flex items-center justify-between pb-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] p-4 rounded-t-2xl">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--tertiary-container)] text-[var(--tertiary)] flex items-center justify-center font-bold">
-            <i className="ti ti-file-text text-xl"></i>
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex flex-col p-0 sm:p-6 text-[var(--on-surface)] animate-scaleIn">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] p-3.5 sm:p-4 rounded-none sm:rounded-t-2xl shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--tertiary-container)] text-[var(--tertiary)] flex items-center justify-center font-bold shrink-0">
+            <i className="ti ti-file-text text-lg sm:text-xl"></i>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-accent font-bold">{courseCode}</span>
-              <span className="badge badge-gray">{batch}</span>
-              <span className="text-xs text-[var(--on-surface-variant)]">• {examTitle}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <span className="badge badge-accent font-bold text-[10px]">{courseCode}</span>
+              <span className="badge badge-gray text-[10px]">{batch}</span>
+              <span className="text-[11px] text-[var(--on-surface-variant)] truncate">• {examTitle}</span>
             </div>
-            <h2 className="font-display font-extrabold text-lg text-[var(--on-surface)] mt-0.5 flex items-center gap-3">
+            <h2 className="font-display font-extrabold text-sm sm:text-lg text-[var(--on-surface)] mt-0.5 flex items-center gap-2 flex-wrap truncate">
               <span>{isIdentityRevealed ? `${studentName} (${candidateCode})` : candidateCode}</span>
               <button
                 onClick={() => setIsIdentityRevealed(!isIdentityRevealed)}
-                className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--tertiary)] hover:bg-[var(--surface-container)] transition-colors flex items-center gap-1"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--tertiary)] hover:bg-[var(--surface-container)] transition-colors flex items-center gap-1 min-h-[32px]"
               >
                 <i className={`ti ${isIdentityRevealed ? "ti-eye-off" : "ti-eye"}`}></i>
-                {isIdentityRevealed ? "Mask Identity" : "Reveal Identity"}
+                {isIdentityRevealed ? "Mask" : "Reveal"}
               </button>
             </h2>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           <div className="text-right">
             <p className="text-[10px] uppercase font-bold text-[var(--on-surface-variant)]">Exam Total</p>
-            <p className="font-display font-extrabold text-xl text-[var(--tertiary)]">
+            <p className="font-display font-extrabold text-base sm:text-xl text-[var(--tertiary)]">
               {totalScore} <span className="text-xs font-normal text-[var(--outline)]">/ {totalMax}</span>
             </p>
           </div>
-          <button onClick={onClose} className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] p-2">
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+            aria-label="Close"
+          >
             <i className="ti ti-x text-2xl"></i>
           </button>
         </div>
       </div>
 
-      
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 p-4 sm:p-6 overflow-hidden bg-[var(--surface-container-lowest)] border-x border-[var(--outline-variant)]">
-        
-        <div className="space-y-2 border-r border-[var(--outline-variant)] pr-4 overflow-y-auto">
-          <p className="text-xs font-bold text-[var(--on-surface-variant)] uppercase tracking-wider mb-2">
+      {/* Main Content Area */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 sm:gap-6 p-3 sm:p-6 overflow-y-auto lg:overflow-hidden bg-[var(--surface-container-lowest)] border-x-0 sm:border-x border-[var(--outline-variant)]">
+        {/* Question Selector: Horizontal scroll pills on mobile, vertical list on desktop */}
+        <div className="lg:border-r border-[var(--outline-variant)] lg:pr-4 overflow-x-auto no-scrollbar lg:overflow-y-auto flex lg:flex-col gap-2 pb-2 lg:pb-0 shrink-0">
+          <p className="text-xs font-bold text-[var(--on-surface-variant)] uppercase tracking-wider hidden lg:block mb-2">
             Exam Questions ({questions.length})
           </p>
           {questions.map((q, idx) => (
             <button
               key={q.id}
               onClick={() => setActiveQIndex(idx)}
-              className={`w-full text-left p-3 rounded-xl border text-xs transition-all flex items-center justify-between ${
+              className={`text-left p-2.5 sm:p-3 rounded-xl border text-xs transition-all flex items-center justify-between gap-2 shrink-0 min-h-[44px] ${
                 activeQIndex === idx
-                  ? "border-[var(--tertiary)] bg-[var(--surface-container-low)] font-bold text-[var(--on-surface)]"
+                  ? "border-[var(--tertiary)] bg-[var(--surface-container-low)] font-bold text-[var(--on-surface)] shadow-sm"
                   : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]/50"
               }`}
             >
@@ -117,30 +121,30 @@ export default function ExamAnswerReviewer({
           ))}
         </div>
 
-        
-        <div className="flex flex-col h-full space-y-4 overflow-y-auto">
-          <div className="card p-5 space-y-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+        {/* Question Answer & Grading */}
+        <div className="flex flex-col space-y-4 overflow-y-auto">
+          <div className="card p-4 sm:p-5 space-y-2 sm:space-y-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
               <span className="font-bold text-xs text-[var(--tertiary)]">
                 Question {activeQIndex + 1} of {questions.length} ({currentQ.type})
               </span>
               <span className="badge badge-accent text-[10px] font-bold">{currentQ.maxMarks} Marks Max</span>
             </div>
-            <p className="font-bold text-sm text-[var(--on-surface)] leading-relaxed">{currentQ.text}</p>
+            <p className="font-bold text-xs sm:text-sm text-[var(--on-surface)] leading-relaxed">{currentQ.text}</p>
           </div>
 
-          <div className="card p-5 space-y-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex-1 flex flex-col">
+          <div className="card p-4 sm:p-5 space-y-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex-1 flex flex-col">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface-variant)]">
               Student Submitted Answer
             </h4>
-            <div className="flex-1 p-4 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] font-mono text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-line">
-              {currentQ.studentAnswer}
+            <div className="flex-1 min-h-[120px] p-3 sm:p-4 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] font-mono text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-line break-words">
+              {currentQ.studentAnswer || "No answer provided"}
             </div>
 
-            <div className="pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between">
+            <div className="pt-3 border-t border-[var(--outline-variant)] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div>
                 {currentQ.autoScored ? (
-                  <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                     <i className="ti ti-check"></i> Objective Answer Auto-Scored
                   </span>
                 ) : (
@@ -150,7 +154,7 @@ export default function ExamAnswerReviewer({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <input
                   type="number"
                   min={0}
@@ -158,7 +162,7 @@ export default function ExamAnswerReviewer({
                   disabled={currentQ.autoScored}
                   value={currentQ.awardedMarks}
                   onChange={(e) => handleMarkChange(activeQIndex, Number(e.target.value))}
-                  className="w-20 text-xs p-2 rounded-xl border border-[var(--outline-variant)] font-bold text-center bg-[var(--surface-container-lowest)] text-[var(--on-surface)] disabled:opacity-60"
+                  className="w-20 min-h-[44px] text-xs p-2 rounded-xl border border-[var(--outline-variant)] font-bold text-center bg-[var(--surface-container-lowest)] text-[var(--on-surface)] disabled:opacity-60"
                 />
                 <span className="text-xs font-bold text-[var(--on-surface-variant)]">/ {currentQ.maxMarks} Marks</span>
               </div>
@@ -167,31 +171,31 @@ export default function ExamAnswerReviewer({
         </div>
       </div>
 
-      
-      <div className="flex items-center justify-between p-4 bg-[var(--surface-container-lowest)] border-t border-[var(--outline-variant)] rounded-b-2xl">
+      {/* Footer Navigation Bar */}
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3.5 sm:p-4 bg-[var(--surface-container-lowest)] border-t border-[var(--outline-variant)] rounded-none sm:rounded-b-2xl shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveQIndex((i) => Math.max(0, i - 1))}
             disabled={activeQIndex === 0}
-            className="btn-secondary text-xs disabled:opacity-40"
+            className="btn-secondary text-xs flex-1 sm:flex-none min-h-[44px] justify-center disabled:opacity-40"
           >
             Previous Q
           </button>
           <button
             onClick={() => setActiveQIndex((i) => Math.min(questions.length - 1, i + 1))}
             disabled={activeQIndex === questions.length - 1}
-            className="btn-secondary text-xs disabled:opacity-40"
+            className="btn-secondary text-xs flex-1 sm:flex-none min-h-[44px] justify-center disabled:opacity-40"
           >
             Next Q
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={onClose} className="btn-secondary text-xs px-4 py-2">
+          <button onClick={onClose} className="btn-secondary text-xs px-4 min-h-[44px] justify-center">
             Cancel
           </button>
-          <button onClick={handleSave} className="btn-primary text-xs px-6 py-2.5 shadow-md">
-            <i className="ti ti-check mr-1 text-sm"></i> Save & Next Student
+          <button onClick={handleSave} className="btn-primary text-xs px-6 min-h-[44px] shadow-md justify-center flex-1 sm:flex-none">
+            <i className="ti ti-check mr-1 text-sm"></i> Save & Next
           </button>
         </div>
       </div>

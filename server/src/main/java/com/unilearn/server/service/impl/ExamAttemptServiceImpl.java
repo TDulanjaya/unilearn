@@ -29,6 +29,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final ExamRepository examRepository;
     private final StudentRepository studentRepository;
     private final ExamAttemptMapper examAttemptMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -36,6 +37,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (request == null) {
             throw new ValidationException("ExamAttempt request cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(request.getStudentId());
 
         Exam exam = examRepository.findById(request.getExamId())
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + request.getExamId()));
@@ -67,9 +69,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         ExamAttempt attempt = examAttemptRepository.findById(attemptId)
                 .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found with ID: " + attemptId));
 
-        if (studentId != null && attempt.getStudent() != null
-                && !studentId.equals(attempt.getStudent().getStudentId())) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied: Attempt belongs to another student");
+        if (attempt.getStudent() != null) {
+            ownershipValidator.checkStudentOwnership(attempt.getStudent().getStudentId());
         }
 
         if ("submitted".equalsIgnoreCase(attempt.getStatus())) {
@@ -98,8 +99,11 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (examId == null) {
             throw new ValidationException("Exam ID cannot be null");
         }
-        if (!examRepository.existsById(examId)) {
-            throw new EntryNotFoundException("Exam not found with ID: " + examId);
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
         }
 
         return examAttemptRepository.findByExam_ExamId(examId)
@@ -113,6 +117,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (studentId == null) {
             throw new ValidationException("Student ID cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(studentId);
+
         if (!studentRepository.existsById(studentId)) {
             throw new EntryNotFoundException("Student not found with ID: " + studentId);
         }

@@ -55,28 +55,17 @@ export default function ProfilePage() {
     setTimeout(() => setToastMsg(""), 3000);
   };
 
-  const uploadToCloudinary = async (file: File): Promise<string> => {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "unilearn";
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "unilearn_preset";
-
+  const uploadAvatar = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", uploadPreset);
 
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.secure_url) {
-          return data.secure_url;
-        }
+      const res = await api.post<{ url: string }>("/api/v1/files/upload?folder=avatars", formData);
+      if (res?.url) {
+        return res.url;
       }
     } catch (e) {
-      console.warn("Cloudinary upload failed, falling back to data URL for local dev:", e);
+      console.warn("Avatar upload failed, falling back to data URL for local dev:", e);
     }
 
     return new Promise((resolve, reject) => {
@@ -91,12 +80,12 @@ export default function ProfilePage() {
     if (files.length === 0) return;
     setIsUploading(true);
     try {
-      const secureUrl = await uploadToCloudinary(files[0]);
+      const photoUrl = await uploadAvatar(files[0]);
       const updatedProfile = await api.patch<UserProfile>("/api/v1/profile/me/photo", {
-        photoUrl: secureUrl,
+        photoUrl,
       });
       setProfile(updatedProfile);
-      setAvatarPreview(updatedProfile.photoUrl || secureUrl);
+      setAvatarPreview(updatedProfile.photoUrl || photoUrl);
       setShowAvatarModal(false);
       showToast("Profile picture updated successfully!");
     } catch (err: any) {

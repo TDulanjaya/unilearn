@@ -454,7 +454,7 @@ export default function EventsEnrollmentPage() {
         {toast && (
           <div className="fixed top-6 right-6 z-50 animate-bounce duration-300">
             <div
-              className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border text-sm font-semibold text-white ${
+              className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border text-sm font-semibold text-[var(--on-surface)] ${
                 toast.type === "error"
                   ? "bg-rose-600 border-rose-400"
                   : "bg-emerald-600 border-emerald-400"
@@ -472,8 +472,8 @@ export default function EventsEnrollmentPage() {
             onClick={() => setActiveTab("wizard")}
             className={`px-4 py-2.5 font-bold text-xs sm:text-sm rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
               activeTab === "wizard"
-                ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-                : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-slate-800/30"
+                ? "border-cyan-500 text-[var(--tertiary)] bg-[var(--surface-container)]"
+                : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
             }`}
           >
             <i className="ti ti-wand text-base" /> Batch Enrollment Wizard
@@ -482,8 +482,8 @@ export default function EventsEnrollmentPage() {
             onClick={() => setActiveTab("events")}
             className={`px-4 py-2.5 font-bold text-xs sm:text-sm rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
               activeTab === "events"
-                ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-                : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-slate-800/30"
+                ? "border-cyan-500 text-[var(--tertiary)] bg-[var(--surface-container)]"
+                : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
             }`}
           >
             <i className="ti ti-calendar-event text-base" /> Events & RSVPs
@@ -492,8 +492,8 @@ export default function EventsEnrollmentPage() {
             onClick={() => setActiveTab("announcements")}
             className={`px-4 py-2.5 font-bold text-xs sm:text-sm rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
               activeTab === "announcements"
-                ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-                : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-slate-800/30"
+                ? "border-cyan-500 text-[var(--tertiary)] bg-[var(--surface-container)]"
+                : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-low)]"
             }`}
           >
             <i className="ti ti-speakerphone text-base" /> Announcements
@@ -504,26 +504,26 @@ export default function EventsEnrollmentPage() {
         {activeTab === "wizard" && (
           <div className="space-y-6">
             {/* Step Progress Header */}
-            <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl">
+            <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl">
               <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
                 {/* Step 1 */}
                 <button
                   onClick={() => setEnrollStep(1)}
                   className={`flex flex-col sm:flex-row items-center gap-2.5 p-3 rounded-xl transition-all text-left ${
                     enrollStep === 1
-                      ? "bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 ring-2 ring-cyan-500/20"
+                      ? "bg-[var(--tertiary-container)] border border-[var(--tertiary)] text-[var(--tertiary)] ring-2 ring-[var(--tertiary)]"
                       : selectedBatchId
                       ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 cursor-pointer"
-                      : "opacity-60 text-slate-400"
+                      : "opacity-60 text-[var(--on-surface-variant)]"
                   }`}
                 >
                   <span
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md ${
                       enrollStep === 1
-                        ? "bg-cyan-500 text-slate-950"
+                        ? "bg-[var(--tertiary)] text-[var(--on-surface)]"
                         : selectedBatchId
-                        ? "bg-emerald-500 text-slate-950"
-                        : "bg-slate-800 text-slate-400"
+                        ? "bg-emerald-500 text-[var(--on-surface)]"
+                        : "bg-[var(--surface-container)] text-[var(--on-surface-variant)]"
                     }`}
                   >
                     {selectedBatchId && enrollStep !== 1 ? "✓" : "1"}
@@ -542,19 +542,19 @@ export default function EventsEnrollmentPage() {
                   disabled={!selectedBatchId}
                   className={`flex flex-col sm:flex-row items-center gap-2.5 p-3 rounded-xl transition-all text-left ${
                     enrollStep === 2
-                      ? "bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 ring-2 ring-cyan-500/20"
+                      ? "bg-[var(--tertiary-container)] border border-[var(--tertiary)] text-[var(--tertiary)] ring-2 ring-[var(--tertiary)]"
                       : selectedOfferingIds.length > 0
                       ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 cursor-pointer"
-                      : "opacity-60 text-slate-400 disabled:cursor-not-allowed"
+                      : "opacity-60 text-[var(--on-surface-variant)] disabled:cursor-not-allowed"
                   }`}
                 >
                   <span
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md ${
                       enrollStep === 2
-                        ? "bg-cyan-500 text-slate-950"
+                        ? "bg-[var(--tertiary)] text-[var(--on-surface)]"
                         : selectedOfferingIds.length > 0
-                        ? "bg-emerald-500 text-slate-950"
-                        : "bg-slate-800 text-slate-400"
+                        ? "bg-emerald-500 text-[var(--on-surface)]"
+                        : "bg-[var(--surface-container)] text-[var(--on-surface-variant)]"
                     }`}
                   >
                     {selectedOfferingIds.length > 0 && enrollStep > 2 ? "✓" : "2"}
@@ -577,13 +577,13 @@ export default function EventsEnrollmentPage() {
                   disabled={!selectedBatchId || selectedOfferingIds.length === 0}
                   className={`flex flex-col sm:flex-row items-center gap-2.5 p-3 rounded-xl transition-all text-left ${
                     enrollStep === 3
-                      ? "bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 ring-2 ring-cyan-500/20"
-                      : "opacity-60 text-slate-400 disabled:cursor-not-allowed"
+                      ? "bg-[var(--tertiary-container)] border border-[var(--tertiary)] text-[var(--tertiary)] ring-2 ring-[var(--tertiary)]"
+                      : "opacity-60 text-[var(--on-surface-variant)] disabled:cursor-not-allowed"
                   }`}
                 >
                   <span
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md ${
-                      enrollStep === 3 ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"
+                      enrollStep === 3 ? "bg-[var(--tertiary)] text-[var(--on-surface)]" : "bg-[var(--surface-container)] text-[var(--on-surface-variant)]"
                     }`}
                   >
                     3
@@ -598,42 +598,42 @@ export default function EventsEnrollmentPage() {
 
             {/* STEP 1: SELECT BATCH */}
             {enrollStep === 1 && (
-              <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--outline-variant)]">
                   <div>
-                    <h2 className="text-lg font-black text-white flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs">
+                    <h2 className="text-lg font-black text-[var(--on-surface)] flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-[var(--tertiary-container)] text-[var(--tertiary)] flex items-center justify-center text-xs">
                         1
                       </span>
                       Select Target Student Batch
                     </h2>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">
                       Choose which academic batch you want to bulk enroll into course offerings.
                     </p>
                   </div>
                   <div className="relative w-full sm:w-72">
-                    <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none z-10" />
+                    <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-variant)] text-sm pointer-events-none z-10" />
                     <input
                       type="text"
                       placeholder="Search batch or department..."
                       value={batchSearch}
                       onChange={(e) => setBatchSearch(e.target.value)}
                       style={{ paddingLeft: "2.5rem" }}
-                      className="w-full bg-slate-950/70 border border-slate-700 rounded-xl !pl-10 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl !pl-10 pr-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                     />
                   </div>
                 </div>
 
                 {batchesLoading ? (
-                  <div className="py-12 text-center text-slate-400 text-sm flex flex-col items-center justify-center gap-2">
-                    <i className="ti ti-loader animate-spin text-2xl text-cyan-400" />
+                  <div className="py-12 text-center text-[var(--on-surface-variant)] text-sm flex flex-col items-center justify-center gap-2">
+                    <i className="ti ti-loader animate-spin text-2xl text-[var(--tertiary)]" />
                     <span>Loading student batches from database...</span>
                   </div>
                 ) : filteredBatches.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 text-sm bg-slate-950/30 rounded-xl border border-dashed border-slate-800">
-                    <i className="ti ti-users-group text-3xl text-slate-600 block mb-2" />
+                  <div className="py-12 text-center text-[var(--on-surface-variant)] text-sm bg-[var(--surface-container)] rounded-xl border border-dashed border-[var(--outline-variant)]">
+                    <i className="ti ti-users-group text-3xl text-[var(--ink-faint)] block mb-2" />
                     <p className="font-semibold">No Batches Found</p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-[var(--ink-faint)] mt-1">
                       Create batches in the Academic Structure page first.
                     </p>
                   </div>
@@ -647,35 +647,35 @@ export default function EventsEnrollmentPage() {
                           onClick={() => setSelectedBatchId(b.batchId)}
                           className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between group ${
                             isSelected
-                              ? "border-cyan-500 bg-cyan-950/30 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-950/50"
-                              : "border-slate-800 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-800/40"
+                              ? "border-cyan-500 bg-[var(--tertiary-container)] ring-2 ring-[var(--tertiary)] shadow-lg shadow-[var(--surface-container-highest)]"
+                              : "border-[var(--outline-variant)] bg-[var(--surface-container-low)] hover:border-[var(--border)] hover:bg-[var(--surface-container-low)]"
                           }`}
                         >
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-800 text-cyan-400 border border-cyan-500/20">
+                              <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-[var(--surface-container)] text-[var(--tertiary)] border border-[var(--tertiary)]">
                                 {b.academicYearLabel}
                               </span>
                               {isSelected && (
-                                <span className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center text-xs font-black">
+                                <span className="w-5 h-5 rounded-full bg-[var(--tertiary)] text-[var(--on-surface)] flex items-center justify-center text-xs font-black">
                                   ✓
                                 </span>
                               )}
                             </div>
-                            <h3 className="font-black text-base text-white group-hover:text-cyan-300 transition-colors">
+                            <h3 className="font-black text-base text-[var(--on-surface)] group-hover:text-[var(--tertiary)] transition-colors">
                               {b.name}
                             </h3>
-                            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                              <i className="ti ti-building text-slate-500" />
+                            <p className="text-xs text-[var(--on-surface-variant)] flex items-center gap-1.5">
+                              <i className="ti ti-building text-[var(--ink-faint)]" />
                               {b.departmentName}
                             </p>
                           </div>
 
-                          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                          <div className="mt-4 pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between text-xs text-[var(--on-surface-variant)]">
                             <span className="flex items-center gap-1 text-emerald-400 font-semibold">
                               <i className="ti ti-user-check" /> Active Batch
                             </span>
-                            <span className="text-[11px] text-slate-500">ID #{b.batchId}</span>
+                            <span className="text-[11px] text-[var(--ink-faint)]">ID #{b.batchId}</span>
                           </div>
                         </div>
                       );
@@ -684,8 +684,8 @@ export default function EventsEnrollmentPage() {
                 )}
 
                 {/* Batch Action Bar */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-                  <div className="text-xs text-slate-400">
+                <div className="flex items-center justify-between pt-4 border-t border-[var(--outline-variant)]">
+                  <div className="text-xs text-[var(--on-surface-variant)]">
                     {selectedBatch ? (
                       <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                         <i className="ti ti-check" /> Selected: <b>{selectedBatch.name}</b> ({selectedBatch.departmentName})
@@ -697,7 +697,7 @@ export default function EventsEnrollmentPage() {
                   <button
                     onClick={() => selectedBatchId && setEnrollStep(2)}
                     disabled={!selectedBatchId}
-                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-[var(--on-surface)] bg-cyan-400 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-[var(--tertiary)] flex items-center gap-2"
                   >
                     <span>Next: Choose Course Offering</span>
                     <i className="ti ti-arrow-right" />
@@ -708,17 +708,17 @@ export default function EventsEnrollmentPage() {
 
             {/* STEP 2: SELECT COURSE OFFERING(S) */}
             {enrollStep === 2 && (
-              <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--outline-variant)]">
                   <div>
-                    <h2 className="text-lg font-black text-white flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs">
+                    <h2 className="text-lg font-black text-[var(--on-surface)] flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-[var(--tertiary-container)] text-[var(--tertiary)] flex items-center justify-center text-xs">
                         2
                       </span>
                       Select Course Offering(s)
                     </h2>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Target Batch: <span className="text-cyan-400 font-bold">{selectedBatch?.name}</span> ({selectedBatch?.departmentName})
+                    <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">
+                      Target Batch: <span className="text-[var(--tertiary)] font-bold">{selectedBatch?.name}</span> ({selectedBatch?.departmentName})
                       {" · "}
                       <span className="text-emerald-400 font-bold">
                         {selectedOfferingIds.length} offering{selectedOfferingIds.length === 1 ? "" : "s"} selected
@@ -727,20 +727,20 @@ export default function EventsEnrollmentPage() {
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-72">
-                      <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none z-10" />
+                      <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-variant)] text-sm pointer-events-none z-10" />
                       <input
                         type="text"
                         placeholder="Search course code or title..."
                         value={offeringSearch}
                         onChange={(e) => setOfferingSearch(e.target.value)}
                         style={{ paddingLeft: "2.5rem" }}
-                        className="w-full bg-slate-950/70 border border-slate-700 rounded-xl !pl-10 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl !pl-10 pr-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={selectAllFilteredOfferings}
-                      className="px-3 py-2 rounded-xl text-[11px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-500/30 hover:bg-cyan-900/50 transition-all whitespace-nowrap"
+                      className="px-3 py-2 rounded-xl text-[11px] font-bold text-[var(--tertiary)] bg-[var(--tertiary-container)] border border-[var(--tertiary)] hover:bg-cyan-900/50 transition-all whitespace-nowrap"
                     >
                       Select All
                     </button>
@@ -748,7 +748,7 @@ export default function EventsEnrollmentPage() {
                       type="button"
                       onClick={clearOfferingSelection}
                       disabled={selectedOfferingIds.length === 0}
-                      className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+                      className="px-3 py-2 rounded-xl text-[11px] font-bold text-[var(--on-surface-variant)] bg-[var(--surface-container)] hover:bg-[var(--surface-container-high)] disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap"
                     >
                       Clear
                     </button>
@@ -756,20 +756,20 @@ export default function EventsEnrollmentPage() {
                 </div>
 
                 {offeringsLoading ? (
-                  <div className="py-12 text-center text-slate-400 text-sm flex flex-col items-center justify-center gap-2">
-                    <i className="ti ti-loader animate-spin text-2xl text-cyan-400" />
+                  <div className="py-12 text-center text-[var(--on-surface-variant)] text-sm flex flex-col items-center justify-center gap-2">
+                    <i className="ti ti-loader animate-spin text-2xl text-[var(--tertiary)]" />
                     <span>Loading course offerings from database...</span>
                   </div>
                 ) : filteredOfferings.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 text-sm bg-slate-950/30 rounded-xl border border-dashed border-slate-800 space-y-3">
-                    <i className="ti ti-books text-3xl text-slate-600 block" />
-                    <p className="font-semibold text-slate-300">No Course Offerings Created Yet</p>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  <div className="py-12 text-center text-[var(--on-surface-variant)] text-sm bg-[var(--surface-container)] rounded-xl border border-dashed border-[var(--outline-variant)] space-y-3">
+                    <i className="ti ti-books text-3xl text-[var(--ink-faint)] block" />
+                    <p className="font-semibold text-[var(--on-surface-variant)]">No Course Offerings Created Yet</p>
+                    <p className="text-xs text-[var(--ink-faint)] max-w-md mx-auto">
                       Course offerings link courses to semesters, batches, and lecturers. Please create offerings under Academic Structure &gt; Course Offerings.
                     </p>
                     <a
                       href="/admin/academic-structure"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 transition-all"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[var(--tertiary-container)] text-[var(--tertiary)] border border-[var(--tertiary)] hover:bg-[var(--tertiary)]/30 transition-all"
                     >
                       <i className="ti ti-plus" /> Manage Course Offerings
                     </a>
@@ -786,21 +786,21 @@ export default function EventsEnrollmentPage() {
                           aria-checked={isSelected}
                           className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between group ${
                             isSelected
-                              ? "border-cyan-500 bg-cyan-950/30 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-950/50"
-                              : "border-slate-800 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-800/40"
+                              ? "border-cyan-500 bg-[var(--tertiary-container)] ring-2 ring-[var(--tertiary)] shadow-lg shadow-[var(--surface-container-highest)]"
+                              : "border-[var(--outline-variant)] bg-[var(--surface-container-low)] hover:border-[var(--border)] hover:bg-[var(--surface-container-low)]"
                           }`}
                         >
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-500/30">
+                              <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-[var(--surface-container)] text-[var(--tertiary)] border border-[var(--tertiary)]">
                                 {off.courseCode}
                               </span>
                               <span className="flex items-center gap-2">
-                                <span className="text-[11px] text-slate-500">{off.semesterName}</span>
+                                <span className="text-[11px] text-[var(--ink-faint)]">{off.semesterName}</span>
                                 <span
                                   className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black border transition-all ${
                                     isSelected
-                                      ? "bg-cyan-500 border-cyan-500 text-slate-950"
+                                      ? "bg-[var(--tertiary)] border-cyan-500 text-[var(--on-surface)]"
                                       : "bg-transparent border-slate-600 text-transparent"
                                   }`}
                                 >
@@ -808,20 +808,20 @@ export default function EventsEnrollmentPage() {
                                 </span>
                               </span>
                             </div>
-                            <h3 className="font-black text-base text-white group-hover:text-cyan-300 transition-colors">
+                            <h3 className="font-black text-base text-[var(--on-surface)] group-hover:text-[var(--tertiary)] transition-colors">
                               {off.courseTitle}
                             </h3>
-                            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                              <i className="ti ti-user text-slate-500" />
+                            <p className="text-xs text-[var(--on-surface-variant)] flex items-center gap-1.5">
+                              <i className="ti ti-user text-[var(--ink-faint)]" />
                               Lecturer: {off.lecturerName}
                             </p>
                           </div>
 
-                          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                            <span className="flex items-center gap-1 text-slate-400">
+                          <div className="mt-4 pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between text-xs text-[var(--on-surface-variant)]">
+                            <span className="flex items-center gap-1 text-[var(--on-surface-variant)]">
                               <i className="ti ti-users" /> Capacity: {off.capacity}
                             </span>
-                            <span className="text-[11px] text-slate-500">Offering #{off.offeringId}</span>
+                            <span className="text-[11px] text-[var(--ink-faint)]">Offering #{off.offeringId}</span>
                           </div>
                         </div>
                       );
@@ -830,17 +830,17 @@ export default function EventsEnrollmentPage() {
                 )}
 
                 {/* Offering Action Bar */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between pt-4 border-t border-[var(--outline-variant)]">
                   <button
                     onClick={() => setEnrollStep(1)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-[var(--on-surface-variant)] bg-[var(--surface-container)] hover:bg-[var(--surface-container-high)] transition-all flex items-center gap-1.5"
                   >
                     <i className="ti ti-arrow-left" /> Back to Batches
                   </button>
                   <button
                     onClick={() => selectedOfferingIds.length > 0 && setEnrollStep(3)}
                     disabled={selectedOfferingIds.length === 0}
-                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-[var(--on-surface)] bg-cyan-400 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-[var(--tertiary)] flex items-center gap-2"
                   >
                     <span>
                       Next: Review & Confirm
@@ -854,15 +854,15 @@ export default function EventsEnrollmentPage() {
 
             {/* STEP 3: REVIEW & CONFIRM */}
             {enrollStep === 3 && (
-              <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-6">
-                <div className="pb-4 border-b border-slate-800">
-                  <h2 className="text-lg font-black text-white flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs">
+              <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl space-y-6">
+                <div className="pb-4 border-b border-[var(--outline-variant)]">
+                  <h2 className="text-lg font-black text-[var(--on-surface)] flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-md bg-[var(--tertiary-container)] text-[var(--tertiary)] flex items-center justify-center text-xs">
                       3
                     </span>
                     Review & Bulk Confirm Enrollment
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">
                     Double-check details before executing batch-wide course registration into the database.
                   </p>
                 </div>
@@ -877,11 +877,11 @@ export default function EventsEnrollmentPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs border-t border-emerald-500/20">
                       <div>
                         <span className="text-emerald-500 block font-semibold">Offerings:</span>
-                        <span className="font-bold text-white text-sm">{enrollResult.totalOfferings ?? selectedOfferingIds.length}</span>
+                        <span className="font-bold text-[var(--on-surface)] text-sm">{enrollResult.totalOfferings ?? selectedOfferingIds.length}</span>
                       </div>
                       <div>
                         <span className="text-emerald-500 block font-semibold">Total Students:</span>
-                        <span className="font-bold text-white text-sm">{enrollResult.totalStudents}</span>
+                        <span className="font-bold text-[var(--on-surface)] text-sm">{enrollResult.totalStudents}</span>
                       </div>
                       <div>
                         <span className="text-emerald-500 block font-semibold">Newly Enrolled:</span>
@@ -889,7 +889,7 @@ export default function EventsEnrollmentPage() {
                       </div>
                       <div>
                         <span className="text-emerald-500 block font-semibold">Already Enrolled:</span>
-                        <span className="font-bold text-slate-300 text-sm">{enrollResult.alreadyEnrolled}</span>
+                        <span className="font-bold text-[var(--on-surface-variant)] text-sm">{enrollResult.alreadyEnrolled}</span>
                       </div>
                     </div>
 
@@ -912,12 +912,12 @@ export default function EventsEnrollmentPage() {
                 {/* Selected Details Overview */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   {/* Batch Card */}
-                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-500/30">
+                  <div className="p-5 rounded-2xl bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] space-y-2">
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[var(--surface-container)] text-[var(--tertiary)] border border-[var(--tertiary)]">
                       Target Batch
                     </span>
                     <h3 className="font-black text-lg text-white">{selectedBatch?.name}</h3>
-                    <div className="text-xs text-slate-400 space-y-1">
+                    <div className="text-xs text-[var(--on-surface-variant)] space-y-1">
                       <p><b>Department:</b> {selectedBatch?.departmentName}</p>
                       <p><b>Academic Year:</b> {selectedBatch?.academicYearLabel}</p>
                       <p><b>Batch ID:</b> #{selectedBatch?.batchId}</p>
@@ -925,17 +925,17 @@ export default function EventsEnrollmentPage() {
                   </div>
 
                   {/* Offering(s) Card */}
-                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-purple-950 text-purple-400 border border-purple-500/30">
+                  <div className="p-5 rounded-2xl bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] space-y-2">
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[var(--surface-container)] text-[var(--on-surface-variant)] border border-[var(--outline-variant)]">
                       Target Course Offering{selectedOfferings.length === 1 ? "" : "s"} ({selectedOfferings.length})
                     </span>
                     <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
                       {selectedOfferings.map((so) => (
-                        <div key={so.offeringId} className="pb-2 border-b border-slate-800/60 last:border-0 last:pb-0">
+                        <div key={so.offeringId} className="pb-2 border-b border-[var(--outline-variant)] last:border-0 last:pb-0">
                           <h3 className="font-black text-sm text-white">
                             {so.courseCode} - {so.courseTitle}
                           </h3>
-                          <div className="text-[11px] text-slate-400">
+                          <div className="text-[11px] text-[var(--on-surface-variant)]">
                             <span>{so.lecturerName}</span>
                             {" · "}
                             <span>{so.semesterName}</span>
@@ -951,35 +951,35 @@ export default function EventsEnrollmentPage() {
                 {/* Students In Batch Preview */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm text-white flex items-center gap-2">
-                      <i className="ti ti-users text-cyan-400" />
+                    <h4 className="font-bold text-sm text-[var(--on-surface)] flex items-center gap-2">
+                      <i className="ti ti-users text-[var(--tertiary)]" />
                       Students In This Batch ({selectedBatchStudents.length})
                     </h4>
-                    <span className="text-xs text-slate-400">Live Database Roster</span>
+                    <span className="text-xs text-[var(--on-surface-variant)]">Live Database Roster</span>
                   </div>
 
                   {studentsLoading ? (
-                    <div className="py-6 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
-                      <i className="ti ti-loader animate-spin text-cyan-400" /> Loading student roster...
+                    <div className="py-6 text-center text-[var(--on-surface-variant)] text-xs flex items-center justify-center gap-2">
+                      <i className="ti ti-loader animate-spin text-[var(--tertiary)]" /> Loading student roster...
                     </div>
                   ) : selectedBatchStudents.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-400">
+                    <div className="p-4 rounded-xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-center text-xs text-[var(--on-surface-variant)]">
                       No student records found in batch <b>{selectedBatch?.name}</b> yet.
                     </div>
                   ) : (
-                    <div className="max-h-56 overflow-y-auto border border-slate-800 rounded-xl divide-y divide-slate-850 bg-slate-950/40">
+                    <div className="max-h-56 overflow-y-auto border border-[var(--outline-variant)] rounded-xl divide-y divide-[var(--outline-variant)] bg-[var(--surface-container-low)]">
                       {selectedBatchStudents.map((s) => (
-                        <div key={s.studentId} className="px-4 py-2.5 flex items-center justify-between text-xs hover:bg-slate-800/30">
+                        <div key={s.studentId} className="px-4 py-2.5 flex items-center justify-between text-xs hover:bg-[var(--surface-container-low)]">
                           <div className="flex items-center gap-3">
-                            <span className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-cyan-400 font-bold flex items-center justify-center text-[10px]">
+                            <span className="w-7 h-7 rounded-full bg-[var(--surface-container)] border border-[var(--border)] text-[var(--tertiary)] font-bold flex items-center justify-center text-[10px]">
                               {s.fullName.charAt(0)}
                             </span>
                             <div>
                               <p className="font-semibold text-white">{s.fullName}</p>
-                              <p className="text-[11px] text-slate-500">{s.email}</p>
+                              <p className="text-[11px] text-[var(--ink-faint)]">{s.email}</p>
                             </div>
                           </div>
-                          <span className="font-mono text-slate-400 text-[11px]">{s.studentNo}</span>
+                          <span className="font-mono text-[var(--on-surface-variant)] text-[11px]">{s.studentNo}</span>
                         </div>
                       ))}
                     </div>
@@ -987,10 +987,10 @@ export default function EventsEnrollmentPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between pt-4 border-t border-[var(--outline-variant)]">
                   <button
                     onClick={() => setEnrollStep(2)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-[var(--on-surface-variant)] bg-[var(--surface-container)] hover:bg-[var(--surface-container-high)] transition-all flex items-center gap-1.5"
                   >
                     <i className="ti ti-arrow-left" /> Back
                   </button>
@@ -1003,14 +1003,14 @@ export default function EventsEnrollmentPage() {
                         setSelectedOfferingIds([]);
                         setEnrollResult(null);
                       }}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all"
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-all"
                     >
                       Reset Wizard
                     </button>
                     <button
                       onClick={handleExecuteBulkEnroll}
                       disabled={bulkEnrollMutation.isPending || selectedOfferingIds.length === 0}
-                      className="px-6 py-2.5 rounded-xl text-xs font-black text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 disabled:opacity-40 transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2"
+                      className="px-6 py-2.5 rounded-xl text-xs font-black text-[var(--on-surface)] bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 disabled:opacity-40 transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2"
                     >
                       {bulkEnrollMutation.isPending ? (
                         <>
@@ -1034,17 +1034,17 @@ export default function EventsEnrollmentPage() {
         {activeTab === "events" && (
           <div className="grid lg:grid-cols-2 gap-6">
             <div id="event-form-card" className={`card p-6 border transition-all rounded-2xl shadow-xl space-y-4 ${
-              editingEventId ? "border-amber-500/50 bg-slate-900/90 ring-2 ring-amber-500/20" : "border-slate-700/50 bg-slate-900/60 backdrop-blur-md"
+              editingEventId ? "border-amber-500/50 bg-[var(--surface-container)] ring-2 ring-amber-500/20" : "border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md"
             }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="font-display font-bold text-lg text-white flex items-center gap-2">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
+                <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
                   {editingEventId ? (
                     <>
                       <i className="ti ti-edit text-amber-400" /> Edit Campus Event
                     </>
                   ) : (
                     <>
-                      <i className="ti ti-calendar-plus text-cyan-400" /> Create Campus Event
+                      <i className="ti ti-calendar-plus text-[var(--tertiary)]" /> Create Campus Event
                     </>
                   )}
                 </h3>
@@ -1053,53 +1053,53 @@ export default function EventsEnrollmentPage() {
                     <button
                       type="button"
                       onClick={handleCancelEdit}
-                      className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                      className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[var(--surface-container)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] transition-colors"
                     >
                       Cancel Edit
                     </button>
                   )}
-                  <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-500/30">
-                    Backblaze B2 Storage
+                  <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[var(--surface-container)] text-[var(--tertiary)] border border-[var(--tertiary)]">
+                    Storj S3 Storage
                   </span>
                 </div>
               </div>
 
               <form onSubmit={handleCreateOrUpdateEvent} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Event Title *</label>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Event Title *</label>
                   <input
                     type="text"
                     required
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value)}
                     placeholder="e.g. Annual Tech Symposium 2026"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                   />
                 </div>
 
                 {/* Poster Upload */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Event Poster Image (Uploaded to Backblaze B2)
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
+                    Event Poster Image (Cloud Storage)
                   </label>
                   {posterPreview ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-cyan-500/40 bg-slate-950 group">
+                    <div className="relative rounded-2xl overflow-hidden border border-[var(--tertiary)] bg-[var(--surface-container-lowest)] group">
                       <img src={posterPreview} alt="Poster Preview" className="w-full h-44 object-cover" />
-                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <div className="absolute inset-0 bg-[var(--surface-container-lowest)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <button
                           type="button"
                           onClick={handleRemovePoster}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-white hover:bg-rose-500 flex items-center gap-1 shadow-lg"
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-[var(--on-surface)] hover:bg-rose-500 flex items-center gap-1 shadow-lg"
                         >
                           <i className="ti ti-trash" /> Remove Poster
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer bg-slate-950/50 hover:bg-slate-900 transition-all text-center group">
-                      <i className="ti ti-cloud-upload text-3xl text-cyan-400 mb-1.5 group-hover:scale-110 transition-transform" />
+                    <label className="border-2 border-dashed border-[var(--border)] hover:border-[var(--tertiary)] rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer bg-[var(--surface-container-low)] hover:bg-[var(--surface-container-low)] transition-all text-center group">
+                      <i className="ti ti-cloud-upload text-3xl text-[var(--tertiary)] mb-1.5 group-hover:scale-110 transition-transform" />
                       <span className="text-xs font-bold text-slate-200">Click to upload poster image</span>
-                      <span className="text-[11px] text-slate-500 mt-0.5">PNG, JPG, WEBP up to 10MB</span>
+                      <span className="text-[11px] text-[var(--ink-faint)] mt-0.5">PNG, JPG, WEBP up to 10MB</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -1111,35 +1111,35 @@ export default function EventsEnrollmentPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Description</label>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Description</label>
                   <textarea
                     rows={3}
                     value={eventDesc}
                     onChange={(e) => setEventDesc(e.target.value)}
                     placeholder="Provide details about the event, agenda, guests..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Event Date *</label>
+                    <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Event Date *</label>
                     <input
                       type="datetime-local"
                       required
                       value={eventDate}
                       onChange={(e) => setEventDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Venue</label>
+                    <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Venue</label>
                     <input
                       type="text"
                       value={eventVenue}
                       onChange={(e) => setEventVenue(e.target.value)}
                       placeholder="e.g. Main Auditorium"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                     />
                   </div>
                 </div>
@@ -1150,8 +1150,8 @@ export default function EventsEnrollmentPage() {
                     disabled={createEventMutation.isPending || updateEventMutation.isPending || isUploadingPoster}
                     className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
                       editingEventId
-                        ? "text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-amber-500/20"
-                        : "text-slate-950 bg-cyan-400 hover:bg-cyan-300 shadow-cyan-500/20"
+                        ? "text-[var(--on-surface)] bg-amber-400 hover:bg-amber-300 shadow-amber-500/20"
+                        : "text-[var(--on-surface)] bg-cyan-400 hover:opacity-90 shadow-[var(--tertiary)]"
                     }`}
                   >
                     {isUploadingPoster ? (
@@ -1177,7 +1177,7 @@ export default function EventsEnrollmentPage() {
                     <button
                       type="button"
                       onClick={handleCancelEdit}
-                      className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                      className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-[var(--surface-container)] hover:bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] transition-colors"
                     >
                       Cancel
                     </button>
@@ -1186,18 +1186,18 @@ export default function EventsEnrollmentPage() {
               </form>
             </div>
 
-            <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl space-y-4">
-              <h3 className="font-display font-bold text-lg text-white pb-3 border-b border-slate-800 flex items-center gap-2">
-                <i className="ti ti-calendar-event text-cyan-400" /> Upcoming Events ({eventsList.length})
+            <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl space-y-4">
+              <h3 className="font-display font-bold text-lg text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)] flex items-center gap-2">
+                <i className="ti ti-calendar-event text-[var(--tertiary)]" /> Upcoming Events ({eventsList.length})
               </h3>
               {eventsList.length === 0 ? (
-                <div className="py-12 text-center text-slate-500 text-xs">No upcoming events scheduled.</div>
+                <div className="py-12 text-center text-[var(--ink-faint)] text-xs">No upcoming events scheduled.</div>
               ) : (
                 <div className="space-y-4 max-h-[680px] overflow-y-auto pr-1">
                   {eventsList.map((ev) => (
                     <div
                       key={ev.id}
-                      className="relative rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden group hover:border-cyan-500/40 transition-all min-h-[220px] p-5 flex flex-col justify-between shadow-xl"
+                      className="relative rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] overflow-hidden group hover:border-[var(--tertiary)] transition-all min-h-[220px] p-5 flex flex-col justify-between shadow-xl"
                     >
                       {/* Background Image */}
                       {ev.posterUrl ? (
@@ -1230,7 +1230,7 @@ export default function EventsEnrollmentPage() {
 
                       {/* Top Action Row */}
                       <div className="relative z-10 flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-cyan-950/90 text-cyan-300 border border-cyan-500/40 backdrop-blur-md">
+                        <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-[var(--surface-container)]/90 text-[var(--tertiary)] border border-[var(--tertiary)] backdrop-blur-md">
                           Campus Event
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -1244,7 +1244,7 @@ export default function EventsEnrollmentPage() {
                           <button
                             onClick={() => deleteEventMutation.mutate(ev.id)}
                             title="Delete Event"
-                            className="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 transition-colors"
+                            className="text-[var(--on-surface-variant)] hover:text-rose-400 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 transition-colors"
                           >
                             <i className="ti ti-trash text-sm" />
                           </button>
@@ -1253,16 +1253,16 @@ export default function EventsEnrollmentPage() {
 
                       {/* Details */}
                       <div className="relative z-10 space-y-1.5 mt-auto pt-4">
-                        <h4 className="font-bold text-base text-white group-hover:text-cyan-300 transition-colors">
+                        <h4 className="font-bold text-base text-[var(--on-surface)] group-hover:text-[var(--tertiary)] transition-colors">
                           {ev.title}
                         </h4>
-                        {ev.description && <p className="text-xs text-slate-300 line-clamp-2">{ev.description}</p>}
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-white/10">
-                          <span className="text-cyan-400 font-semibold flex items-center gap-1">
+                        {ev.description && <p className="text-xs text-[var(--on-surface-variant)] line-clamp-2">{ev.description}</p>}
+                        <div className="flex items-center justify-between text-[11px] text-[var(--on-surface-variant)] pt-2 border-t border-white/10">
+                          <span className="text-[var(--tertiary)] font-semibold flex items-center gap-1">
                             <i className="ti ti-clock" /> {ev.eventDate}
                           </span>
                           <span className="flex items-center gap-1">
-                            <i className="ti ti-map-pin text-cyan-400" /> {ev.venue}
+                            <i className="ti ti-map-pin text-[var(--tertiary)]" /> {ev.venue}
                           </span>
                         </div>
                       </div>
@@ -1277,58 +1277,58 @@ export default function EventsEnrollmentPage() {
         {/* TAB 3: ANNOUNCEMENTS */}
         {activeTab === "announcements" && (
           <div className="grid lg:grid-cols-3 gap-6">
-            <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl lg:col-span-1 space-y-4">
-              <h3 className="font-display font-bold text-lg text-white pb-3 border-b border-slate-800 flex items-center gap-2">
-                <i className="ti ti-speakerphone text-cyan-400" /> Publish Notice
+            <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl lg:col-span-1 space-y-4">
+              <h3 className="font-display font-bold text-lg text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)] flex items-center gap-2">
+                <i className="ti ti-speakerphone text-[var(--tertiary)]" /> Publish Notice
               </h3>
               <form onSubmit={handlePublishAnnouncement} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Notice Title *</label>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Notice Title *</label>
                   <input
                     type="text"
                     required
                     value={annTitle}
                     onChange={(e) => setAnnTitle(e.target.value)}
                     placeholder="Important Notice"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Notice Content *</label>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Notice Content *</label>
                   <textarea
                     rows={4}
                     required
                     value={annContent}
                     onChange={(e) => setAnnContent(e.target.value)}
                     placeholder="Enter announcement message..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={publishAnnMutation.isPending}
-                  className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 transition-all shadow-md shadow-cyan-500/20"
+                  className="w-full py-2.5 rounded-xl text-xs font-bold text-[var(--on-surface)] bg-cyan-400 hover:opacity-90 transition-all shadow-md shadow-[var(--tertiary)]"
                 >
                   {publishAnnMutation.isPending ? "Publishing..." : "Publish Announcement"}
                 </button>
               </form>
             </div>
 
-            <div className="card p-6 border border-slate-700/50 bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-xl lg:col-span-2 space-y-4">
-              <h3 className="font-display font-bold text-lg text-white pb-3 border-b border-slate-800 flex items-center gap-2">
-                <i className="ti ti-bell text-cyan-400" /> Published Announcements ({announcementsList.length})
+            <div className="card p-6 border border-[var(--border)] bg-[var(--surface-container-low)] backdrop-blur-md rounded-2xl shadow-xl lg:col-span-2 space-y-4">
+              <h3 className="font-display font-bold text-lg text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)] flex items-center gap-2">
+                <i className="ti ti-bell text-[var(--tertiary)]" /> Published Announcements ({announcementsList.length})
               </h3>
               {announcementsList.length === 0 ? (
-                <div className="py-12 text-center text-slate-500 text-xs">No announcements published yet.</div>
+                <div className="py-12 text-center text-[var(--ink-faint)] text-xs">No announcements published yet.</div>
               ) : (
                 <div className="space-y-3">
                   {announcementsList.map((ann) => (
-                    <div key={ann.id} className="p-4 rounded-xl border border-slate-800 bg-slate-950/50 space-y-1">
+                    <div key={ann.id} className="p-4 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] space-y-1">
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-sm text-white">{ann.title}</h4>
-                        <span className="text-[10px] text-slate-500">{ann.postedAt}</span>
+                        <span className="text-[10px] text-[var(--ink-faint)]">{ann.postedAt}</span>
                       </div>
-                      <p className="text-xs text-slate-300 whitespace-pre-wrap">{ann.content}</p>
+                      <p className="text-xs text-[var(--on-surface-variant)] whitespace-pre-wrap">{ann.content}</p>
                     </div>
                   ))}
                 </div>

@@ -1,5 +1,5 @@
 services:
-  # Spring Boot Backend Service (Connected to your TiDB Cloud Database & Storage)
+  # Backend
   backend:
     build:
       context: ./server
@@ -15,15 +15,13 @@ services:
     networks:
       - unilearn-network
 
-  # Next.js Frontend Service
+  # Frontend
   frontend:
     build:
       context: ./client
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-unilearn}
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:-unilearn_preset}
     container_name: unilearn-frontend
     restart: unless-stopped
     depends_on:

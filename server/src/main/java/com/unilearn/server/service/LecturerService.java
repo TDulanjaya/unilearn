@@ -9,9 +9,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing lecturers.
- */
+// Lecturers service
 public interface LecturerService {
 
     LecturerResponse createLecturer(LecturerRequest request);

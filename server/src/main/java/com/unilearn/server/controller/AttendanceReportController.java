@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/reports/attendance")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
 public class AttendanceReportController {
 
     private final AttendanceReportService attendanceReportService;

@@ -37,29 +37,40 @@ import { useEffect } from "react";
 
 export default function StudentRecordsPage() {
   const { user } = useAuth();
-  const { data: rawSemesters } = useQuery({
-    queryKey: ["semesters"],
-    queryFn: () => api.get<any>("/api/v1/semesters"),
+
+  const { data: enrollmentsData } = useQuery({
+    queryKey: ["student-records-enrollments", user?.userId],
+    queryFn: () => (user?.userId ? api.get<any[]>(`/api/v1/enrollments/student/${user.userId}`) : Promise.resolve([])),
+    enabled: !!user?.userId,
   });
 
-  const apiSemesters: SemesterData[] = Array.isArray(rawSemesters) && rawSemesters.length > 0
-    ? rawSemesters.map((s: any) => ({
-        semester: s.name || "Semester",
-        gpa: 3.67,
-        credits: 12,
-        courses: [
-          { code: "SE201.2", name: "Data Structures & Algorithms", credits: 4, grade: "A", points: 4.0 },
-          { code: "SE202.2", name: "Database Systems", credits: 4, grade: "A-", points: 3.7 },
-        ],
-      }))
-    : INITIAL_SEMESTERS;
+  const { data: rawSemesters } = useQuery({
+    queryKey: ["semesters"],
+    queryFn: () => api.get<any[]>("/api/v1/semesters"),
+  });
 
-  const [semesters, setSemesters] = useState<SemesterData[]>(apiSemesters);
+  const semesters: SemesterData[] = Array.isArray(rawSemesters) && rawSemesters.length > 0
+    ? rawSemesters.map((s: any) => {
+        const matchingEnrollments = Array.isArray(enrollmentsData)
+          ? enrollmentsData.filter((e: any) => e.status === "ACTIVE" || e.status === "ENROLLED" || e.status === "COMPLETED")
+          : [];
+        const courses: CourseRecord[] = matchingEnrollments.map((e: any) => ({
+          code: e.courseCode || "CRS",
+          name: e.courseName || "Course",
+          credits: 3,
+          grade: "A",
+          points: 4.0,
+        }));
+        return {
+          semester: s.name || "Semester",
+          gpa: courses.length > 0 ? 4.0 : 0.0,
+          credits: courses.length * 3,
+          courses,
+        };
+      }).filter((s) => s.courses.length > 0)
+    : [];
+
   const [selectedSemIdx, setSelectedSemIdx] = useState(0);
-
-  useEffect(() => {
-    if (apiSemesters) setSemesters(apiSemesters);
-  }, [rawSemesters]);
 
   
   const [hypotheticalGrades, setHypotheticalGrades] = useState<Record<string, string>>({});
@@ -249,17 +260,35 @@ Total Credits: ${totalCredits}
 
       
       {currentSem ? (
-        <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-          <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-3">
+        <div className="card p-4 sm:p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--outline-variant)] pb-3">
             <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
               Course Grade History — {currentSem.semester}
             </h3>
-            <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)]">
+            <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)] self-start sm:self-auto">
               Semester GPA: {currentSem.gpa}
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card View (< md) */}
+          <div className="md:hidden divide-y divide-[var(--outline-variant)]">
+            {currentSem.courses.map((course) => (
+              <div key={course.code} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-[var(--tertiary)]">{course.code}</span>
+                  <span className="badge badge-accent font-bold">{course.grade}</span>
+                </div>
+                <p className="text-xs font-semibold text-[var(--on-surface)]">{course.name}</p>
+                <div className="flex items-center justify-between text-[11px] text-[var(--on-surface-variant)] pt-1">
+                  <span>Credits: <b className="text-[var(--on-surface)]">{course.credits}</b></span>
+                  <span>Grade Points: <b className="font-mono text-[var(--on-surface)]">{course.points.toFixed(2)}</b></span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] font-bold uppercase text-[11px]">
                 <tr>

@@ -36,9 +36,9 @@ export default function CourseMaterialsTab({
   };
 
   return (
-    <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+    <div className="card p-4 sm:p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
       <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
-        <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
+        <h3 className="font-display font-bold text-base sm:text-lg text-[var(--on-surface)] flex items-center gap-2">
           <i className="ti ti-book text-[var(--tertiary)] text-xl"></i> Course Materials
         </h3>
       </div>
@@ -56,7 +56,7 @@ export default function CourseMaterialsTab({
               className="border border-[var(--outline-variant)] rounded-xl bg-[var(--surface-container-lowest)] overflow-hidden transition-colors"
             >
               
-              <div className="flex items-center justify-between p-4 hover:bg-[var(--surface-container-low)]/50 transition-colors">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 hover:bg-[var(--surface-container-low)]/50 transition-colors gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${meta.bg}`}
@@ -64,7 +64,7 @@ export default function CourseMaterialsTab({
                     <i className={`ti ${meta.icon} text-lg`}></i>
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-[var(--on-surface)] truncate">
                         {m.title}
                       </p>
@@ -80,31 +80,31 @@ export default function CourseMaterialsTab({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 ml-3">
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto flex-wrap">
                   {!hasAttachments && (
                     <>
-                      {m.type === "VIDEO" ? (
+                      {!m.linkUrl ? (
+                        <span className="text-xs text-[var(--outline)] italic px-2">No file attached</span>
+                      ) : m.type === "VIDEO" ? (
                         <button
                           onClick={() =>
                             setActiveVideoModal({
                               title: m.title,
-                              url:
-                                m.linkUrl ||
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                              url: m.linkUrl!,
                               moduleName: m.module,
                             })
                           }
-                          className="btn-primary text-xs !py-1.5 flex items-center gap-1 bg-pink-600 hover:bg-pink-700 text-white"
+                          className="btn-primary text-xs !py-2 !px-3 min-h-[44px] flex items-center gap-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl"
                           title="Watch Recorded Video"
                         >
                           <i className="ti ti-player-play text-sm"></i> Watch Video
                         </button>
                       ) : m.type === "LINK" ? (
                         <a
-                          href={m.linkUrl || "https://ieee.org"}
+                          href={m.linkUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn-primary text-xs !py-1.5 flex items-center gap-1 bg-cyan-600 hover:bg-cyan-700 text-white"
+                          className="btn-primary text-xs !py-2 !px-3 min-h-[44px] flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl"
                           title="Open External Resource"
                         >
                           <i className="ti ti-external-link text-sm"></i> Open Link
@@ -113,19 +113,19 @@ export default function CourseMaterialsTab({
                         <>
                           <button
                             onClick={() => setSelectedMaterial(m)}
-                            className="btn-secondary text-xs !py-1.5"
+                            className="btn-secondary text-xs !py-2 !px-3 min-h-[44px] flex items-center gap-1 rounded-xl"
                             title="Preview Summary"
                           >
                             <i className="ti ti-eye text-sm"></i>{" "}
-                            <span className="hidden sm:inline">Preview</span>
+                            <span>Preview</span>
                           </button>
                           <button
                             onClick={() => handleDownloadMaterial(m)}
-                            className="btn-primary text-xs !py-1.5"
+                            className="btn-primary text-xs !py-2 !px-3 min-h-[44px] flex items-center gap-1 rounded-xl"
                             title="Download Document"
                           >
                             <i className="ti ti-download text-sm"></i>{" "}
-                            <span className="hidden sm:inline">Download</span>
+                            <span>Download</span>
                           </button>
                         </>
                       )}
@@ -165,14 +165,14 @@ export default function CourseMaterialsTab({
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {att.type === "VIDEO" ? (
+                            {!att.linkUrl ? (
+                              <span className="text-[10px] text-[var(--outline)] italic px-1">No file attached</span>
+                            ) : att.type === "VIDEO" ? (
                               <button
                                 onClick={() =>
                                   setActiveVideoModal({
                                     title: att.title,
-                                    url:
-                                      att.linkUrl ||
-                                      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                                    url: att.linkUrl!,
                                     moduleName: m.module,
                                   })
                                 }
@@ -182,7 +182,7 @@ export default function CourseMaterialsTab({
                               </button>
                             ) : att.type === "LINK" ? (
                               <a
-                                href={att.linkUrl || "https://ieee.org"}
+                                href={att.linkUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-semibold text-[11px] flex items-center gap-1"

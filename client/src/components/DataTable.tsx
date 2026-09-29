@@ -33,10 +33,8 @@ export default function DataTable<T extends Record<string, any>>({
   const [currentPage, setCurrentPage] = useState(1);
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
 
-  
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchesSearch = Object.values(item).some((val) =>
@@ -45,7 +43,6 @@ export default function DataTable<T extends Record<string, any>>({
         if (!matchesSearch) return false;
       }
 
-      
       for (const key of Object.keys(columnFilters)) {
         const filterVal = columnFilters[key];
         if (filterVal && filterVal !== "ALL") {
@@ -59,7 +56,6 @@ export default function DataTable<T extends Record<string, any>>({
     });
   }, [data, searchTerm, columnFilters]);
 
-  
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const currentPageClamped = Math.min(currentPage, totalPages);
 
@@ -75,10 +71,9 @@ export default function DataTable<T extends Record<string, any>>({
 
   return (
     <div className="space-y-4">
-      
+      {/* Search and Filters */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative w-full md:max-w-sm">
           <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-variant)] text-base pointer-events-none z-10"></i>
           <input
             type="text"
@@ -88,12 +83,12 @@ export default function DataTable<T extends Record<string, any>>({
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full !pl-10 pr-4 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)]/60 focus:outline-none focus:border-[var(--tertiary)] transition-colors"
+            className="w-full !pl-10 pr-4 py-2.5 text-xs sm:text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)]/60 focus:outline-none focus:border-[var(--tertiary)] transition-colors min-h-[44px]"
           />
         </div>
 
-        
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Filters */}
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           {columns
             .filter((col) => col.filterable && col.accessorKey && col.filterOptions)
             .map((col) => {
@@ -103,7 +98,7 @@ export default function DataTable<T extends Record<string, any>>({
                   key={key}
                   value={columnFilters[key] || "ALL"}
                   onChange={(e) => handleFilterChange(key, e.target.value)}
-                  className="px-3 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)]"
+                  className="flex-1 md:flex-none px-3 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)] min-h-[44px]"
                 >
                   <option value="ALL">All {col.header}s</option>
                   {col.filterOptions?.map((opt) => (
@@ -117,9 +112,50 @@ export default function DataTable<T extends Record<string, any>>({
         </div>
       </div>
 
-      
+      {/* Container */}
       <div className="card overflow-hidden border border-[var(--outline-variant)] shadow-sm bg-[var(--surface-container-lowest)]">
-        <div className="overflow-x-auto">
+        {/* Mobile Card View (< md) */}
+        <div className="md:hidden divide-y divide-[var(--outline-variant)]">
+          {paginatedData.length > 0 ? (
+            paginatedData.map((row, rIdx) => (
+              <div
+                key={rIdx}
+                className="p-4 space-y-2.5 bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)]/40 transition-colors"
+              >
+                {columns.map((col, cIdx) => {
+                  const val = col.cell
+                    ? col.cell(row)
+                    : col.accessor
+                    ? col.accessor(row)
+                    : col.accessorKey
+                    ? String(row[col.accessorKey] ?? "")
+                    : null;
+                  return (
+                    <div
+                      key={cIdx}
+                      className="flex items-start justify-between gap-3 text-xs py-0.5 border-b border-[var(--outline-variant)]/40 last:border-0"
+                    >
+                      <span className="font-semibold text-[var(--on-surface-variant)] shrink-0 min-w-[85px]">
+                        {col.header}
+                      </span>
+                      <div className="text-[var(--on-surface)] text-right break-words overflow-hidden flex-1 flex justify-end">
+                        {val}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          ) : (
+            <div className="p-8 text-center text-[var(--on-surface-variant)]">
+              <i className="ti ti-table-off text-2xl block mb-1 opacity-50"></i>
+              No matching records found
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs text-[var(--on-surface)]">
             <thead className="bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] font-semibold border-b border-[var(--outline-variant)] uppercase tracking-wider text-[11px]">
               <tr>
@@ -165,9 +201,9 @@ export default function DataTable<T extends Record<string, any>>({
           </table>
         </div>
 
-        
+        {/* Pagination Bar */}
         <div className="p-3.5 px-4 border-t border-[var(--outline-variant)] bg-[var(--surface-container-low)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--on-surface-variant)]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
             <span>Show</span>
             <select
               value={pageSize}
@@ -175,7 +211,7 @@ export default function DataTable<T extends Record<string, any>>({
                 setPageSize(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="px-2 py-1 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+              className="px-2 py-1.5 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] min-h-[36px]"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -183,21 +219,22 @@ export default function DataTable<T extends Record<string, any>>({
                 </option>
               ))}
             </select>
-            <span>entries per page</span>
+            <span>entries</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span>
-              Showing {filteredData.length === 0 ? 0 : (currentPageClamped - 1) * pageSize + 1} to{" "}
-              {Math.min(currentPageClamped * pageSize, filteredData.length)} of {filteredData.length} entries
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+            <span className="text-[11px] sm:text-xs">
+              {filteredData.length === 0 ? 0 : (currentPageClamped - 1) * pageSize + 1}-
+              {Math.min(currentPageClamped * pageSize, filteredData.length)} of {filteredData.length}
             </span>
 
             <div className="flex items-center gap-1">
               <button
                 disabled={currentPageClamped === 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
+                className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
                 title="Previous page"
+                aria-label="Previous page"
               >
                 <i className="ti ti-chevron-left text-sm"></i>
               </button>
@@ -207,8 +244,9 @@ export default function DataTable<T extends Record<string, any>>({
               <button
                 disabled={currentPageClamped === totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="p-1.5 rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
+                className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
                 title="Next page"
+                aria-label="Next page"
               >
                 <i className="ti ti-chevron-right text-sm"></i>
               </button>

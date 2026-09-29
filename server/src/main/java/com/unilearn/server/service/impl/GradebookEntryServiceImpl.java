@@ -27,6 +27,7 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
     private final CourseOfferingRepository courseOfferingRepository;
     private final StudentRepository studentRepository;
     private final GradebookEntryMapper gradebookEntryMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -34,6 +35,7 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
         if (request == null) {
             throw new ValidationException("GradebookEntry request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
@@ -59,6 +61,11 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
         GradebookEntry entry = gradebookEntryRepository.findById(entryId)
                 .orElseThrow(() -> new EntryNotFoundException("GradebookEntry not found with ID: " + entryId));
 
+        if (entry.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(entry.getCourseOffering().getOfferingId());
+        }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
+
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
@@ -82,10 +89,14 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
         if (entryId == null) {
             throw new ValidationException("Gradebook entry ID cannot be null");
         }
-        if (!gradebookEntryRepository.existsById(entryId)) {
-            throw new EntryNotFoundException("GradebookEntry not found with ID: " + entryId);
+        GradebookEntry entry = gradebookEntryRepository.findById(entryId)
+                .orElseThrow(() -> new EntryNotFoundException("GradebookEntry not found with ID: " + entryId));
+
+        if (entry.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(entry.getCourseOffering().getOfferingId());
         }
-        gradebookEntryRepository.deleteById(entryId);
+
+        gradebookEntryRepository.delete(entry);
     }
 
     @Override
@@ -103,6 +114,8 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
         if (offeringId == null) {
             throw new ValidationException("Offering ID cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(offeringId);
+
         if (!courseOfferingRepository.existsById(offeringId)) {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
         }
@@ -118,6 +131,8 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
         if (studentId == null) {
             throw new ValidationException("Student ID cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(studentId);
+
         if (!studentRepository.existsById(studentId)) {
             throw new EntryNotFoundException("Student not found with ID: " + studentId);
         }

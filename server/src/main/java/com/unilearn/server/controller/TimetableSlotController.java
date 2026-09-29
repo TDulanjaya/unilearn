@@ -20,31 +20,33 @@ public class TimetableSlotController {
     private final TimetableSlotService timetableSlotService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<TimetableSlotResponse> createSlot(@Valid @RequestBody TimetableSlotRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(timetableSlotService.createSlot(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<TimetableSlotResponse> updateSlot(@PathVariable Long id,
                                                             @Valid @RequestBody TimetableSlotRequest request) {
         return ResponseEntity.ok(timetableSlotService.updateSlot(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<Void> deleteSlot(@PathVariable Long id) {
         timetableSlotService.deleteSlot(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/offering/{offeringId}")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER', 'STUDENT')")
     public ResponseEntity<List<TimetableSlotResponse>> getSlotsByOffering(@PathVariable Long offeringId) {
         return ResponseEntity.ok(timetableSlotService.getSlotsByOffering(offeringId));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER', 'STUDENT')")
     public ResponseEntity<List<TimetableSlotResponse>> getAllSlots() {
         return ResponseEntity.ok(timetableSlotService.getAllSlots());
     }

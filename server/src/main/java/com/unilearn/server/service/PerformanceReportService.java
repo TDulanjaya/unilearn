@@ -4,9 +4,7 @@ import com.unilearn.server.dto.response.PerformanceReportResponse;
 
 import java.util.List;
 
-/**
- * Service interface for generating performance reports.
- */
+// Performance reports service
 public interface PerformanceReportService {
 
     List<PerformanceReportResponse> generateReport(Long facultyId, Long departmentId, Long offeringId);

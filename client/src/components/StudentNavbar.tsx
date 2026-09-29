@@ -37,6 +37,25 @@ export default function StudentNavbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        setIsAccountOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   const handleLogout = () => {
     setIsOpen(false);
     setIsAccountOpen(false);
@@ -131,41 +150,47 @@ export default function StudentNavbar() {
       </div>
 
       {isOpen && (
-        <nav className="md:hidden pt-3 pb-2 mt-2 border-t border-[var(--glass-border)] flex flex-col space-y-1">
-          <Link
-            href="/profile"
+        <>
+          <div
             onClick={() => setIsOpen(false)}
-            className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-container-low)] mb-2"
-          >
-            <div className="avatar w-8 h-8 text-xs font-bold">{displayInitials}</div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
-              <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
-            </div>
-          </Link>
-          {links.map((link) => {
-            const isActive = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsOpen(false)}
-                className={`sidebar-link ${isActive ? "active" : ""}`}
-              >
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
-          <div className="pt-2 border-t border-[var(--outline-variant)]">
-            <button
-              onClick={handleLogout}
-              className="sidebar-link w-full text-left text-[var(--error)] hover:bg-[var(--error-container)]/30"
+            className="md:hidden fixed inset-0 top-[60px] z-30 bg-black/50 backdrop-blur-sm transition-opacity"
+          />
+          <nav className="md:hidden pt-3 pb-2 mt-2 border-t border-[var(--glass-border)] flex flex-col space-y-1 relative z-40 max-h-[calc(100vh-80px)] overflow-y-auto">
+            <Link
+              href="/profile"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 p-2.5 min-h-[44px] rounded-xl bg-[var(--surface-container-low)] mb-2"
             >
-              <i className="ti ti-logout text-lg"></i>
-              <span>Logout</span>
-            </button>
-          </div>
-        </nav>
+              <div className="avatar w-8 h-8 text-xs font-bold shrink-0">{displayInitials}</div>
+              <div className="overflow-hidden min-w-0">
+                <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
+                <p className="text-[11px] text-[var(--on-surface-variant)] truncate">{displaySub}</p>
+              </div>
+            </Link>
+            {links.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsOpen(false)}
+                  className={`sidebar-link min-h-[44px] ${isActive ? "active" : ""}`}
+                >
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+            <div className="pt-2 border-t border-[var(--outline-variant)]">
+              <button
+                onClick={handleLogout}
+                className="sidebar-link min-h-[44px] w-full text-left text-[var(--error)] hover:bg-[var(--error-container)]/30"
+              >
+                <i className="ti ti-logout text-lg"></i>
+                <span>Logout</span>
+              </button>
+            </div>
+          </nav>
+        </>
       )}
     </header>
   );

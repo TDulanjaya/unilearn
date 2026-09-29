@@ -66,7 +66,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(enrollmentService.getEnrollmentsByOffering(offeringId, pageable));
     }
 
-    // Single offering batch enroll (kept for backward compatibility)
+    // Enroll batch into single course offering
     @PostMapping("/batch/{batchId}/offering/{offeringId}")
     @PreAuthorize("hasRole('STAFF_ADMIN')")
     public ResponseEntity<java.util.Map<String, Object>> enrollBatch(
@@ -75,7 +75,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(enrollmentService.enrollBatch(batchId, offeringId));
     }
 
-    // Enroll a batch into one or more offerings
+    // Enroll batch into multiple course offerings
     @PostMapping("/batch/{batchId}")
     @PreAuthorize("hasRole('STAFF_ADMIN')")
     public ResponseEntity<java.util.Map<String, Object>> enrollBatchMultiple(

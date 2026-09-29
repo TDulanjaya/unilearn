@@ -30,4 +30,7 @@ public class AiChatMessageRequest {
 
     @NotBlank(message = "Content is required")
     private String content;
+
+    // scope: course_materials, my_notes, or both (defaults to both)
+    private String sourceScope;
 }

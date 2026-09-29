@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.ExamResultResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing exam results.
- */
+// Exam results service
 public interface ExamResultService {
 
     ExamResultResponse publishResult(ExamResultRequest request);

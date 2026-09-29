@@ -46,6 +46,9 @@ public class AiChatMessage {
     @Column(nullable = false)
     private String content;
 
+    @Column(name = "sources", length = 1000)
+    private String sources;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

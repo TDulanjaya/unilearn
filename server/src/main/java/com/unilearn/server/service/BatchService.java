@@ -9,9 +9,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing batches.
- */
+// Batches service
 public interface BatchService {
 
     BatchResponse createBatch(BatchRequest request);

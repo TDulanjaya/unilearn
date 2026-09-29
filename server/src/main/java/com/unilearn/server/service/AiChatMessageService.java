@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.AiChatMessageResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing AI chat messages.
- */
+// Ai chat messages service
 public interface AiChatMessageService {
 
     AiChatMessageResponse saveMessage(AiChatMessageRequest request);

@@ -8,9 +8,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing courses.
- */
+// Courses service
 public interface CourseService {
 
     CourseResponse createCourse(CourseRequest request);

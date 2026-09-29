@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.AiQuizSessionResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing AI quiz sessions.
- */
+// Ai quiz sessions service
 public interface AiQuizSessionService {
 
     AiQuizSessionResponse startQuizSession(AiQuizSessionRequest request);

@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.ExamAttemptResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing exam attempts.
- */
+// Exam attempts service
 public interface ExamAttemptService {
 
     ExamAttemptResponse startAttempt(ExamAttemptStartRequestDTO request);

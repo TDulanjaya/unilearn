@@ -30,14 +30,14 @@ type FilterType =
 export default function StudentCoursesPage() {
   const { user } = useAuth();
 
-  // 1. Fetch student enrollments
+  // enrollments
   const { data: enrollmentsData } = useQuery({
     queryKey: ["studentEnrollments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
     enabled: !!user?.userId,
   });
 
-  // 2. Fetch all offerings
+  // course offerings
   const { data: offeringsData, isLoading } = useQuery({
     queryKey: ["courseOfferings"],
     queryFn: () => api.get<any>("/api/v1/course-offerings"),
@@ -51,15 +51,17 @@ export default function StudentCoursesPage() {
     ? offeringsData
     : offeringsData?.content || offeringsData?.dataList || [];
 
-  // If student has specific enrollments, display them; otherwise display all offerings
+  // Show enrolled courses or all courses
   const activeList = enrolledList.length > 0 ? enrolledList : allOfferingsList;
 
   const apiCourses: CourseItem[] = activeList.map((o: any, idx: number) => ({
     id: String(o.offeringId || idx + 1),
-    code: o.courseCode || "SE308.3",
-    title: o.courseName || o.courseTitle || "Software Engineering Module",
-    lecturer: `${o.primaryLecturerName || o.lecturerName || "Lecturer"} · ${o.departmentName || o.batchName || "Faculty of Computing"}`,
-    progress: 75,
+    code: o.courseCode || "—",
+    title: o.courseName || o.courseTitle || "Untitled Course",
+    lecturer: o.primaryLecturerName
+      ? `${o.primaryLecturerName}${o.departmentName ? " · " + o.departmentName : ""}`
+      : (o.lecturerName || "Lecturer"),
+    progress: o.progress ?? 0,
     assignmentsPending: 0,
     status: "In progress",
     isStarred: false,

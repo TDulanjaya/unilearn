@@ -20,6 +20,8 @@ public class ExamQuestionResponse {
     private Long examId;
     private Long questionId;
     private String questionText;
+    private String questionType;
+    private String options;
     private BigDecimal marks;
     private BigDecimal marksOverride;
     private Integer orderIndex;

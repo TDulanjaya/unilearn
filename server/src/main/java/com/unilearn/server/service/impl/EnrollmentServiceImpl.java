@@ -33,6 +33,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final StudentRepository studentRepository;
     private final CourseOfferingRepository courseOfferingRepository;
     private final EnrollmentMapper enrollmentMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -40,6 +41,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (request == null) {
             throw new ValidationException("Enrollment request cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(request.getStudentId());
 
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
@@ -79,9 +81,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new EntryNotFoundException("Enrollment not found with ID: " + enrollmentId));
 
-        if (currentUserId != null && enrollment.getStudent() != null
-                && !currentUserId.equals(enrollment.getStudent().getStudentId())) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied: Enrollment belongs to another student");
+        if (enrollment.getStudent() != null) {
+            ownershipValidator.checkStudentOwnership(enrollment.getStudent().getStudentId());
         }
 
         enrollment.setStatus("dropped");
@@ -93,6 +94,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (studentId == null) {
             throw new ValidationException("Student ID cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(studentId);
+
         if (!studentRepository.existsById(studentId)) {
             throw new EntryNotFoundException("Student not found with ID: " + studentId);
         }
@@ -111,6 +114,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(offeringId);
+
         if (!courseOfferingRepository.existsById(offeringId)) {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
         }
@@ -164,7 +169,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             throw new ValidationException("At least one offering ID is required");
         }
 
-        // Remove any duplicates while keeping selection order
+        // Remove duplicates while keeping order
         List<Long> distinctOfferingIds = offeringIds.stream().distinct().toList();
 
         List<Map<String, Object>> perOffering = new ArrayList<>();
@@ -199,7 +204,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return aggregate;
     }
 
-    // Helper to enroll all students of a batch into one offering with capacity check
+    // Enroll all students of batch into one offering
     private Map<String, Object> enrollBatchIntoOneOffering(Long batchId, Long offeringId) {
         if (batchId == null || offeringId == null) {
             throw new ValidationException("Batch ID and Offering ID are required");
@@ -232,13 +237,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         int skippedCapacity = 0;
 
         for (Student student : students) {
-            // Skip if student is already in this offering
+            // Skip if already enrolled
             if (enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(student.getStudentId(), offeringId)) {
                 alreadyEnrolled++;
                 continue;
             }
 
-            // Stop enrolling if class is full
+            // Skip if class is full
             if (offering.getCapacity() != null && currentCount >= offering.getCapacity()) {
                 skippedCapacity++;
                 continue;

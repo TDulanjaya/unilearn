@@ -12,6 +12,7 @@ import java.util.Map;
 public class HealthController {
 
     @GetMapping({"/", "/health", "/api/health", "/api/v1/health"})
+    @org.springframework.security.access.prepost.PreAuthorize("permitAll()")
     public ResponseEntity<Map<String, Object>> healthCheck() {
         return ResponseEntity.ok(Map.of(
                 "status", "UP",

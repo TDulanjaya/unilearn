@@ -4,9 +4,7 @@ import com.unilearn.server.dto.response.EnrollmentReportResponse;
 
 import java.util.List;
 
-/**
- * Service interface for generating enrollment reports.
- */
+// Enrollment reports service
 public interface EnrollmentReportService {
 
     List<EnrollmentReportResponse> generateReport(Long facultyId, Long departmentId, Long courseId);

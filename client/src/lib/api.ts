@@ -1,4 +1,4 @@
-import { getToken, getRefreshToken, setToken, setRefreshToken, getUser, setUser, clearAuth } from "./auth";
+import { getToken, setToken, getUser, setUser, clearAuth } from "./auth";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -26,54 +26,47 @@ export async function apiFetch<T = any>(
 
   const response = await fetch(url, {
     ...options,
+    credentials: "include",
     headers,
   });
 
   if (response.status === 401) {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        const refreshUrl = `${BASE_URL}/api/v1/auth/refresh`;
-        const refreshRes = await fetch(refreshUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
+    try {
+      const refreshUrl = `${BASE_URL}/api/v1/auth/refresh`;
+      const refreshRes = await fetch(refreshUrl, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        setToken(refreshData.accessToken);
+        const currentUser = getUser();
+        if (currentUser) {
+          currentUser.token = refreshData.accessToken;
+          setUser(currentUser);
+        }
+        // Retry original request with new token
+        headers["Authorization"] = `Bearer ${refreshData.accessToken}`;
+        const retryResponse = await fetch(url, {
+          ...options,
+          credentials: "include",
+          headers,
         });
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          setToken(refreshData.accessToken);
-          if (refreshData.refreshToken) {
-            setRefreshToken(refreshData.refreshToken);
-          }
-          const currentUser = getUser();
-          if (currentUser) {
-            currentUser.token = refreshData.accessToken;
-            if (refreshData.refreshToken) {
-              currentUser.refreshToken = refreshData.refreshToken;
-            }
-            setUser(currentUser);
-          }
-          // Retry original request
-          headers["Authorization"] = `Bearer ${refreshData.accessToken}`;
-          const retryResponse = await fetch(url, {
-            ...options,
-            headers,
-          });
-          if (retryResponse.status === 204) {
-            return null as T;
-          }
-          if (retryResponse.ok) {
-            const contentType = retryResponse.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-              return await retryResponse.json() as T;
-            } else {
-              return await retryResponse.text() as unknown as T;
-            }
+        if (retryResponse.status === 204) {
+          return null as T;
+        }
+        if (retryResponse.ok) {
+          const contentType = retryResponse.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            return (await retryResponse.json()) as T;
+          } else {
+            return (await retryResponse.text()) as unknown as T;
           }
         }
-      } catch (err) {
-        console.error("Token refresh failed:", err);
       }
+    } catch (err) {
+      console.error("Token refresh failed:", err);
     }
 
     clearAuth();

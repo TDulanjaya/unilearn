@@ -30,6 +30,24 @@ public class ExamQuestionMapper {
                 .examId(eq.getExam() != null ? eq.getExam().getExamId() : null)
                 .questionId(eq.getQuestion() != null ? eq.getQuestion().getQuestionId() : null)
                 .questionText(eq.getQuestion() != null ? eq.getQuestion().getQuestionText() : null)
+                .questionType(eq.getQuestion() != null ? eq.getQuestion().getQuestionType() : null)
+                .options(eq.getQuestion() != null ? eq.getQuestion().getOptions() : null)
+                .marks(eq.getQuestion() != null ? eq.getQuestion().getMarks() : null)
+                .marksOverride(eq.getMarksOverride())
+                .orderIndex(eq.getQuestionOrder())
+                .build();
+    }
+
+    public com.unilearn.server.dto.response.StudentExamQuestionResponse toStudentExamQuestionResponse(ExamQuestion eq) {
+        if (eq == null) {
+            throw new ValidationException("ExamQuestion cannot be null");
+        }
+        return com.unilearn.server.dto.response.StudentExamQuestionResponse.builder()
+                .examId(eq.getExam() != null ? eq.getExam().getExamId() : null)
+                .questionId(eq.getQuestion() != null ? eq.getQuestion().getQuestionId() : null)
+                .questionText(eq.getQuestion() != null ? eq.getQuestion().getQuestionText() : null)
+                .questionType(eq.getQuestion() != null ? eq.getQuestion().getQuestionType() : null)
+                .options(eq.getQuestion() != null ? eq.getQuestion().getOptions() : null)
                 .marks(eq.getQuestion() != null ? eq.getQuestion().getMarks() : null)
                 .marksOverride(eq.getMarksOverride())
                 .orderIndex(eq.getQuestionOrder())

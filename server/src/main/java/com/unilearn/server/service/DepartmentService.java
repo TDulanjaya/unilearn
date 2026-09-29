@@ -8,9 +8,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing departments within the UniLearn platform.
- */
+// Departments service
 public interface DepartmentService {
 
     DepartmentResponse createDepartment(DepartmentRequest request);

@@ -12,6 +12,7 @@ public class AiQuizQuestionMapper {
         if (question == null) {
             throw new ValidationException("AiQuizQuestion cannot be null");
         }
+        boolean isRevealed = Boolean.TRUE.equals(question.getAnswerRevealed());
         return AiQuizQuestionResponse.builder()
                 .questionId(question.getQuestionId())
                 .sessionId(question.getQuizSession() != null ? question.getQuizSession().getSessionId() : null)
@@ -19,10 +20,10 @@ public class AiQuizQuestionMapper {
                 .questionText(question.getQuestionText())
                 .questionType(question.getQuestionType())
                 .options(question.getOptions())
-                .correctAnswer(question.getCorrectAnswer())
+                .correctAnswer(isRevealed ? question.getCorrectAnswer() : null)
                 .studentAnswer(question.getStudentAnswer())
                 .isCorrect(question.getIsCorrect())
-                .answerRevealed(question.getAnswerRevealed())
+                .answerRevealed(isRevealed)
                 .build();
     }
 }

@@ -19,9 +19,16 @@ import java.util.List;
 public class AttendanceReportServiceImpl implements AttendanceReportService {
 
     private final AttendanceRecordRepository attendanceRecordRepository;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     public List<AttendanceReportResponse> generateReport(Long facultyId, Long departmentId, Long offeringId) {
+        if (offeringId != null) {
+            ownershipValidator.checkLecturerOfferingAccess(offeringId);
+        }
+        if (departmentId != null) {
+            ownershipValidator.checkHodDepartmentAccess(departmentId);
+        }
         List<MonthlyPointDTO> trend = Arrays.asList(
                 MonthlyPointDTO.builder().month("2026-05").value(82.0).build(),
                 MonthlyPointDTO.builder().month("2026-06").value(85.0).build(),

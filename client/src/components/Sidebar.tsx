@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
@@ -16,6 +16,22 @@ export default function Sidebar({ role, name = "Administrator", sub = "Staff Adm
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
 
   const isSuperAdmin = user?.role?.toLowerCase() === "super_admin";
   const displayName = user?.fullName || name;
@@ -121,7 +137,7 @@ export default function Sidebar({ role, name = "Administrator", sub = "Staff Adm
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsOpen(true)}
-            className="p-2 text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] rounded-lg transition-colors"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--on-surface)] hover:bg-[var(--surface-container-low)] rounded-lg transition-colors"
             aria-label="Open menu"
           >
             <i className="ti ti-menu-2 text-2xl"></i>
@@ -139,12 +155,12 @@ export default function Sidebar({ role, name = "Administrator", sub = "Staff Adm
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
-          className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+          className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity"
         />
       )}
 
       <div
-        className={`lg:hidden fixed top-0 left-0 bottom-0 z-50 w-72 glass border-r border-[var(--glass-border)] p-5 transform transition-transform duration-300 ${
+        className={`lg:hidden fixed top-0 left-0 bottom-0 z-[55] w-72 glass border-r border-[var(--glass-border)] p-5 overflow-y-auto transform transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

@@ -96,7 +96,10 @@
   box-sizing: border-box;
 }
 
+html,
 body {
+  overflow-x: hidden;
+  max-width: 100vw;
   background: var(--background);
   color: var(--on-background);
   font-family: "Inter", sans-serif;
@@ -267,7 +270,7 @@ body {
   background: var(--surface-container-low);
 }
 
-input[type=text], input[type=email], input[type=password], input[type=date], input[type=time], input[type=number], select, textarea {
+input[type=text], input[type=email], input[type=password], input[type=date], input[type=time], input[type=number], input[type=tel], select, textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.55rem 0.75rem;
@@ -275,6 +278,21 @@ input[type=text], input[type=email], input[type=password], input[type=date], inp
   width: 100%;
   background: var(--surface-container-lowest);
   color: var(--on-surface);
+}
+
+@media (max-width: 767px) {
+  /* 16px minimum font size on mobile devices prevents iOS Safari auto-zoom */
+  input[type=text], input[type=email], input[type=password], input[type=date], input[type=time], input[type=number], input[type=tel], select, textarea {
+    font-size: 1rem !important;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 input:focus, select:focus, textarea:focus {

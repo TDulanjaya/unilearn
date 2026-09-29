@@ -7,9 +7,7 @@ import com.unilearn.server.dto.response.LecturerResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing course offering secondary lecturers.
- */
+// Course offering secondary lecturers service
 public interface CourseOfferingLecturerService {
 
     CourseOfferingLecturerResponse assignLecturer(CourseOfferingLecturerRequest request);

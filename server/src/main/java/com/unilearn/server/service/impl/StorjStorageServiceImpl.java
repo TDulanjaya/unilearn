@@ -16,8 +16,6 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -27,21 +25,21 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-public class BackblazeStorageServiceImpl implements StorageService {
+public class StorjStorageServiceImpl implements StorageService {
 
-    @Value("${storage.b2.key-id:}")
+    @Value("${storage.s3.key-id:${storage.b2.key-id:}}")
     private String keyId;
 
-    @Value("${storage.b2.application-key:}")
+    @Value("${storage.s3.application-key:${storage.b2.application-key:}}")
     private String applicationKey;
 
-    @Value("${storage.b2.endpoint:https://s3.us-west-004.backblazeb2.com}")
+    @Value("${storage.s3.endpoint:${storage.b2.endpoint:https://gateway.storjshare.io}}")
     private String endpoint;
 
-    @Value("${storage.b2.bucket-name:unilearn-files}")
+    @Value("${storage.s3.bucket-name:${storage.b2.bucket-name:unilearn-files}}")
     private String bucketName;
 
-    @Value("${storage.b2.region:us-west-004}")
+    @Value("${storage.s3.region:${storage.b2.region:ap1}}")
     private String region;
 
     private S3Client s3Client;
@@ -60,12 +58,12 @@ public class BackblazeStorageServiceImpl implements StorageService {
                                 .pathStyleAccessEnabled(true)
                                 .build())
                         .build();
-                log.info("Initialized Backblaze B2 S3Client for bucket: {}", bucketName);
+                log.info("Initialized Storj S3 client for bucket: {}", bucketName);
             } catch (Exception e) {
-                log.warn("Could not initialize Backblaze B2 S3Client. Falling back to local storage: {}", e.getMessage());
+                log.warn("Could not initialize Storj S3 client, using local storage: {}", e.getMessage());
             }
         } else {
-            log.info("Backblaze B2 credentials not configured. Using local filesystem storage in './uploads'.");
+            log.info("Storj S3 credentials not configured. Using local filesystem storage in './uploads'.");
         }
 
         try {
@@ -92,7 +90,7 @@ public class BackblazeStorageServiceImpl implements StorageService {
         String safePrefix = (folder != null && !folder.isBlank()) ? folder.trim().replaceAll("[^a-zA-Z0-9_-]", "") + "/" : "";
         String uniqueFileName = safePrefix + UUID.randomUUID() + extension;
 
-        // 1. Store locally first to guarantee direct and immediate browser loading
+        // save local copy
         String localFileName = uniqueFileName.replace("/", "_");
         try {
             Path targetPath = localUploadDir.resolve(localFileName);
@@ -102,7 +100,7 @@ public class BackblazeStorageServiceImpl implements StorageService {
             log.error("Failed to write file locally", e);
         }
 
-        // 2. Also back up to cloud S3 storage (Backblaze / Storj) if configured
+        // backup to Storj S3 if configured
         if (s3Client != null) {
             try {
                 PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -112,14 +110,13 @@ public class BackblazeStorageServiceImpl implements StorageService {
                         .build();
 
                 s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-                log.info("Successfully backed up file to cloud S3 bucket: {}", uniqueFileName);
+                log.info("Backed up file to Storj S3: {}", uniqueFileName);
             } catch (Exception e) {
-                log.warn("Cloud S3 backup skipped: {}", e.getMessage());
+                log.warn("Storj S3 backup skipped: {}", e.getMessage());
             }
         }
 
-        String localUrl = "/api/v1/files/download/" + localFileName;
-        return localUrl;
+        return "/api/v1/files/download/" + localFileName;
     }
 
     @Override
@@ -130,10 +127,10 @@ public class BackblazeStorageServiceImpl implements StorageService {
             try {
                 String key = fileUrl.substring(fileUrl.indexOf(bucketName) + bucketName.length() + 1);
                 s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucketName).key(key).build());
-                log.info("Deleted file from Backblaze B2: {}", key);
+                log.info("Deleted file from Storj S3: {}", key);
                 return;
             } catch (Exception e) {
-                log.warn("Failed to delete file from Backblaze B2: {}", e.getMessage());
+                log.warn("Failed to delete file from Storj S3: {}", e.getMessage());
             }
         }
 

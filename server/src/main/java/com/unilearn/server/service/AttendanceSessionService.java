@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.AttendanceSessionResponse;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Service interface for managing attendance sessions.
- */
+// Attendance sessions service
 public interface AttendanceSessionService {
 
     AttendanceSessionResponse createSession(AttendanceSessionRequest request);

@@ -24,7 +24,7 @@ export default function StudentTimetablePage() {
   const [viewMode, setViewMode] = useState<"Weekly" | "Daily">("Weekly");
   const [selectedDay, setSelectedDay] = useState("Monday");
 
-  // 1. Fetch student enrollments
+  // enrollments
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["studentEnrollments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),

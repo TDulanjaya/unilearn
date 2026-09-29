@@ -1,91 +1,116 @@
 package com.unilearn.server.ai;
 
-import com.unilearn.server.model.Material;
-import com.unilearn.server.model.PersonalResource;
-import com.unilearn.server.repository.MaterialRepository;
-import com.unilearn.server.repository.PersonalResourceRepository;
+import com.unilearn.server.model.MaterialChunk;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class AiGroundingContextHelper {
 
-    private final MaterialRepository materialRepository;
-    private final PersonalResourceRepository personalResourceRepository;
+    private final MaterialChunkService materialChunkService;
 
-    public String fetchCourseContext(Long offeringId, String sourceScope) {
-        return fetchCourseContext(offeringId, null, sourceScope);
+    @Getter
+    @AllArgsConstructor
+    public static class GroundedContextResult {
+        private final String contextText;
+        private final List<String> sources;
+        private final List<String> courseSources;
+        private final List<String> noteSources;
+
+        public GroundedContextResult(String contextText, List<String> sources) {
+            this(contextText, sources, List.of(), List.of());
+        }
     }
 
-    public String fetchCourseContext(Long offeringId, Long studentId, String sourceScope) {
+    // gets relevant chunks and split sources for a question
+    public GroundedContextResult fetchRelevantCourseContext(Long offeringId, Long studentId, String sourceScope, String userQuestion, int limit) {
+        if (offeringId == null) {
+            return new GroundedContextResult("General Course Study (No specific offering)", List.of(), List.of(), List.of());
+        }
+
+        // keep between 5 and 8 chunks
+        int chunkLimit = Math.max(5, Math.min(limit > 0 ? limit : 6, 8));
+        List<MaterialChunk> chunks = materialChunkService.findRelevantChunks(offeringId, studentId, sourceScope, userQuestion, chunkLimit);
+
+        if (chunks == null || chunks.isEmpty()) {
+            return new GroundedContextResult(
+                    "No uploaded material contents or text chunks found for this course offering yet.",
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+        }
+
+        StringBuilder sb = new StringBuilder();
+        List<String> sources = new ArrayList<>();
+        List<String> courseSources = new ArrayList<>();
+        List<String> noteSources = new ArrayList<>();
+
+        for (int i = 0; i < chunks.size(); i++) {
+            MaterialChunk c = chunks.get(i);
+            String title = c.getSourceTitle() != null ? c.getSourceTitle() : "Course Material";
+            boolean isPersonal = "PERSONAL".equalsIgnoreCase(c.getSourceType()) || c.getPersonalResourceId() != null;
+
+            if (isPersonal) {
+                if (!noteSources.contains(title)) {
+                    noteSources.add(title);
+                }
+                if (!sources.contains(title)) {
+                    sources.add(title);
+                }
+                sb.append(String.format("[Your notes: %s | Section #%d]\n", title, c.getChunkIndex() + 1));
+            } else {
+                if (!courseSources.contains(title)) {
+                    courseSources.add(title);
+                }
+                if (!sources.contains(title)) {
+                    sources.add(title);
+                }
+                sb.append(String.format("[Lecturer material: %s | Section #%d]\n", title, c.getChunkIndex() + 1));
+            }
+            sb.append(c.getContent().trim()).append("\n\n");
+        }
+
+        return new GroundedContextResult(sb.toString().trim(), sources, courseSources, noteSources);
+    }
+
+    public GroundedContextResult fetchRelevantCourseContext(Long offeringId, Long studentId, String userQuestion, int limit) {
+        return fetchRelevantCourseContext(offeringId, studentId, "both", userQuestion, limit);
+    }
+
+    // gets course chunks for quiz generation
+    public String fetchQuizCourseContext(Long offeringId, Long studentId, String sourceScope, int limit) {
         if (offeringId == null) {
             return "General Course Study";
         }
 
-        List<Material> materials = materialRepository.findByCourseOffering_OfferingId(offeringId);
-        List<Material> filteredMaterials = materials != null ? materials : Collections.emptyList();
+        int chunkLimit = Math.max(6, Math.min(limit > 0 ? limit : 8, 12));
+        List<MaterialChunk> chunks = materialChunkService.findRelevantChunks(offeringId, studentId, sourceScope, sourceScope, chunkLimit);
 
-        // Scope distinction: "ongoing_topics" vs "full_course"
-        if ("ongoing_topics".equalsIgnoreCase(sourceScope) && !filteredMaterials.isEmpty()) {
-            LocalDateTime now = LocalDateTime.now();
-            filteredMaterials = filteredMaterials.stream()
-                    .filter(m -> m.getUploadedAt() == null || !m.getUploadedAt().isAfter(now))
-                    .sorted(Comparator.comparing(Material::getUploadedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                    .toList();
-        }
-
-        List<PersonalResource> personalResources = Collections.emptyList();
-        if (studentId != null) {
-            personalResources = personalResourceRepository
-                    .findByStudent_StudentIdAndCourseOffering_OfferingId(studentId, offeringId);
+        if (chunks == null || chunks.isEmpty()) {
+            return "No uploaded lecture notes or textbook material chunks available for this course offering.";
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Course Offering ID: ").append(offeringId).append("\n");
-        sb.append("Scope: ").append(sourceScope != null ? sourceScope : "full_course").append("\n\n");
+        for (int i = 0; i < chunks.size(); i++) {
+            MaterialChunk c = chunks.get(i);
+            String title = c.getSourceTitle() != null ? c.getSourceTitle() : "Course Material";
+            boolean isPersonal = "PERSONAL".equalsIgnoreCase(c.getSourceType()) || c.getPersonalResourceId() != null;
 
-        sb.append("=== SECTION 1: OFFICIAL COURSE MATERIALS (Uploaded by Lecturer) ===\n");
-        if (filteredMaterials.isEmpty()) {
-            sb.append("No official lecturer materials uploaded for this offering yet.\n");
-        } else {
-            for (int i = 0; i < filteredMaterials.size(); i++) {
-                Material m = filteredMaterials.get(i);
-                sb.append(i + 1).append(". ").append(m.getTitle())
-                        .append(" [Type: ").append(m.getResourceType()).append("]");
-                if (m.getFileUrl() != null && !m.getFileUrl().isBlank()) {
-                    sb.append(" (File: ").append(m.getFileUrl()).append(")");
-                }
-                if (m.getLinkUrl() != null && !m.getLinkUrl().isBlank()) {
-                    sb.append(" (Link: ").append(m.getLinkUrl()).append(")");
-                }
-                sb.append("\n");
+            if (isPersonal) {
+                sb.append(String.format("[Your notes: %s | Chunk #%d]\n", title, c.getChunkIndex() + 1));
+            } else {
+                sb.append(String.format("[Lecturer material: %s | Chunk #%d]\n", title, c.getChunkIndex() + 1));
             }
-        }
-        sb.append("\n");
-
-        sb.append("=== SECTION 2: STUDENT PERSONAL STUDY RESOURCES (Uploaded by Student) ===\n");
-        if (personalResources == null || personalResources.isEmpty()) {
-            sb.append("No personal study resources uploaded by the student for this course.\n");
-        } else {
-            for (int i = 0; i < personalResources.size(); i++) {
-                PersonalResource pr = personalResources.get(i);
-                sb.append(i + 1).append(". Title: ").append(pr.getTitle());
-                if (pr.getFileUrl() != null && !pr.getFileUrl().isBlank()) {
-                    sb.append(" (File: ").append(pr.getFileUrl()).append(")");
-                }
-                if (pr.getFileSizeKb() != null) {
-                    sb.append(" [Size: ").append(pr.getFileSizeKb()).append(" KB]");
-                }
-                sb.append("\n");
-            }
+            sb.append(c.getContent().trim()).append("\n\n");
         }
 
-        return sb.toString();
+        return sb.toString().trim();
     }
 }

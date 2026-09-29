@@ -7,14 +7,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 import { CourseTab, Course, MaterialItem, Assignment, Resource } from "@/types/course";
-import {
-  COURSES,
-  INITIAL_MATERIALS,
-  INITIAL_ASSIGNMENTS,
-  MCQ_BANKS,
-  STRUCTURED_BANKS,
-  INITIAL_RESOURCES,
-} from "@/mock/courseData";
 
 import CourseMaterialsTab from "@/components/course/CourseMaterialsTab";
 import CourseAssignmentsTab from "@/components/course/CourseAssignmentsTab";
@@ -25,56 +17,32 @@ function CourseHubContent() {
   const params = useParams();
   const searchParams = useSearchParams();
 
-  const courseId = (params.id as string) || "1";
-  const numericId = Number(courseId) || 1;
+  const courseId = params?.id as string;
+  const numericId = Number(courseId);
 
-  const { data: offeringResponse, isLoading: isLoadingOffering } = useQuery({
+  const { data: offeringResponse, isLoading: isLoadingOffering, isError: isErrorOffering } = useQuery({
     queryKey: ["courseOffering", numericId],
     queryFn: () => api.get<any>(`/api/v1/course-offerings/${numericId}`),
-    enabled: !isNaN(numericId),
+    enabled: !isNaN(numericId) && numericId > 0,
   });
 
   const { data: rawMaterialsData } = useQuery({
     queryKey: ["materials", numericId],
     queryFn: () => api.get<any>(`/api/v1/materials/offering/${numericId}`),
-    enabled: !isNaN(numericId),
+    enabled: !isNaN(numericId) && numericId > 0,
   });
 
   const { data: rawAssignmentsData } = useQuery({
     queryKey: ["assignments", numericId],
     queryFn: () => api.get<any>(`/api/v1/assignments/offering/${numericId}`),
-    enabled: !isNaN(numericId),
+    enabled: !isNaN(numericId) && numericId > 0,
   });
 
   const { data: rawResourcesData } = useQuery({
     queryKey: ["personalResources", numericId],
     queryFn: () => api.get<any>(`/api/v1/personal-resources/offering/${numericId}`),
-    enabled: !isNaN(numericId),
+    enabled: !isNaN(numericId) && numericId > 0,
   });
-
-  const defaultFallbackCourse: Course = {
-    code: "SE308.3",
-    title: "Course Workspace",
-    lecturer: "Lecturer",
-    dept: "Department",
-    progress: 0,
-  };
-
-  const fallbackCourse: Course = COURSES[courseId] || COURSES["1"] || defaultFallbackCourse;
-
-  const course: Course = offeringResponse
-    ? {
-        code: offeringResponse.courseCode || fallbackCourse.code || "SE308.3",
-        title: offeringResponse.courseName || offeringResponse.courseTitle || fallbackCourse.title || "Course Details",
-        lecturer: offeringResponse.primaryLecturerName || offeringResponse.lecturerName || fallbackCourse.lecturer || "Lecturer",
-        dept: offeringResponse.departmentName || fallbackCourse.dept || "Department",
-        progress: offeringResponse.progress ?? fallbackCourse.progress ?? 0,
-      }
-    : fallbackCourse;
-
-  const activeCourseCode = course?.code || "SE308.3";
-  const mcqBank = (activeCourseCode && MCQ_BANKS[activeCourseCode]) || MCQ_BANKS["SE308.3"] || [];
-  const structuredBank = (activeCourseCode && STRUCTURED_BANKS[activeCourseCode]) || STRUCTURED_BANKS["SE308.3"] || [];
 
   const initialTab = (searchParams.get("tab") as CourseTab) || "materials";
   const [activeTab, setActiveTab] = useState<CourseTab>(initialTab);
@@ -86,14 +54,53 @@ function CourseHubContent() {
     }
   }, [searchParams]);
 
-  const fetchedMaterials: MaterialItem[] = rawMaterialsData?.content
-    ? rawMaterialsData.content.map((m: any) => ({
+  if (isLoadingOffering) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-sm font-semibold text-[var(--on-surface-variant)] animate-pulse">
+          Loading course hub...
+        </div>
+      </div>
+    );
+  }
+
+  if (isErrorOffering || !offeringResponse) {
+    return (
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-16 text-center space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-3xl bg-red-500/10 text-red-500 flex items-center justify-center text-3xl">
+          <i className="ti ti-alert-circle"></i>
+        </div>
+        <h1 className="font-display font-extrabold text-2xl text-[var(--on-surface)]">
+          Course not found
+        </h1>
+        <p className="text-sm text-[var(--on-surface-variant)] max-w-md mx-auto">
+          The requested course offering could not be loaded or does not exist.
+        </p>
+        <div className="pt-2">
+          <Link href="/student/courses" className="btn-primary text-xs inline-flex items-center gap-2">
+            <i className="ti ti-arrow-left"></i> Back to My Courses
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const course: Course = {
+    code: offeringResponse.courseCode || "—",
+    title: offeringResponse.courseName || offeringResponse.courseTitle || "Course Details",
+    lecturer: offeringResponse.primaryLecturerName || offeringResponse.lecturerName || "Lecturer",
+    dept: offeringResponse.departmentName || "Department",
+    progress: offeringResponse.progress ?? 0,
+  };
+
+  const fetchedMaterials: MaterialItem[] = rawMaterialsData?.content || (Array.isArray(rawMaterialsData) ? rawMaterialsData : [])
+    ? (rawMaterialsData.content || (Array.isArray(rawMaterialsData) ? rawMaterialsData : [])).map((m: any) => ({
         id: m.materialId,
         title: m.title,
         type: (m.resourceType as any) || "PDF",
         module: "Module 1",
         date: m.uploadedAt ? new Date(m.uploadedAt).toLocaleDateString() : "Recent",
-        size: "2.5 MB",
+        size: m.fileSize ? `${Math.round(m.fileSize / 1024)} KB` : "Document",
         summary: m.title,
         linkUrl: m.fileUrl || m.linkUrl || m.externalLink,
       }))
@@ -112,25 +119,55 @@ function CourseHubContent() {
       }))
     : [];
 
-  const fetchedResources: Resource[] = rawResourcesData?.content
-    ? rawResourcesData.content.map((r: any) => ({
+  const fetchedResources: Resource[] = rawResourcesData?.content || (Array.isArray(rawResourcesData) ? rawResourcesData : [])
+    ? (rawResourcesData.content || (Array.isArray(rawResourcesData) ? rawResourcesData : [])).map((r: any) => ({
         id: r.resourceId,
         fileName: r.fileName || r.title || "Resource File",
         uploadedAt: r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : "Today",
       }))
     : [];
 
+  return (
+    <CourseHubView
+      course={course}
+      numericId={numericId}
+      fetchedMaterials={fetchedMaterials}
+      fetchedAssignments={fetchedAssignments}
+      fetchedResources={fetchedResources}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+    />
+  );
+}
+
+function CourseHubView({
+  course,
+  numericId,
+  fetchedMaterials,
+  fetchedAssignments,
+  fetchedResources,
+  activeTab,
+  onTabChange,
+}: {
+  course: Course;
+  numericId: number;
+  fetchedMaterials: MaterialItem[];
+  fetchedAssignments: Assignment[];
+  fetchedResources: Resource[];
+  activeTab: CourseTab;
+  onTabChange: (tab: CourseTab) => void;
+}) {
   const [assignments, setAssignments] = useState<Assignment[]>(fetchedAssignments);
   const [resources, setResources] = useState<Resource[]>(fetchedResources);
   const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
-    if (fetchedAssignments) setAssignments(fetchedAssignments);
-  }, [rawAssignmentsData]);
+    setAssignments(fetchedAssignments);
+  }, [fetchedAssignments]);
 
   useEffect(() => {
-    if (fetchedResources) setResources(fetchedResources);
-  }, [rawResourcesData]);
+    setResources(fetchedResources);
+  }, [fetchedResources]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -151,8 +188,16 @@ function CourseHubContent() {
     );
   };
 
-  const handleDeleteResource = (id: number) => {
-    setResources((prev) => prev.filter((r) => r.id !== id));
+  const handleDeleteResource = async (id: number) => {
+    if (confirm("Are you sure you want to delete this resource?")) {
+      try {
+        await api.delete(`/api/v1/personal-resources/${id}`);
+        setResources((prev) => prev.filter((r) => r.id !== id));
+        showToast("Personal resource deleted and removed from AI index.");
+      } catch (err: any) {
+        showToast("Failed to delete resource: " + (err.message || "Error"));
+      }
+    }
   };
 
   const tabs: { key: CourseTab; label: string; icon: string }[] = [
@@ -163,7 +208,7 @@ function CourseHubContent() {
   ];
 
   const handleTabChange = (key: CourseTab) => {
-    setActiveTab(key);
+    onTabChange(key);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("tab", key);
@@ -196,7 +241,7 @@ function CourseHubContent() {
           </span>
         </div>
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
-          {isLoadingOffering ? "Loading course..." : course.title}
+          {course.title}
         </h1>
         <div className="mt-3 max-w-sm">
           <div className="progress-track mb-1">
@@ -208,16 +253,17 @@ function CourseHubContent() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)] overflow-x-auto">
+      <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)] overflow-x-auto no-scrollbar flex-nowrap pb-1">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => handleTabChange(t.key)}
-            className={`tab-btn flex items-center gap-1.5 ${activeTab === t.key ? "active" : ""}`}
+            className={`tab-btn flex items-center gap-2 min-h-[44px] shrink-0 whitespace-nowrap px-4 py-2.5 ${
+              activeTab === t.key ? "active" : ""
+            }`}
           >
-            <i className={`ti ${t.icon} text-sm`}></i>
-            <span className="hidden sm:inline">{t.label}</span>
-            <span className="sm:hidden">{t.label.split(" ").pop()}</span>
+            <i className={`ti ${t.icon} text-base`}></i>
+            <span className="font-semibold text-xs sm:text-sm">{t.label}</span>
           </button>
         ))}
       </div>
@@ -236,6 +282,7 @@ function CourseHubContent() {
 
       {activeTab === "resources" && (
         <CourseResourcesTab
+          offeringId={numericId}
           resources={resources}
           onAddResource={handleAddResource}
           onRenameResource={handleRenameResource}
@@ -249,9 +296,7 @@ function CourseHubContent() {
           course={course}
           offeringId={numericId}
           materialsCount={fetchedMaterials.length}
-          resourcesCount={fetchedResources.length}
-          mcqBank={mcqBank}
-          structuredBank={structuredBank}
+          resourcesCount={resources.length}
         />
       )}
     </main>

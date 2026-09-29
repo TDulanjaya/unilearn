@@ -16,16 +16,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-import org.springframework.context.annotation.Lazy;
+import com.unilearn.server.service.impl.UserDetailsServiceImpl;
 
 @Component
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsServiceImpl userDetailsService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, @Lazy UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsServiceImpl userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
     }
@@ -43,6 +43,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String email = jwtService.getEmailFromToken(token);
                     if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                        if (userDetails instanceof com.unilearn.server.model.User u && Boolean.TRUE.equals(u.getMustChangePassword())) {
+                            String uri = request.getRequestURI();
+                            if (!uri.startsWith("/api/v1/auth/change-password")
+                                    && !uri.startsWith("/api/v1/auth/logout")
+                                    && !uri.startsWith("/api/v1/auth/refresh")) {
+                                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                                response.setContentType("application/json");
+                                response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Password change required before accessing the system\"}");
+                                return;
+                            }
+                        }
                         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,

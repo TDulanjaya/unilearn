@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bulk-import")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('STAFF_ADMIN')")
+@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
 public class BulkImportController {
 
     private final BulkImportService bulkImportService;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import McqQuestion from "@/components/exam/McqQuestion";
@@ -19,47 +19,13 @@ export interface QuestionData {
   options?: string[];
 }
 
-export interface MockExam {
+export interface ActiveExamSession {
   id: number;
   courseCode: string;
   courseTitle: string;
   durationMinutes: number;
   questions: QuestionData[];
 }
-
-const MOCK_ONLINE_EXAM: MockExam = {
-  id: 101,
-  courseCode: "SE308.3",
-  courseTitle: "Software Process Management Final Assessment",
-  durationMinutes: 45,
-  questions: [
-    {
-      id: 1,
-      text: "Which process model emphasizes early risk assessment in every iteration cycle?",
-      type: "MCQ",
-      points: 5,
-      options: ["Waterfall Model", "Spiral Model", "V-Model", "Big Bang Model"],
-    },
-    {
-      id: 2,
-      text: "Code coverage measurements guarantee that software is 100% bug-free.",
-      type: "TRUE_FALSE",
-      points: 5,
-    },
-    {
-      id: 3,
-      text: "Define CMMI Level 3 in one concise sentence.",
-      type: "SHORT_TEXT",
-      points: 10,
-    },
-    {
-      id: 4,
-      text: "Discuss the trade-offs between Scrum and Kanban in high-velocity startup teams.",
-      type: "ESSAY",
-      points: 20,
-    },
-  ],
-};
 
 interface ExamListEntry {
   id: number;
@@ -71,24 +37,27 @@ interface ExamListEntry {
   type: "Final Exam" | "Midterm Quiz" | "In-Class Assessment";
   status: "Upcoming" | "Completed";
   grade?: string;
+  durationMinutes?: number;
   isOnlineAvailable?: boolean;
 }
 
 export default function StudentExamsPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<"Upcoming" | "Completed">("Upcoming");
-  const [activeExam, setActiveExam] = useState<MockExam | null>(null);
+  const [activeExam, setActiveExam] = useState<ActiveExamSession | null>(null);
 
   // Exam wizard states
   const [currentQIndex, setCurrentQIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(MOCK_ONLINE_EXAM.durationMinutes * 60);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(45 * 60);
   const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null);
+  const [examError, setExamError] = useState<string | null>(null);
 
-  // 1. Fetch student's enrollments
+  // enrollments
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["studentEnrollments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
@@ -97,7 +66,7 @@ export default function StudentExamsPage() {
 
   const enrollmentList = enrollments || [];
 
-  // 2. Fetch scheduled exams for enrolled offerings
+  // exams for offerings
   const examQueries = useQueries({
     queries: enrollmentList.map((e: any) => ({
       queryKey: ["exams", e.offeringId],
@@ -105,19 +74,46 @@ export default function StudentExamsPage() {
     })),
   });
 
+  // completed attempts
+  const { data: studentAttempts } = useQuery({
+    queryKey: ["studentExamAttempts", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/exam-attempts/student/${user?.userId}`),
+    enabled: !!user?.userId,
+  });
+
   const rawExams = examQueries.flatMap((q: any) => q.data || []);
 
-  const exams: ExamListEntry[] = rawExams.map((ex: any, idx: number) => ({
+  const upcomingExams: ExamListEntry[] = rawExams.map((ex: any, idx: number) => ({
     id: ex.examId,
-    courseCode: ex.courseCode || "SE",
+    courseCode: ex.courseCode || "—",
     courseTitle: ex.title || "Examination",
     dateTime: ex.startDateTime ? new Date(ex.startDateTime).toLocaleString() : "Date & Time TBD",
-    venue: "Online Exam Portal",
+    venue: ex.location || "Online Exam Portal",
     seatNo: `SEAT-${idx + 10}`,
     type: "In-Class Assessment",
     status: "Upcoming",
+    durationMinutes: ex.durationMinutes || 45,
     isOnlineAvailable: true,
   }));
+
+  const completedExams: ExamListEntry[] = (studentAttempts || []).map((att: any) => {
+    const matchedExam = rawExams.find((e: any) => e.examId === att.examId);
+    return {
+      id: att.examId || att.attemptId,
+      courseCode: matchedExam?.courseCode || "Exam",
+      courseTitle: matchedExam?.title || `Exam Attempt #${att.attemptId}`,
+      dateTime: att.endTime ? new Date(att.endTime).toLocaleString() : (att.startTime ? new Date(att.startTime).toLocaleString() : "Submitted"),
+      venue: "Online Exam Portal",
+      seatNo: `ATT-${att.attemptId}`,
+      type: "Final Exam",
+      status: "Completed",
+      grade: att.score != null ? `${att.score}%` : "Pending Grading",
+      durationMinutes: matchedExam?.durationMinutes || 45,
+      isOnlineAvailable: false,
+    };
+  });
+
+  const exams: ExamListEntry[] = filter === "Upcoming" ? upcomingExams : completedExams;
 
   // Mutations
   const startAttemptMutation = useMutation({
@@ -128,32 +124,78 @@ export default function StudentExamsPage() {
       }),
   });
 
+  const saveAnswerMutation = useMutation({
+    mutationFn: (data: { attemptId: number; questionId: number; answer: string }) =>
+      api.post("/api/v1/exam-answers", {
+        attemptId: data.attemptId,
+        questionId: data.questionId,
+        selectedOption: data.answer,
+        answerText: data.answer,
+      }),
+  });
+
   const completeAttemptMutation = useMutation({
     mutationFn: (attemptId: number) =>
       api.patch(`/api/v1/exam-attempts/${attemptId}/complete`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["studentExamAttempts", user?.userId] });
+    },
   });
 
-  const startExam = async (exam: any) => {
+  const startExam = async (exam: ExamListEntry) => {
+    setExamError(null);
     try {
-      const res = await startAttemptMutation.mutateAsync(exam.id);
-      setCurrentAttemptId(res.attemptId);
+      // create attempt
+      const attemptRes = await startAttemptMutation.mutateAsync(exam.id);
+      const attemptId = attemptRes.attemptId;
+      setCurrentAttemptId(attemptId);
+
+      // fetch exam questions
+      const questionsRes = await api.get<any[]>(`/api/v1/exams/${exam.id}/questions`);
+
+      const loadedQuestions: QuestionData[] = (questionsRes || []).map((q: any) => {
+        let parsedOptions: string[] = [];
+        if (q.options) {
+          try {
+            parsedOptions = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
+          } catch {
+            parsedOptions = [];
+          }
+        }
+        let qType: QuestionType = "SHORT_TEXT";
+        const rawType = (q.questionType || "").toLowerCase();
+        if (rawType.includes("mcq")) qType = "MCQ";
+        else if (rawType.includes("true") || rawType.includes("boolean")) qType = "TRUE_FALSE";
+        else if (rawType.includes("essay")) qType = "ESSAY";
+        else qType = "SHORT_TEXT";
+
+        return {
+          id: q.questionId,
+          text: q.questionText || "Question",
+          type: qType,
+          points: Number(q.marksOverride ?? q.marks ?? 5),
+          options: parsedOptions,
+        };
+      });
+
+      const examDuration = exam.durationMinutes || 45;
 
       setActiveExam({
         id: exam.id,
         courseCode: exam.courseCode,
         courseTitle: exam.courseTitle,
-        durationMinutes: exam.durationMinutes || 45,
-        questions: MOCK_ONLINE_EXAM.questions,
+        durationMinutes: examDuration,
+        questions: loadedQuestions,
       });
 
-      setSecondsRemaining((exam.durationMinutes || 45) * 60);
+      setSecondsRemaining(examDuration * 60);
       setCurrentQIndex(0);
       setAnswers({});
       setFlagged({});
       setTabSwitchCount(0);
       setIsSubmitted(false);
     } catch (err: any) {
-      alert("Failed to start exam attempt: " + err.message);
+      setExamError(err.message || "Failed to start exam attempt. Please try again.");
     }
   };
 
@@ -199,6 +241,9 @@ export default function StudentExamsPage() {
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          if (currentAttemptId) {
+            completeAttemptMutation.mutate(currentAttemptId);
+          }
           setIsSubmitted(true);
           return 0;
         }
@@ -207,6 +252,17 @@ export default function StudentExamsPage() {
     }, 1000);
 
     return () => clearInterval(timer);
+  }, [activeExam, isSubmitted, currentAttemptId]);
+
+  useEffect(() => {
+    if (!activeExam || isSubmitted) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "You have an active exam in progress. Are you sure you want to leave?";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [activeExam, isSubmitted]);
 
   const formatTimer = (totalSec: number) => {
@@ -217,6 +273,13 @@ export default function StudentExamsPage() {
 
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
+    if (currentAttemptId) {
+      saveAnswerMutation.mutate({
+        attemptId: currentAttemptId,
+        questionId,
+        answer: value,
+      });
+    }
   };
 
   const toggleFlag = (questionId: number) => {
@@ -229,8 +292,7 @@ export default function StudentExamsPage() {
            UNILEARN OFFICIAL ADMISSION SLIP
 ============================================================
 Student Name: ${user?.fullName || "Student"}
-Index Number: SE-2023-042
-Degree: B.Sc. (Hons) in Software Engineering
+Email: ${user?.email || "—"}
 
 EXAM DETAILS:
 Course Code : ${exam.courseCode}
@@ -268,39 +330,42 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
     ).length;
 
     return (
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
-        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--surface-container-low)]">
-          <div>
-            <span className="badge badge-accent mb-1 font-bold">
+      <main className="max-w-[1200px] mx-auto px-3 sm:px-8 py-3 sm:py-8 space-y-4 sm:space-y-6 pb-24 sm:pb-8">
+        {/* Sticky Top Timer Bar on Mobile & Desktop */}
+        <div className="glass sticky top-0 z-40 -mx-3 -mt-3 sm:mx-0 sm:mt-0 p-3.5 sm:p-6 border-b sm:border border-[var(--glass-border)] shadow-xl flex items-center justify-between gap-3 bg-[var(--surface-container-low)]/95 backdrop-blur-md rounded-none sm:rounded-3xl">
+          <div className="min-w-0 pr-1">
+            <span className="badge badge-accent mb-0.5 font-bold text-[10px]">
               {activeExam.courseCode}
             </span>
-            <h1 className="font-display font-extrabold text-xl sm:text-2xl text-[var(--on-surface)]">
+            <h1 className="font-display font-extrabold text-sm sm:text-2xl text-[var(--on-surface)] truncate">
               {activeExam.courseTitle}
             </h1>
-            <p className="text-xs text-[var(--on-surface-variant)]">
-              Questions: {activeExam.questions.length} · Answered: {answeredCount}/{activeExam.questions.length}
+            <p className="text-[11px] sm:text-xs text-[var(--on-surface-variant)]">
+              Q {currentQIndex + 1}/{activeExam.questions.length} · Answered: {answeredCount}/{activeExam.questions.length}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5 font-semibold">
-              <i className="ti ti-alert-triangle text-base"></i>
-              <span>Focus Alerts: {tabSwitchCount}</span>
-            </div>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {tabSwitchCount > 0 && (
+              <div className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] sm:text-xs flex items-center gap-1 font-semibold">
+                <i className="ti ti-alert-triangle text-sm"></i>
+                <span className="hidden sm:inline">Alerts: </span>{tabSwitchCount}
+              </div>
+            )}
 
-            <div className="px-4 py-2 rounded-2xl bg-[var(--primary)] text-[var(--on-primary)] font-mono font-bold text-lg flex items-center gap-2 shadow-md">
-              <i className="ti ti-clock text-xl text-[var(--tertiary)]"></i>
+            <div className="px-3.5 sm:px-4 py-2 rounded-2xl bg-[var(--primary)] text-[var(--on-primary)] font-mono font-extrabold text-base sm:text-lg flex items-center gap-1.5 shadow-md">
+              <i className="ti ti-clock text-lg text-[var(--tertiary)]"></i>
               <span>{formatTimer(secondsRemaining)}</span>
             </div>
           </div>
         </div>
 
         {isSubmitted ? (
-          <div className="card p-8 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-2xl animate-scaleIn">
+          <div className="card p-6 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-2xl animate-scaleIn">
             <div className="w-16 h-16 rounded-3xl bg-[var(--secondary-container)] text-[var(--on-secondary-container)] flex items-center justify-center mx-auto">
               <i className="ti ti-check-circle text-4xl"></i>
             </div>
-            <h2 className="font-display font-extrabold text-2xl text-[var(--on-surface)]">
+            <h2 className="font-display font-extrabold text-xl sm:text-2xl text-[var(--on-surface)]">
               Assessment Submitted Successfully
             </h2>
             <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
@@ -309,39 +374,58 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
 
             <button
               onClick={() => setActiveExam(null)}
-              className="btn-primary text-xs !py-2.5 !px-6 justify-center shadow-md mx-auto"
+              className="btn-primary text-xs !py-3 !px-6 min-h-[44px] justify-center shadow-md mx-auto"
             >
               Return to Exams Dashboard
             </button>
           </div>
+        ) : activeExam.questions.length === 0 ? (
+          <div className="card p-8 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-xl">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto text-3xl">
+              <i className="ti ti-file-text"></i>
+            </div>
+            <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
+              No Questions Configured
+            </h3>
+            <p className="text-xs text-[var(--on-surface-variant)] max-w-sm mx-auto">
+              Questions have not been published for this examination yet. Please contact your course lecturer.
+            </p>
+            <button
+              onClick={() => setActiveExam(null)}
+              className="btn-secondary text-xs !py-2.5 !px-4 min-h-[44px] mx-auto"
+            >
+              Back to Examinations
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 card p-6 sm:p-8 space-y-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex flex-col justify-between">
+            <div className="lg:col-span-2 card p-4 sm:p-8 space-y-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-4 mb-6">
-                  <span className="font-display font-bold text-sm text-[var(--tertiary)]">
+                <div className="flex items-center justify-between border-b border-[var(--outline-variant)] pb-3 sm:pb-4 mb-4 sm:mb-6 gap-2">
+                  <span className="font-display font-bold text-xs sm:text-sm text-[var(--tertiary)]">
                     Question {currentQIndex + 1} of {activeExam.questions.length}
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <span className="badge bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] text-xs">
                       {currentQ.points} Points
                     </span>
                     <button
                       type="button"
                       onClick={() => toggleFlag(currentQ.id)}
-                      className={`text-xs px-3 py-1.5 rounded-xl font-semibold border transition-all flex items-center gap-1.5 ${
+                      className={`text-xs px-3 py-1.5 min-h-[36px] rounded-xl font-semibold border transition-all flex items-center gap-1.5 ${
                         flagged[currentQ.id]
                           ? "bg-amber-500 text-white border-amber-500 shadow-sm"
                           : "border-[var(--outline-variant)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]"
                       }`}
                     >
                       <i className="ti ti-flag text-sm"></i>
-                      {flagged[currentQ.id] ? "Flagged" : "Flag for Review"}
+                      <span className="hidden sm:inline">{flagged[currentQ.id] ? "Flagged" : "Flag for Review"}</span>
+                      <span className="sm:hidden">{flagged[currentQ.id] ? "Flagged" : "Flag"}</span>
                     </button>
                   </div>
                 </div>
 
-                <h3 className="font-display font-bold text-base sm:text-lg text-[var(--on-surface)] mb-6 leading-relaxed">
+                <h3 className="font-display font-bold text-base sm:text-lg text-[var(--on-surface)] mb-4 sm:mb-6 leading-relaxed">
                   {currentQ.text}
                 </h3>
 
@@ -376,31 +460,32 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                 )}
               </div>
 
-              <div className="flex items-center justify-between border-t border-[var(--outline-variant)] pt-6 mt-8">
+              {/* Fixed Bottom Controls on Mobile, Normal in Desktop */}
+              <div className="fixed bottom-0 left-0 right-0 sm:static p-3 sm:p-0 bg-[var(--surface-container-lowest)] sm:bg-transparent border-t border-[var(--outline-variant)] sm:border-0 z-30 shadow-2xl sm:shadow-none flex items-center justify-between gap-3 mt-4 sm:mt-8 pt-0 sm:pt-6">
                 <button
                   type="button"
                   disabled={currentQIndex === 0}
                   onClick={() => setCurrentQIndex((p) => p - 1)}
-                  className="btn-secondary text-xs !py-2.5 !px-5 disabled:opacity-40"
+                  className="btn-secondary text-xs !py-3 sm:!py-2.5 !px-5 min-h-[44px] flex-1 sm:flex-none justify-center disabled:opacity-40"
                 >
-                  <i className="ti ti-arrow-left mr-1"></i> Previous
+                  <i className="ti ti-arrow-left mr-1"></i> Prev
                 </button>
 
                 {currentQIndex < activeExam.questions.length - 1 ? (
                   <button
                     type="button"
                     onClick={() => setCurrentQIndex((p) => p + 1)}
-                    className="btn-primary text-xs !py-2.5 !px-5 shadow-sm"
+                    className="btn-primary text-xs !py-3 sm:!py-2.5 !px-5 min-h-[44px] flex-1 sm:flex-none justify-center shadow-sm"
                   >
-                    Next Question <i className="ti ti-arrow-right ml-1"></i>
+                    Next <i className="ti ti-arrow-right ml-1"></i>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={handleManualSubmit}
-                    className="btn-primary text-xs !py-2.5 !px-6 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="btn-primary text-xs !py-3 sm:!py-2.5 !px-6 min-h-[44px] flex-1 sm:flex-none justify-center shadow-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                   >
-                    Finish & Submit Exam <i className="ti ti-check ml-1"></i>
+                    Submit Exam <i className="ti ti-check ml-1"></i>
                   </button>
                 )}
               </div>
@@ -467,10 +552,20 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
     );
   }
 
-  const filteredExams = exams.filter((e) => e.status === filter);
-
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
+      {examError && (
+        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <i className="ti ti-alert-triangle text-base"></i>
+            <span>{examError}</span>
+          </div>
+          <button onClick={() => setExamError(null)} className="hover:opacity-80">
+            <i className="ti ti-x"></i>
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
@@ -498,33 +593,13 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
         </div>
       </div>
 
-      {filter === "Upcoming" && exams.length > 0 && (
-        <div className="glass rounded-3xl p-6 border border-[var(--glass-border)] shadow-xl bg-gradient-to-r from-[var(--surface-container-low)] via-[var(--surface-container)] to-[var(--surface-container-low)] flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--surface-container-low)]">
-          <div className="space-y-1">
-            <span className="badge badge-accent font-bold">Live Portal Ready</span>
-            <h3 className="font-display font-bold text-lg text-[var(--on-surface)]">
-              {exams[0].courseCode} Online Exam Runner Wizard
-            </h3>
-            <p className="text-xs text-[var(--on-surface-variant)]">
-              Practice test runner with countdown timer, draft auto-save, question navigator, and focus monitoring.
-            </p>
-          </div>
-          <button
-            onClick={() => startExam(exams[0])}
-            className="btn-primary text-xs !py-3 !px-6 shadow-md shrink-0 justify-center"
-          >
-            <i className="ti ti-player-play"></i> Launch Exam Wizard
-          </button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredExams.length === 0 ? (
-          <div className="text-center p-6 text-xs text-[var(--on-surface-variant)] col-span-2 font-semibold">
-            No exams scheduled in this category.
+        {exams.length === 0 ? (
+          <div className="text-center p-8 text-xs text-[var(--on-surface-variant)] col-span-2 font-semibold border border-dashed border-[var(--outline-variant)] rounded-2xl">
+            No exams found in this category.
           </div>
         ) : (
-          filteredExams.map((exam) => (
+          exams.map((exam) => (
             <div
               key={exam.id}
               className="card p-6 flex flex-col justify-between space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:shadow-lg transition-all"
@@ -564,7 +639,7 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                   <span className="text-xs font-semibold text-emerald-600">Grade: {exam.grade}</span>
                 )}
 
-                {exam.isOnlineAvailable && (
+                {exam.isOnlineAvailable && exam.status === "Upcoming" && (
                   <button
                     onClick={() => startExam(exam)}
                     className="btn-primary text-xs !py-2 !px-4"

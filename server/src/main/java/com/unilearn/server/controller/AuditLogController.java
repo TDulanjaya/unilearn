@@ -10,14 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Audit log controller — read-only, STAFF_ADMIN only.
- * No create endpoint — logAction() is called internally by other services.
- */
+// Audit logs (read-only for admins)
 @RestController
 @RequestMapping("/api/v1/audit-logs")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('STAFF_ADMIN')")
+@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
 public class AuditLogController {
 
     private final AuditLogService auditLogService;

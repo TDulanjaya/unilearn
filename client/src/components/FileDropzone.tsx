@@ -107,13 +107,12 @@ export default function FileDropzone({
 
   return (
     <div className="space-y-3">
-      
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 text-center cursor-pointer transition-all duration-200 ${
+        className={`border-2 border-dashed rounded-3xl p-5 sm:p-8 text-center cursor-pointer transition-all duration-200 ${
           errorMessage
             ? "border-red-400 bg-red-50/40 dark:bg-red-950/20"
             : isDragOver
@@ -135,14 +134,26 @@ export default function FileDropzone({
         </div>
 
         <p className="font-display font-semibold text-sm text-[var(--on-surface)] mb-1">
-          <span className="text-[var(--tertiary)] underline underline-offset-2">Click to browse</span> or drag and drop files here
+          <span className="text-[var(--tertiary)] underline underline-offset-2">Click to browse</span>
+          <span className="hidden sm:inline"> or drag and drop files here</span>
         </p>
-        <p className="text-xs text-[var(--on-surface-variant)]">
+        <p className="text-xs text-[var(--on-surface-variant)] mb-2">
           Accepted formats: <span className="font-mono">{accept}</span> (Max {maxSizeMB}MB)
         </p>
+
+        {/* Mobile Choose File Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            inputRef.current?.click();
+          }}
+          className="sm:hidden btn-primary text-xs !py-2.5 !px-5 mt-2 min-h-[44px] inline-flex items-center gap-1.5 shadow-sm rounded-xl font-bold"
+        >
+          <i className="ti ti-folder-open text-base"></i> Choose File
+        </button>
       </div>
 
-      
       {errorMessage && (
         <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
           <i className="ti ti-alert-circle text-base shrink-0"></i>
@@ -150,14 +161,13 @@ export default function FileDropzone({
         </div>
       )}
 
-      
       {selectedFiles.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-[var(--on-surface-variant)]">Selected File(s):</p>
           {selectedFiles.map((file, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between p-3 rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-xs shadow-sm"
+              className="flex items-center justify-between p-3 rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-xs shadow-sm gap-2"
             >
               <div className="flex items-center gap-3 min-w-0 pr-2">
                 <div className="w-8 h-8 rounded-lg bg-[var(--tertiary-container)] text-[var(--on-tertiary-container)] flex items-center justify-center font-bold shrink-0">
@@ -174,10 +184,11 @@ export default function FileDropzone({
                   e.stopPropagation();
                   removeFile(idx);
                 }}
-                className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0"
                 title="Remove file"
+                aria-label="Remove file"
               >
-                <i className="ti ti-x text-base"></i>
+                <i className="ti ti-x text-lg"></i>
               </button>
             </div>
           ))}

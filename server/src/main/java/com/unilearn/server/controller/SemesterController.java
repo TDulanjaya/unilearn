@@ -20,36 +20,39 @@ public class SemesterController {
     private final SemesterService semesterService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<SemesterResponse> createSemester(@Valid @RequestBody SemesterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(semesterService.createSemester(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<SemesterResponse> updateSemester(@PathVariable Long id,
                                                            @Valid @RequestBody SemesterRequest request) {
         return ResponseEntity.ok(semesterService.updateSemester(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteSemester(@PathVariable Long id) {
         semesterService.deleteSemester(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<SemesterResponse> getSemesterById(@PathVariable Long id) {
         return ResponseEntity.ok(semesterService.getSemesterById(id));
     }
 
     @GetMapping("/academic-year/{academicYearId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SemesterResponse>> getSemestersByAcademicYear(@PathVariable Long academicYearId) {
         return ResponseEntity.ok(semesterService.getSemestersByAcademicYear(academicYearId));
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SemesterResponse>> getAllSemesters() {
         return ResponseEntity.ok(semesterService.getAllSemesters());
     }

@@ -95,7 +95,7 @@ export default function LecturerSchedulePage() {
   const [currentAttendance, setCurrentAttendance] = useState<Record<string, AttendanceStatus>>({});
   const [savedSlotIds, setSavedSlotIds] = useState<Record<string, boolean>>({});
 
-  // 1. Fetch lecturer offerings to match enrollments
+  // lecturer offerings
   const { data: lecturerOfferings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
@@ -223,7 +223,7 @@ export default function LecturerSchedulePage() {
       const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
       const endTime = end.toTimeString().split(" ")[0];
 
-      // 1. Create or retrieve active session for today
+      // active session for today
       const session = await startSessionMutation.mutateAsync({
         offeringId: selectedAttendanceSlot.offeringId,
         sessionDate,
@@ -232,7 +232,7 @@ export default function LecturerSchedulePage() {
         markedByLecturerId: user?.userId,
       });
 
-      // 2. Bulk post student records
+      // bulk post attendance
       const records = Object.entries(currentAttendance).map(([studentId, status]) => ({
         studentId: Number(studentId),
         status,

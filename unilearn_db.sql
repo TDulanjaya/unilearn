@@ -1,6 +1,8 @@
 CREATE DATABASE IF NOT EXISTS `unilearn_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE `unilearn_db`;
 
+SET FOREIGN_KEY_CHECKS = 0;
+
 
 -- Table: academic_years
 DROP TABLE IF EXISTS `academic_years`;
@@ -82,10 +84,11 @@ CREATE TABLE `users` (
   `photo_url` varchar(255) DEFAULT NULL,
   `role` varchar(20) NOT NULL,
   `status` varchar(20) DEFAULT 'active',
+  `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `email` (`email`),
-  CONSTRAINT `users_chk_1` CHECK ((`role` in (_utf8mb4'student',_utf8mb4'lecturer',_utf8mb4'examiner',_utf8mb4'staff_admin',_utf8mb4'hod_dean',_utf8mb4'guest_lecturer'))),
+  CONSTRAINT `users_chk_1` CHECK ((`role` in (_utf8mb4'student',_utf8mb4'lecturer',_utf8mb4'examiner',_utf8mb4'staff_admin',_utf8mb4'super_admin',_utf8mb4'hod_dean',_utf8mb4'guest_lecturer'))),
   CONSTRAINT `users_chk_2` CHECK ((`status` in (_utf8mb4'active',_utf8mb4'inactive',_utf8mb4'suspended')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -94,8 +97,8 @@ DROP TABLE IF EXISTS `students`;
 CREATE TABLE `students` (
   `student_id` int NOT NULL,
   `student_no` varchar(30) NOT NULL,
-  `department_id` int NOT NULL,
-  `batch_id` int NOT NULL,
+  `department_id` int DEFAULT NULL,
+  `batch_id` int DEFAULT NULL,
   `enrollment_year` int NOT NULL,
   PRIMARY KEY (`student_id`),
   UNIQUE KEY `student_no` (`student_no`),
@@ -328,7 +331,7 @@ CREATE TABLE `question_banks` (
   KEY `course_id` (`course_id`),
   KEY `created_by` (`created_by`),
   CONSTRAINT `question_banks_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
-  CONSTRAINT `question_banks_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `examiners` (`examiner_id`)
+  CONSTRAINT `question_banks_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Table: questions
@@ -364,7 +367,6 @@ CREATE TABLE `exams` (
   `venue` varchar(100) DEFAULT NULL,
   `duration_minutes` int NOT NULL,
   `status` varchar(20) DEFAULT 'published',
-  `examiner_id` bigint DEFAULT NULL,
   PRIMARY KEY (`exam_id`),
   KEY `scheduled_by_user_id` (`scheduled_by_user_id`),
   KEY `linked_slot_id` (`linked_slot_id`),
@@ -424,7 +426,7 @@ CREATE TABLE `exam_answers` (
   KEY `graded_by` (`graded_by`),
   CONSTRAINT `exam_answers_ibfk_1` FOREIGN KEY (`attempt_id`) REFERENCES `exam_attempts` (`attempt_id`),
   CONSTRAINT `exam_answers_ibfk_2` FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`),
-  CONSTRAINT `exam_answers_ibfk_3` FOREIGN KEY (`graded_by`) REFERENCES `examiners` (`examiner_id`)
+  CONSTRAINT `exam_answers_ibfk_3` FOREIGN KEY (`graded_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Table: exam_results
@@ -457,17 +459,6 @@ CREATE TABLE `proctoring_flags` (
   PRIMARY KEY (`flag_id`),
   KEY `attempt_id` (`attempt_id`),
   CONSTRAINT `proctoring_flags_ibfk_1` FOREIGN KEY (`attempt_id`) REFERENCES `exam_attempts` (`attempt_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- Table: examiners
-DROP TABLE IF EXISTS `examiners`;
-CREATE TABLE `examiners` (
-  `examiner_id` int NOT NULL,
-  `department_id` int NOT NULL,
-  PRIMARY KEY (`examiner_id`),
-  KEY `department_id` (`department_id`),
-  CONSTRAINT `examiners_ibfk_1` FOREIGN KEY (`examiner_id`) REFERENCES `users` (`user_id`),
-  CONSTRAINT `examiners_ibfk_2` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Table: attendance_sessions
@@ -506,6 +497,7 @@ CREATE TABLE `events` (
   `title` varchar(200) NOT NULL,
   `description` longtext,
   `venue` varchar(100) DEFAULT NULL,
+  `poster_url` varchar(500) DEFAULT NULL,
   `event_date` datetime NOT NULL,
   `faculty_id` int DEFAULT NULL,
   `created_by` int NOT NULL,
@@ -596,7 +588,7 @@ CREATE TABLE `notifications` (
   `user_id` int NOT NULL,
   `type` varchar(30) NOT NULL,
   `title` varchar(200) NOT NULL,
-  `message` tinytext NOT NULL,
+  `message` text NOT NULL,
   `ref_table` varchar(50) DEFAULT NULL,
   `ref_id` int DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT '0',
@@ -614,7 +606,8 @@ CREATE TABLE `ai_chat_messages` (
   `student_id` int NOT NULL,
   `offering_id` int NOT NULL,
   `role` varchar(10) NOT NULL,
-  `content` tinytext NOT NULL,
+  `content` mediumtext NOT NULL,
+  `sources` varchar(1000) DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`message_id`),
   KEY `offering_id` (`offering_id`),
@@ -649,11 +642,11 @@ CREATE TABLE `ai_quiz_questions` (
   `question_id` bigint NOT NULL AUTO_INCREMENT,
   `session_id` int NOT NULL,
   `order_no` int NOT NULL,
-  `question_text` tinytext NOT NULL,
+  `question_text` text NOT NULL,
   `question_type` varchar(20) NOT NULL,
   `options` json DEFAULT NULL,
-  `correct_answer` tinytext NOT NULL,
-  `student_answer` longtext,
+  `correct_answer` text NOT NULL,
+  `student_answer` mediumtext,
   `is_correct` tinyint(1) DEFAULT NULL,
   `answer_revealed` tinyint(1) DEFAULT '0',
   PRIMARY KEY (`question_id`),
@@ -692,6 +685,47 @@ CREATE TABLE `personal_resources` (
   KEY `idx_personal_resources_student` (`student_id`,`offering_id`),
   CONSTRAINT `personal_resources_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
   CONSTRAINT `personal_resources_ibfk_2` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table: material_chunks
+DROP TABLE IF EXISTS `material_chunks`;
+CREATE TABLE `material_chunks` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `material_id` bigint DEFAULT NULL,
+  `personal_resource_id` bigint DEFAULT NULL,
+  `student_id` int DEFAULT NULL,
+  `owner_student_id` int DEFAULT NULL,
+  `source_type` varchar(20) NOT NULL DEFAULT 'LECTURER',
+  `offering_id` int NOT NULL,
+  `chunk_index` int NOT NULL,
+  `source_title` varchar(255) NOT NULL,
+  `content` mediumtext NOT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_material_chunks_offering` (`offering_id`),
+  KEY `idx_material_chunks_material` (`material_id`),
+  KEY `idx_material_chunks_student` (`student_id`,`offering_id`),
+  KEY `idx_material_chunks_owner` (`owner_student_id`,`offering_id`),
+  KEY `idx_material_chunks_source_type` (`source_type`),
+  FULLTEXT KEY `idx_material_chunks_content` (`content`),
+  CONSTRAINT `material_chunks_ibfk_1` FOREIGN KEY (`material_id`) REFERENCES `materials` (`material_id`) ON DELETE CASCADE,
+  CONSTRAINT `material_chunks_ibfk_2` FOREIGN KEY (`personal_resource_id`) REFERENCES `personal_resources` (`resource_id`) ON DELETE CASCADE,
+  CONSTRAINT `material_chunks_ibfk_3` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE,
+  CONSTRAINT `material_chunks_ibfk_4` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table: password_reset_tokens
+DROP TABLE IF EXISTS `password_reset_tokens`;
+CREATE TABLE `password_reset_tokens` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `expiry_date` datetime(6) NOT NULL,
+  `token` varchar(255) NOT NULL,
+  `used` bit(1) NOT NULL DEFAULT b'0',
+  `user_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_password_reset_token` (`token`),
+  KEY `fk_password_reset_user` (`user_id`),
+  CONSTRAINT `fk_password_reset_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

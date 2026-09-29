@@ -14,4 +14,6 @@ public interface AiChatMessageRepository extends JpaRepository<AiChatMessage, Lo
     List<AiChatMessage> findByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId);
 
     List<AiChatMessage> findByStudent_StudentIdAndCourseOffering_OfferingIdOrderByCreatedAtAsc(Long studentId, Long offeringId);
+
+    long countByStudent_StudentIdAndRoleAndCreatedAtGreaterThanEqual(Long studentId, String role, java.time.LocalDateTime since);
 }

@@ -79,7 +79,7 @@ export default function CourseAssignmentsTab({
       {assignments.map((a) => (
         <div
           key={a.id}
-          className="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+          className="card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
         >
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--on-surface)] mb-1">{a.title}</p>
@@ -91,32 +91,32 @@ export default function CourseAssignmentsTab({
               {a.grade && <span className="badge badge-success">Grade: {a.grade}</span>}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto w-full sm:w-auto">
             {a.status === "Draft" || a.status === "Late" ? (
               <button
                 onClick={() => setSubmittingAssignment(a)}
-                className="btn-primary text-xs !py-1.5 shadow-sm"
+                className="btn-primary text-xs !py-2.5 sm:!py-1.5 min-h-[44px] shadow-sm w-full sm:w-auto justify-center"
               >
-                <i className="ti ti-upload text-sm"></i> Upload Submission
+                <i className="ti ti-upload text-sm mr-1"></i> Upload Submission
               </button>
             ) : (
               <button
                 onClick={() => setViewingAssignment(a)}
-                className="btn-secondary text-xs !py-1.5"
+                className="btn-secondary text-xs !py-2.5 sm:!py-1.5 min-h-[44px] w-full sm:w-auto justify-center"
               >
-                <i className="ti ti-eye text-sm"></i> View Details & History
+                <i className="ti ti-eye text-sm mr-1"></i> View Details & History
               </button>
             )}
           </div>
         </div>
       ))}
 
-      
+      {/* Upload Submission Modal */}
       {submittingAssignment && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleConfirmSubmit}
-            className="card max-w-lg w-full p-6 animate-scaleIn max-h-[90vh] overflow-y-auto bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]"
+            className="card max-w-lg w-full p-4 sm:p-6 animate-scaleIn max-h-[92vh] overflow-y-auto bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] rounded-2xl sm:rounded-3xl"
           >
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)] mb-4">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
@@ -125,7 +125,8 @@ export default function CourseAssignmentsTab({
               <button
                 type="button"
                 onClick={() => setSubmittingAssignment(null)}
-                className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+                aria-label="Close"
               >
                 <i className="ti ti-x text-lg"></i>
               </button>
@@ -142,7 +143,7 @@ export default function CourseAssignmentsTab({
 
               <div>
                 <label className="block text-xs font-semibold text-[var(--on-surface)] mb-2">
-                  Upload Submission File (Drag & Drop)
+                  Upload Submission File
                 </label>
                 <FileDropzone
                   accept=".pdf,.docx,.zip,.rar"
@@ -164,7 +165,6 @@ export default function CourseAssignmentsTab({
                 />
               </div>
 
-              
               {submittingAssignment.attempts.length > 0 && (
                 <div className="border-t border-[var(--outline-variant)] pt-3 space-y-2">
                   <p className="text-xs font-bold text-[var(--on-surface)]">
@@ -187,15 +187,15 @@ export default function CourseAssignmentsTab({
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-[var(--outline-variant)]">
               <button
                 type="button"
                 onClick={() => setSubmittingAssignment(null)}
-                className="btn-secondary text-xs"
+                className="btn-secondary text-xs min-h-[44px] justify-center"
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-primary text-xs shadow-md">
+              <button type="submit" className="btn-primary text-xs shadow-md min-h-[44px] justify-center">
                 Confirm & Submit
               </button>
             </div>
@@ -203,10 +203,10 @@ export default function CourseAssignmentsTab({
         </div>
       )}
 
-      
+      {/* View Details Modal */}
       {viewingAssignment && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-lg w-full p-6 animate-scaleIn space-y-4 max-h-[90vh] overflow-y-auto bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="card max-w-lg w-full p-4 sm:p-6 animate-scaleIn space-y-4 max-h-[92vh] overflow-y-auto bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] rounded-2xl sm:rounded-3xl">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--outline-variant)]">
               <div>
                 <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
@@ -218,7 +218,8 @@ export default function CourseAssignmentsTab({
               </div>
               <button
                 onClick={() => setViewingAssignment(null)}
-                className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+                aria-label="Close"
               >
                 <i className="ti ti-x text-lg"></i>
               </button>
@@ -231,7 +232,6 @@ export default function CourseAssignmentsTab({
               </p>
             </div>
 
-            
             <div className="border-t border-b border-[var(--outline-variant)] py-3 space-y-2">
               <p className="text-xs font-bold text-[var(--on-surface)]">
                 Submission Attempts History Timeline:
@@ -274,7 +274,7 @@ export default function CourseAssignmentsTab({
             )}
 
             <div className="flex justify-end pt-2 border-t border-[var(--outline-variant)]">
-              <button onClick={() => setViewingAssignment(null)} className="btn-secondary text-xs">
+              <button onClick={() => setViewingAssignment(null)} className="btn-secondary text-xs min-h-[44px] px-4">
                 Close
               </button>
             </div>

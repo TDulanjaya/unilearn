@@ -28,6 +28,7 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
     private final CourseOfferingRepository courseOfferingRepository;
     private final LecturerRepository lecturerRepository;
     private final AttendanceSessionMapper attendanceSessionMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -35,6 +36,7 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
         if (request == null) {
             throw new ValidationException("AttendanceSession request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
@@ -87,10 +89,14 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
         if (sessionId == null) {
             throw new ValidationException("Session ID cannot be null");
         }
-        if (!attendanceSessionRepository.existsById(sessionId)) {
-            throw new EntryNotFoundException("AttendanceSession not found with ID: " + sessionId);
+        AttendanceSession session = attendanceSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new EntryNotFoundException("AttendanceSession not found with ID: " + sessionId));
+
+        if (session.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(session.getCourseOffering().getOfferingId());
         }
-        attendanceSessionRepository.deleteById(sessionId);
+
+        attendanceSessionRepository.delete(session);
     }
 
     @Override
@@ -108,6 +114,8 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
         if (offeringId == null) {
             throw new ValidationException("Offering ID cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(offeringId);
+
         if (!courseOfferingRepository.existsById(offeringId)) {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
         }

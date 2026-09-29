@@ -28,6 +28,8 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final CourseOfferingRepository courseOfferingRepository;
     private final LecturerRepository lecturerRepository;
     private final AssignmentMapper assignmentMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
+    private final com.unilearn.server.repository.EnrollmentRepository enrollmentRepository;
 
     @Override
     @Transactional
@@ -35,6 +37,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         if (request == null) {
             throw new ValidationException("Assignment request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         if (request.getDeadline() != null && request.getDeadline().isBefore(LocalDateTime.now())) {
             throw new com.unilearn.server.exception.IllegalStateException("Due date cannot be in the past or before the publish date");
@@ -63,6 +66,11 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new EntryNotFoundException("Assignment not found with ID: " + assignmentId));
+
+        if (assignment.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(assignment.getCourseOffering().getOfferingId());
+        }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         if (request.getDeadline() != null && request.getDeadline().isBefore(LocalDateTime.now())) {
             throw new com.unilearn.server.exception.IllegalStateException("Due date cannot be in the past or before the publish date");
@@ -94,10 +102,14 @@ public class AssignmentServiceImpl implements AssignmentService {
         if (assignmentId == null) {
             throw new ValidationException("Assignment ID cannot be null");
         }
-        if (!assignmentRepository.existsById(assignmentId)) {
-            throw new EntryNotFoundException("Assignment not found with ID: " + assignmentId);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new EntryNotFoundException("Assignment not found with ID: " + assignmentId));
+
+        if (assignment.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(assignment.getCourseOffering().getOfferingId());
         }
-        assignmentRepository.deleteById(assignmentId);
+
+        assignmentRepository.delete(assignment);
     }
 
     @Override
@@ -107,6 +119,19 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new EntryNotFoundException("Assignment not found with ID: " + assignmentId));
+
+        if (assignment.getCourseOffering() != null) {
+            Long offId = assignment.getCourseOffering().getOfferingId();
+            if (ownershipValidator.isLecturer()) {
+                ownershipValidator.checkLecturerOfferingAccess(offId);
+            } else if (ownershipValidator.isStudent()) {
+                var currentUser = ownershipValidator.getCurrentUser();
+                if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offId)) {
+                    throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+                }
+            }
+        }
+
         return assignmentMapper.toAssignmentResponse(assignment);
     }
 
@@ -117,6 +142,15 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
         if (!courseOfferingRepository.existsById(offeringId)) {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
+        }
+
+        if (ownershipValidator.isLecturer()) {
+            ownershipValidator.checkLecturerOfferingAccess(offeringId);
+        } else if (ownershipValidator.isStudent()) {
+            var currentUser = ownershipValidator.getCurrentUser();
+            if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offeringId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+            }
         }
 
         return assignmentRepository.findByCourseOffering_OfferingId(offeringId)

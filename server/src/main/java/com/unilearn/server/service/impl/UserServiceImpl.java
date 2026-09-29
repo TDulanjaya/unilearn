@@ -56,6 +56,32 @@ public class UserServiceImpl implements UserService {
     private final MessageRepository messageRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
+    private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String LOWER = "abcdefghijklmnopqrstuvwxyz";
+    private static final String DIGITS = "0123456789";
+    private static final String SPECIAL = "@#$!%*?&";
+    private static final String ALL_CHARS = UPPER + LOWER + DIGITS + SPECIAL;
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+
+    public static String generateSecureTemporaryPassword() {
+        StringBuilder sb = new StringBuilder(16);
+        sb.append(UPPER.charAt(SECURE_RANDOM.nextInt(UPPER.length())));
+        sb.append(LOWER.charAt(SECURE_RANDOM.nextInt(LOWER.length())));
+        sb.append(DIGITS.charAt(SECURE_RANDOM.nextInt(DIGITS.length())));
+        sb.append(SPECIAL.charAt(SECURE_RANDOM.nextInt(SPECIAL.length())));
+        for (int i = 4; i < 16; i++) {
+            sb.append(ALL_CHARS.charAt(SECURE_RANDOM.nextInt(ALL_CHARS.length())));
+        }
+        char[] chars = sb.toString().toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = SECURE_RANDOM.nextInt(i + 1);
+            char temp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = temp;
+        }
+        return new String(chars);
+    }
+
     @Override
     @Transactional
     public UserResponse createUser(UserRequest request) {
@@ -77,8 +103,15 @@ public class UserServiceImpl implements UserService {
             throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
         }
 
-        String passwordHash = passwordEncoder.encode(request.getPassword() != null ? request.getPassword() : "defaultPass123");
+        boolean mustChange = false;
+        String rawPassword = request.getPassword();
+        if (rawPassword == null || rawPassword.trim().isEmpty()) {
+            rawPassword = generateSecureTemporaryPassword();
+            mustChange = true;
+        }
+        String passwordHash = passwordEncoder.encode(rawPassword.trim());
         User user = userMapper.toUser(request, passwordHash);
+        user.setMustChangePassword(mustChange);
         User saved = userRepository.save(user);
 
         String roleName = saved.getRole() != null ? saved.getRole().toUpperCase() : "STUDENT";
@@ -86,18 +119,20 @@ public class UserServiceImpl implements UserService {
         if (request.getDepartmentId() != null) {
             dept = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
-        } else {
+        } else if (!"STUDENT".equals(roleName)) {
             dept = departmentRepository.findAll().stream().findFirst().orElse(null);
         }
 
         if ("STUDENT".equals(roleName)) {
-            Batch batch = null;
-            if (request.getBatchId() != null) {
-                batch = batchRepository.findById(request.getBatchId())
-                        .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
-            } else {
-                batch = batchRepository.findAll().stream().findFirst().orElse(null);
+            if (request.getDepartmentId() == null) {
+                throw new ValidationException("Department is required when creating a student account");
             }
+            if (request.getBatchId() == null) {
+                throw new ValidationException("Batch is required when creating a student account");
+            }
+
+            Batch batch = batchRepository.findById(request.getBatchId())
+                    .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
 
             Student student = Student.builder()
                     .user(saved)
@@ -149,7 +184,9 @@ public class UserServiceImpl implements UserService {
             hodDeanAssignmentRepository.save(assignment);
         }
 
-        return enrichUserResponse(saved);
+        UserResponse response = enrichUserResponse(saved);
+        response.setTemporaryPassword(rawPassword);
+        return response;
     }
 
     @Override
@@ -164,6 +201,8 @@ public class UserServiceImpl implements UserService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
+
+        checkSuperAdminModification(user);
 
         if (!user.getEmail().equalsIgnoreCase(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
             throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
@@ -208,9 +247,20 @@ public class UserServiceImpl implements UserService {
 
         String role = user.getRole() != null ? user.getRole().toLowerCase() : "";
 
-        // Prevent deleting the Super Administrator or the sole administrator
+        // Do not delete super admin or last admin
         if ("super_admin".equalsIgnoreCase(role)) {
-            throw new ValidationException("Cannot delete the Super Administrator account.");
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
+            if (!isSuperAdmin) {
+                throw new org.springframework.security.access.AccessDeniedException("Staff Admin is not authorized to delete a Super Administrator account.");
+            }
+            long superAdminCount = userRepository.findAll().stream()
+                    .filter(u -> "super_admin".equalsIgnoreCase(u.getRole()))
+                    .count();
+            if (superAdminCount <= 1) {
+                throw new ValidationException("Cannot delete the last Super Administrator account.");
+            }
         }
         if ("staff_admin".equalsIgnoreCase(role)) {
             long adminCount = userRepository.findAll().stream()
@@ -221,7 +271,7 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // Cascade-delete all related academic records before removing the user
+        // Delete related academic records first
         if ("student".equals(role)) {
             attendanceRecordRepository.deleteAll(attendanceRecordRepository.findByStudent_StudentId(userId));
             submissionRepository.deleteAll(submissionRepository.findByStudent_StudentId(userId));
@@ -250,7 +300,7 @@ public class UserServiceImpl implements UserService {
             hodDeanAssignmentRepository.deleteAll(hodDeanAssignmentRepository.findByUser_UserId(userId));
         }
 
-        // Unlink HOD or Dean role if assigned to department or faculty
+        // Unlink HOD or Dean role
         departmentRepository.findByHod_UserId(userId).ifPresent(d -> {
             d.setHod(null);
             departmentRepository.save(d);
@@ -260,7 +310,7 @@ public class UserServiceImpl implements UserService {
             facultyRepository.save(f);
         });
 
-        // Reassign historical parent references (exams, question banks, announcements) to fallback admin if possible
+        // Reassign exams, banks, and announcements to admin
         Long fallbackAdminId = userRepository.findAll().stream()
                 .filter(u -> ("super_admin".equalsIgnoreCase(u.getRole()) || "staff_admin".equalsIgnoreCase(u.getRole())) && !u.getUserId().equals(userId))
                 .map(User::getUserId)
@@ -279,7 +329,7 @@ public class UserServiceImpl implements UserService {
             } catch (Exception ignored) {}
         }
 
-        // Clean up user-level auxiliary records
+        // Delete user auxiliary records
         try {
             jdbcTemplate.update("DELETE FROM examiners WHERE examiner_id = ?", userId);
         } catch (Exception ignored) {}
@@ -294,7 +344,7 @@ public class UserServiceImpl implements UserService {
             jdbcTemplate.update("DELETE FROM ai_chat_sessions WHERE user_id = ?", userId);
         } catch (Exception ignored) {}
 
-        // Delete audit logs, notifications and messages
+        // Delete logs, notifications, and messages
         auditLogRepository.deleteAll(auditLogRepository.findByUser_UserId(userId));
         notificationRepository.deleteAll(notificationRepository.findByUser_UserId(userId));
         messageRepository.deleteAll(messageRepository.findBySender_UserIdOrReceiver_UserId(userId, userId));
@@ -338,6 +388,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
 
+        checkSuperAdminModification(user);
+
         if (!active && "super_admin".equalsIgnoreCase(user.getRole())) {
             throw new ValidationException("Cannot deactivate the Super Administrator account.");
         }
@@ -362,9 +414,22 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + userId));
 
+        checkSuperAdminModification(user);
+
         user.setPasswordHash(passwordEncoder.encode(newPassword.trim()));
         User updated = userRepository.save(user);
         return enrichUserResponse(updated);
+    }
+
+    private void checkSuperAdminModification(User targetUser) {
+        if ("super_admin".equalsIgnoreCase(targetUser.getRole())) {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
+            if (!isSuperAdmin) {
+                throw new org.springframework.security.access.AccessDeniedException("Staff Admin is not authorized to modify a Super Administrator account.");
+            }
+        }
     }
 
     private UserResponse enrichUserResponse(User user) {

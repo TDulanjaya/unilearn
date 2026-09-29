@@ -32,7 +32,7 @@ public class AiChatController {
     public ResponseEntity<AiChatMessageResponse> askQuestion(
             @AuthenticationPrincipal User principal,
             @Valid @RequestBody AiChatMessageRequest request) {
-        // Derive studentId from principal, never trust client-supplied studentId
+        // use authenticated student id
         request.setStudentId(principal.getUserId());
         if (request.getRole() == null || request.getRole().isBlank()) {
             request.setRole("user");

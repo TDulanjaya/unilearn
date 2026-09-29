@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Course, MCQQuestion, StructuredQA } from "@/types/course";
+import { Course } from "@/types/course";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -10,14 +10,17 @@ interface CourseAiTabProps {
   offeringId?: number;
   materialsCount?: number;
   resourcesCount?: number;
-  mcqBank?: MCQQuestion[];
-  structuredBank?: StructuredQA[];
 }
 
 interface ChatMessage {
   id?: number;
   role: "user" | "assistant";
   content: string;
+  sources?: string[];
+  courseSources?: string[];
+  noteSources?: string[];
+  isError?: boolean;
+  failedPrompt?: string;
 }
 
 interface QuizQuestion {
@@ -37,17 +40,16 @@ export default function CourseAiTab({
   offeringId = 1,
   materialsCount = 0,
   resourcesCount = 0,
-  mcqBank = [],
-  structuredBank = [],
 }: CourseAiTabProps) {
   const { user } = useAuth();
 
   const [studyMode, setStudyMode] = useState<"mcq" | "structured">("mcq");
-  const [sourceScope, setSourceScope] = useState<"full_course" | "ongoing_topics">("full_course");
+  const [quizSourceScope, setQuizSourceScope] = useState<"both" | "course_materials" | "my_notes">("both");
+  const [chatSourceScope, setChatSourceScope] = useState<"both" | "course_materials" | "my_notes">("both");
   const [questionCount, setQuestionCount] = useState<number>(5);
 
-  // Quiz state
-  const [quizState, setQuizState] = useState<"idle" | "loading" | "active" | "done">("idle");
+  // quiz state
+  const [quizState, setQuizState] = useState<"idle" | "loading" | "active" | "done" | "error">("idle");
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -58,14 +60,14 @@ export default function CourseAiTab({
   const [revealedStructured, setRevealedStructured] = useState<Record<number, boolean>>({});
   const [quizError, setQuizError] = useState<string | null>(null);
 
-  // Chat state
+  // chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSendingChat, setIsSendingChat] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Load chat history on mount or when offeringId changes
+  // load history on mount
   useEffect(() => {
     let isMounted = true;
     const loadHistory = async () => {
@@ -76,10 +78,13 @@ export default function CourseAiTab({
         if (isMounted) {
           if (Array.isArray(history) && history.length > 0) {
             setMessages(
-              history.map((m) => ({
+              history.map((m: any) => ({
                 id: m.messageId,
                 role: m.role === "assistant" ? "assistant" : "user",
                 content: m.content,
+                sources: Array.isArray(m.sources) ? m.sources : undefined,
+                courseSources: Array.isArray(m.courseSources) ? m.courseSources : undefined,
+                noteSources: Array.isArray(m.noteSources) ? m.noteSources : undefined,
               }))
             );
           } else {
@@ -111,18 +116,15 @@ export default function CourseAiTab({
     };
   }, [offeringId, course.code, course.title, user?.fullName]);
 
-  // Auto scroll chat
+  // auto-scroll
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isSendingChat]);
 
-  // Handle send chat
-  const handleSendChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || isSendingChat) return;
+  // send question helper
+  const sendQuestion = async (userText: string) => {
+    if (!userText.trim() || isSendingChat) return;
 
-    const userText = chatInput.trim();
-    setChatInput("");
     setMessages((prev) => [...prev, { role: "user", content: userText }]);
     setIsSendingChat(true);
 
@@ -131,10 +133,21 @@ export default function CourseAiTab({
         offeringId: offeringId,
         content: userText,
         role: "user",
+        sourceScope: chatSourceScope,
       });
 
       if (res && res.content) {
-        setMessages((prev) => [...prev, { id: res.messageId, role: "assistant", content: res.content }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: res.messageId,
+            role: "assistant",
+            content: res.content,
+            sources: Array.isArray(res.sources) && res.sources.length > 0 ? res.sources : undefined,
+            courseSources: Array.isArray(res.courseSources) && res.courseSources.length > 0 ? res.courseSources : undefined,
+            noteSources: Array.isArray(res.noteSources) && res.noteSources.length > 0 ? res.noteSources : undefined,
+          },
+        ]);
       } else {
         throw new Error("No response content from AI");
       }
@@ -143,7 +156,9 @@ export default function CourseAiTab({
         ...prev,
         {
           role: "assistant",
-          content: `I couldn't complete that request: ${err.message || "Network error"}. Please make sure you have internet access and the AI model is ready.`,
+          content: err.message || "AI assistant is temporarily unavailable.",
+          isError: true,
+          failedPrompt: userText,
         },
       ]);
     } finally {
@@ -151,7 +166,16 @@ export default function CourseAiTab({
     }
   };
 
-  // Clear chat history
+  // submit chat prompt
+  const handleSendChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isSendingChat) return;
+    const userText = chatInput.trim();
+    setChatInput("");
+    await sendQuestion(userText);
+  };
+
+  // clear chat
   const handleClearChat = async () => {
     if (!confirm("Are you sure you want to clear your AI chat history for this course?")) return;
     try {
@@ -167,7 +191,7 @@ export default function CourseAiTab({
     }
   };
 
-  // Parse options helper
+  // parse mcq options
   const parseOptions = (raw: any): string[] => {
     if (Array.isArray(raw)) return raw;
     if (typeof raw === "string") {
@@ -181,7 +205,7 @@ export default function CourseAiTab({
     return [];
   };
 
-  // Start AI Quiz session
+  // start quiz session
   const startQuiz = async () => {
     setQuizState("loading");
     setQuizError(null);
@@ -194,7 +218,7 @@ export default function CourseAiTab({
         offeringId: offeringId,
         questionType: studyMode,
         questionCount: questionCount,
-        sourceScope: sourceScope,
+        sourceScope: quizSourceScope,
       });
 
       if (res && res.questions && res.questions.length > 0) {
@@ -217,44 +241,13 @@ export default function CourseAiTab({
         throw new Error("No quiz questions were returned by AI.");
       }
     } catch (err: any) {
-      console.warn("API quiz generation failed, falling back to local bank:", err);
-      setQuizError(err.message || "Failed to generate AI quiz");
-      // Fallback to local mock banks so student isn't blocked
-      if (studyMode === "mcq" && mcqBank.length > 0) {
-        setQuestions(
-          mcqBank.slice(0, questionCount).map((m, i) => ({
-            questionId: i + 1,
-            orderNo: i + 1,
-            questionText: m.question,
-            questionType: "mcq",
-            options: m.options,
-            correctAnswer: m.options[m.correctIndex],
-            isCorrect: null,
-            answerRevealed: false,
-          }))
-        );
-        setQuizState("active");
-      } else if (studyMode === "structured" && structuredBank.length > 0) {
-        setQuestions(
-          structuredBank.slice(0, questionCount).map((s, i) => ({
-            questionId: s.id,
-            orderNo: i + 1,
-            questionText: s.question,
-            questionType: "structured",
-            options: [],
-            correctAnswer: s.answer,
-            isCorrect: null,
-            answerRevealed: false,
-          }))
-        );
-        setQuizState("active");
-      } else {
-        setQuizState("idle");
-      }
+      console.error("API quiz generation failed:", err);
+      setQuizError(err.message || "Failed to generate AI quiz from course materials. Please try again.");
+      setQuizState("error");
     }
   };
 
-  // Submit MCQ Answer
+  // submit mcq answer
   const handleSelectOption = async (opt: string) => {
     if (selectedOpt !== null || isSubmittingAnswer) return;
     setSelectedOpt(opt);
@@ -286,7 +279,7 @@ export default function CourseAiTab({
           )
         );
       } else {
-        // Fallback local grading
+        // local fallback grading
         const isCorrect = opt.trim().toLowerCase() === currentQ.correctAnswer?.trim().toLowerCase();
         if (isCorrect) setScore((p) => p + 1);
         setQuestions((prev) =>
@@ -315,16 +308,25 @@ export default function CourseAiTab({
     }
   };
 
-  // Submit Structured Question Answer
+  // submit structured answer
   const handleSubmitStructured = async (qId: number) => {
     const text = structuredInputs[qId] || "";
     setRevealedStructured((prev) => ({ ...prev, [qId]: true }));
 
     if (sessionId && text.trim()) {
       try {
-        await api.post(`/api/v1/ai/quiz/${qId}/answer`, {
+        const res = await api.post<any>(`/api/v1/ai/quiz/${qId}/answer`, {
           studentAnswer: text,
         });
+        if (res && res.correctAnswer) {
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.questionId === qId
+                ? { ...q, correctAnswer: res.correctAnswer, answerRevealed: true }
+                : q
+            )
+          );
+        }
       } catch (err) {
         console.warn("Could not save structured answer on server:", err);
       }
@@ -335,7 +337,7 @@ export default function CourseAiTab({
 
   return (
     <div>
-      {/* Header & Grounding Context Bar */}
+      {/* header */}
       <div className="mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="font-display font-extrabold text-xl text-[var(--on-surface)] flex items-center gap-2">
@@ -347,7 +349,7 @@ export default function CourseAiTab({
           </p>
         </div>
 
-        {/* Grounding Source Badge */}
+        {/* sources badge */}
         <div className="inline-flex items-center gap-2 p-2 px-3 rounded-xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-xs">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span className="text-[var(--on-surface-variant)]">
@@ -364,9 +366,9 @@ export default function CourseAiTab({
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6 items-start">
-        {/* Left Column: AI Quiz & Practice Engine */}
+        {/* quiz panel */}
         <div className="space-y-4">
-          {/* Mode Switcher */}
+          {/* mode switcher */}
           <div className="flex p-1.5 rounded-2xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] gap-1.5">
             <button
               onClick={() => {
@@ -396,18 +398,19 @@ export default function CourseAiTab({
             </button>
           </div>
 
-          {/* Controls Bar for Quiz (Scope & Count) */}
+          {/* scope & count */}
           <div className="card p-3 px-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-[var(--on-surface-variant)] font-semibold">Scope:</span>
+              <span className="text-[var(--on-surface-variant)] font-semibold">Use:</span>
               <select
-                value={sourceScope}
-                onChange={(e) => setSourceScope(e.target.value as any)}
+                value={quizSourceScope}
+                onChange={(e) => setQuizSourceScope(e.target.value as any)}
                 disabled={quizState === "active" || quizState === "loading"}
                 className="bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)] rounded-lg px-2 py-1 focus:outline-none"
               >
-                <option value="full_course">Full Course Materials</option>
-                <option value="ongoing_topics">Ongoing Topics Only</option>
+                <option value="both">Both</option>
+                <option value="course_materials">Course materials</option>
+                <option value="my_notes">My notes</option>
               </select>
             </div>
 
@@ -426,7 +429,7 @@ export default function CourseAiTab({
             </div>
           </div>
 
-          {/* MCQ Practice Engine Panel */}
+          {/* mcq view */}
           {studyMode === "mcq" && (
             <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] min-h-[500px] flex flex-col justify-between">
               <div>
@@ -441,13 +444,25 @@ export default function CourseAiTab({
                   )}
                 </div>
 
-                {quizError && (
-                  <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
-                    <i className="ti ti-alert-circle mr-1"></i> {quizError} (Showing study bank questions)
+                {/* error state */}
+                {quizState === "error" && (
+                  <div className="text-center py-12 space-y-4">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center text-2xl">
+                      <i className="ti ti-alert-triangle"></i>
+                    </div>
+                    <h4 className="font-display font-bold text-base text-[var(--on-surface)]">
+                      Quiz Generation Failed
+                    </h4>
+                    <p className="text-xs text-[var(--on-surface-variant)] max-w-sm mx-auto">
+                      {quizError || "Failed to generate AI quiz questions from course materials."}
+                    </p>
+                    <button onClick={startQuiz} className="btn-primary text-xs shadow-md inline-flex items-center gap-1.5">
+                      <i className="ti ti-rotate"></i> Try Again
+                    </button>
                   </div>
                 )}
 
-                {/* Idle State */}
+                {/* idle state */}
                 {quizState === "idle" && (
                   <div className="text-center py-12">
                     <i className="ti ti-sparkles text-5xl text-[var(--tertiary)] block mb-3 animate-pulse"></i>
@@ -463,7 +478,7 @@ export default function CourseAiTab({
                   </div>
                 )}
 
-                {/* Loading State */}
+                {/* loading state */}
                 {quizState === "loading" && (
                   <div className="text-center py-16">
                     <div className="w-10 h-10 border-4 border-[var(--tertiary)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -476,7 +491,7 @@ export default function CourseAiTab({
                   </div>
                 )}
 
-                {/* Active Question */}
+                {/* active question */}
                 {quizState === "active" && currentQ && (
                   <div>
                     <p className="text-sm font-semibold mb-4 text-[var(--on-surface)] leading-relaxed">
@@ -543,7 +558,7 @@ export default function CourseAiTab({
                   </div>
                 )}
 
-                {/* Done State */}
+                {/* quiz completed */}
                 {quizState === "done" && (
                   <div className="text-center py-10">
                     <i className="ti ti-trophy text-5xl text-[var(--secondary)] block mb-3"></i>
@@ -566,7 +581,7 @@ export default function CourseAiTab({
             </div>
           )}
 
-          {/* Structured Q&A Panel */}
+          {/* structured questions */}
           {studyMode === "structured" && (
             <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] min-h-[500px]">
               <div className="flex items-center justify-between mb-3 pb-3 border-b border-[var(--outline-variant)]">
@@ -593,7 +608,24 @@ export default function CourseAiTab({
                 </div>
               )}
 
-              {quizState !== "loading" && questions.length === 0 && (
+              {quizState === "error" && (
+                <div className="text-center py-12 space-y-4">
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center text-2xl">
+                    <i className="ti ti-alert-triangle"></i>
+                  </div>
+                  <h4 className="font-display font-bold text-base text-[var(--on-surface)]">
+                    Generation Failed
+                  </h4>
+                  <p className="text-xs text-[var(--on-surface-variant)] max-w-sm mx-auto">
+                    {quizError || "Failed to generate structured questions from course materials."}
+                  </p>
+                  <button onClick={startQuiz} className="btn-primary text-xs shadow-md inline-flex items-center gap-1.5">
+                    <i className="ti ti-rotate"></i> Try Again
+                  </button>
+                </div>
+              )}
+
+              {quizState !== "loading" && quizState !== "error" && questions.length === 0 && (
                 <div className="text-center py-12">
                   <i className="ti ti-clipboard-text text-4xl text-[var(--outline)] block mb-2"></i>
                   <p className="text-xs text-[var(--on-surface-variant)] mb-4">
@@ -670,22 +702,36 @@ export default function CourseAiTab({
           )}
         </div>
 
-        {/* Right Column: AI Tutor Chat */}
-        <div className="card p-6 flex flex-col h-[610px] border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
-            <h3 className="font-display font-bold text-lg flex items-center gap-2 text-[var(--on-surface)]">
+        {/* chat column */}
+        <div className="card p-4 sm:p-6 flex flex-col h-[520px] sm:h-[610px] border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)] gap-2">
+            <h3 className="font-display font-bold text-base sm:text-lg flex items-center gap-2 text-[var(--on-surface)]">
               <i className="ti ti-messages text-[var(--tertiary)] text-xl"></i> Course AI Tutor Chat
             </h3>
-            <button
-              onClick={handleClearChat}
-              title="Clear chat history"
-              className="text-xs text-[var(--outline)] hover:text-[var(--error)] flex items-center gap-1 p-1 px-2 rounded-lg hover:bg-[var(--surface-container-low)] transition-colors"
-            >
-              <i className="ti ti-trash text-sm"></i> Clear History
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-[var(--on-surface-variant)] font-semibold">Use:</span>
+                <select
+                  value={chatSourceScope}
+                  onChange={(e) => setChatSourceScope(e.target.value as any)}
+                  className="bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)] rounded-lg px-2 py-1 text-xs focus:outline-none min-h-[36px]"
+                >
+                  <option value="both">Both</option>
+                  <option value="course_materials">Course materials</option>
+                  <option value="my_notes">My notes</option>
+                </select>
+              </div>
+              <button
+                onClick={handleClearChat}
+                title="Clear chat history"
+                className="text-xs text-[var(--outline)] hover:text-[var(--error)] flex items-center gap-1 p-1 px-2 rounded-lg hover:bg-[var(--surface-container-low)] transition-colors min-h-[36px]"
+              >
+                <i className="ti ti-trash text-sm"></i> Clear
+              </button>
+            </div>
           </div>
 
-          {/* Chat Messages */}
+          {/* message list */}
           <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-4">
             {isLoadingHistory && (
               <div className="text-center py-4 text-xs text-[var(--on-surface-variant)] flex items-center justify-center gap-2">
@@ -700,18 +746,97 @@ export default function CourseAiTab({
                 className={`flex items-start gap-2.5 ${m.role === "user" ? "justify-end" : ""}`}
               >
                 {m.role === "assistant" && (
-                  <div className="w-7 h-7 rounded-xl bg-[var(--tertiary)] text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm">
-                    AI
+                  <div className={`w-7 h-7 rounded-xl ${m.isError ? "bg-red-500" : "bg-[var(--tertiary)]"} text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm mt-0.5`}>
+                    {m.isError ? <i className="ti ti-alert-triangle text-[10px]"></i> : "AI"}
                   </div>
                 )}
-                <div
-                  className={`p-3 rounded-xl text-xs max-w-sm whitespace-pre-line leading-relaxed ${
-                    m.role === "user"
-                      ? "bg-[var(--primary)] text-[var(--on-primary)] shadow-sm"
-                      : "bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
-                  }`}
-                >
-                  {m.content}
+                <div className="flex flex-col gap-1.5 max-w-[88%] sm:max-w-sm">
+                  <div
+                    className={`p-3 rounded-xl text-xs whitespace-pre-line leading-relaxed break-words [overflow-wrap:anywhere] ${
+                      m.role === "user"
+                        ? "bg-[var(--primary)] text-[var(--on-primary)] shadow-sm"
+                        : m.isError
+                          ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-[var(--on-surface)]"
+                          : "bg-[var(--surface-container-low)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+
+                  {/* citations */}
+                  {m.role === "assistant" && !m.isError && (
+                    <div className="space-y-1.5 px-1 pt-0.5">
+                      {((m.courseSources && m.courseSources.length > 0) || (m.noteSources && m.noteSources.length > 0)) ? (
+                        <>
+                          {m.courseSources && m.courseSources.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] text-[var(--on-surface-variant)] flex items-center gap-1 font-semibold">
+                                <i className="ti ti-book text-[11px] text-[var(--primary)]"></i> From course materials:
+                              </span>
+                              {m.courseSources.map((src, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--primary)]/10 text-[var(--primary)] text-[10px] font-semibold border border-[var(--primary)]/20 break-all"
+                                >
+                                  <i className="ti ti-file-text text-[9px] shrink-0"></i>
+                                  {src}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {m.noteSources && m.noteSources.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] text-[var(--on-surface-variant)] flex items-center gap-1 font-semibold">
+                                <i className="ti ti-notes text-[11px] text-[var(--tertiary)]"></i> From your notes:
+                              </span>
+                              {m.noteSources.map((src, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--tertiary)]/10 text-[var(--tertiary)] text-[10px] font-semibold border border-[var(--tertiary)]/20 break-all"
+                                >
+                                  <i className="ti ti-file-text text-[9px] shrink-0"></i>
+                                  {src}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : m.sources && m.sources.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] text-[var(--on-surface-variant)] flex items-center gap-1 font-semibold">
+                            <i className="ti ti-book text-[11px]"></i> Sources:
+                          </span>
+                          {m.sources.map((src, sIdx) => (
+                            <span
+                              key={sIdx}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--surface-container-high)] text-[var(--on-surface)] text-[10px] font-semibold border border-[var(--outline-variant)] break-all"
+                            >
+                              <i className="ti ti-file-text text-[9px] shrink-0"></i>
+                              {src}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-[var(--on-surface-variant)] italic">
+                          None (General Knowledge)
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* retry on error */}
+                  {m.isError && m.failedPrompt && (
+                    <button
+                      onClick={() => {
+                        const toRetry = m.failedPrompt!;
+                        setMessages((prev) => prev.filter((_, i) => i !== idx));
+                        sendQuestion(toRetry);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:opacity-80 self-start px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 transition-opacity mt-1 min-h-[36px]"
+                    >
+                      <i className="ti ti-rotate text-xs"></i> Try again
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -730,7 +855,7 @@ export default function CourseAiTab({
             <div ref={chatBottomRef} />
           </div>
 
-          {/* Chat Input Form */}
+          {/* chat form */}
           <form
             onSubmit={handleSendChat}
             className="flex items-center gap-2 pt-3 border-t border-[var(--outline-variant)]"
@@ -740,15 +865,16 @@ export default function CourseAiTab({
               value={chatInput}
               disabled={isSendingChat}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={`Ask anything about ${course.code} or your study notes...`}
-              className="flex-1 px-3.5 py-2.5 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] focus:border-[var(--tertiary)] focus:outline-none transition-colors disabled:opacity-50"
+              placeholder={`Ask anything about ${course.code}...`}
+              className="flex-1 px-3.5 py-2.5 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] focus:border-[var(--tertiary)] focus:outline-none transition-colors disabled:opacity-50 min-h-[44px]"
             />
             <button
               type="submit"
               disabled={isSendingChat || !chatInput.trim()}
-              className="btn-primary !p-2.5 disabled:opacity-50"
+              className="btn-primary min-w-[44px] min-h-[44px] !p-0 flex items-center justify-center rounded-xl disabled:opacity-50"
+              aria-label="Send message"
             >
-              <i className="ti ti-send"></i>
+              <i className="ti ti-send text-base"></i>
             </button>
           </form>
         </div>

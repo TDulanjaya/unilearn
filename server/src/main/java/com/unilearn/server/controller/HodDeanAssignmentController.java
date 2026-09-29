@@ -21,14 +21,14 @@ public class HodDeanAssignmentController {
     private final HodDeanAssignmentService hodDeanAssignmentService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<HodDeanAssignmentResponse> assignHodOrDean(
             @Valid @RequestBody HodDeanAssignRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(hodDeanAssignmentService.assignHodOrDean(request));
     }
 
     @PatchMapping("/{id}/revoke")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<HodDeanAssignmentResponse> revokeAssignment(
             @PathVariable Long id,
             @Valid @RequestBody HodDeanRevokeRequestDTO revokeRequest) {
@@ -36,20 +36,20 @@ public class HodDeanAssignmentController {
     }
 
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<List<HodDeanAssignmentResponse>> getAssignmentsByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(hodDeanAssignmentService.getAssignmentsByUser(userId));
     }
 
     @GetMapping("/department/{departmentId}/active")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<HodDeanAssignmentResponse> getActiveHodForDepartment(
             @PathVariable Long departmentId) {
         return ResponseEntity.ok(hodDeanAssignmentService.getActiveHodForDepartment(departmentId));
     }
 
     @GetMapping("/faculty/{facultyId}/active")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<HodDeanAssignmentResponse> getActiveDeanForFaculty(@PathVariable Long facultyId) {
         return ResponseEntity.ok(hodDeanAssignmentService.getActiveDeanForFaculty(facultyId));
     }

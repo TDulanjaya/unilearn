@@ -16,4 +16,12 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     List<Submission> findByStudent_StudentId(Long studentId);
 
     Optional<Submission> findByAssignment_AssignmentIdAndStudent_StudentId(Long assignmentId, Long studentId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT s FROM Submission s WHERE s.fileUrl LIKE CONCAT('%', :fileUrl, '%')")
+    List<Submission> findAllByFileUrlLike(@org.springframework.data.repository.query.Param("fileUrl") String fileUrl);
+
+    default Optional<Submission> findFirstByFileUrlContaining(String fileUrl) {
+        List<Submission> list = findAllByFileUrlLike(fileUrl);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 }

@@ -12,13 +12,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/reports/performance")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
 public class PerformanceReportController {
 
     private final PerformanceReportService performanceReportService;
 
     @GetMapping
-    // TODO: LECTURER should only see their own offerings — enforce in service layer
+    // Generate performance report
     public ResponseEntity<List<PerformanceReportResponse>> getPerformanceReport(
             @RequestParam(required = false) Long facultyId,
             @RequestParam(required = false) Long departmentId,

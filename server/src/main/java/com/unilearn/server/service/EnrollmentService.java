@@ -7,7 +7,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-// Service interface for managing course enrollments
+// Enrollment service
 public interface EnrollmentService {
 
     EnrollmentResponse enrollStudent(EnrollmentCreateRequestDTO request);
@@ -20,9 +20,9 @@ public interface EnrollmentService {
 
     EnrollmentResponse updateStatus(Long enrollmentId, String status);
 
-    // Legacy single offering batch enroll
+    // Enroll batch into single offering
     java.util.Map<String, Object> enrollBatch(Long batchId, Long offeringId);
 
-    // Enroll a batch into multiple offerings in one go
+    // Enroll batch into multiple offerings
     java.util.Map<String, Object> enrollBatchMultiple(Long batchId, List<Long> offeringIds);
 }

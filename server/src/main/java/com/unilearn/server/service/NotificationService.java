@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.NotificationResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing user notifications.
- */
+// User notifications service
 public interface NotificationService {
 
     NotificationResponse sendNotification(NotificationRequest request);

@@ -25,6 +25,8 @@ import { AcademicDataProvider } from "@/context/AcademicDataContext";
 import { AuthProvider } from "@/context/AuthContext";
 import QueryProvider from "@/lib/QueryProvider";
 
+import { PasswordChangeGuard } from "@/components/PasswordChangeGuard";
+
 export default function RootLayout({
   children,
 }: {
@@ -51,9 +53,11 @@ export default function RootLayout({
           <GlobalErrorBoundary>
             <QueryProvider>
               <AuthProvider>
-                <NotificationProvider>
-                  <AcademicDataProvider>{children}</AcademicDataProvider>
-                </NotificationProvider>
+                <PasswordChangeGuard>
+                  <NotificationProvider>
+                    <AcademicDataProvider>{children}</AcademicDataProvider>
+                  </NotificationProvider>
+                </PasswordChangeGuard>
               </AuthProvider>
             </QueryProvider>
           </GlobalErrorBoundary>

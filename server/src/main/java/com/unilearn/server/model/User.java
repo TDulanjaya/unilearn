@@ -57,9 +57,13 @@ public class User implements UserDetails {
     private String status = "active";
 
     @Builder.Default
+    @Column(name = "must_change_password", nullable = false)
+    private Boolean mustChangePassword = false;
+
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // ── UserDetails contract ──────────────────────────────────────
+    // UserDetails methods
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -14,7 +14,7 @@ export default function LecturerAnnouncementPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  // 1. Fetch lecturer course offerings
+  // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
@@ -27,7 +27,7 @@ export default function LecturerAnnouncementPage() {
     }
   }, [offerings]);
 
-  // 2. Fetch announcements for active offering
+  // announcements for offering
   const { data: announcementsData, isLoading: announcementsLoading } = useQuery({
     queryKey: ["courseAnnouncements", activeOfferingId],
     queryFn: () => api.get<any>(`/api/v1/announcements/me?scope=course&scopeId=${activeOfferingId}&size=50`),

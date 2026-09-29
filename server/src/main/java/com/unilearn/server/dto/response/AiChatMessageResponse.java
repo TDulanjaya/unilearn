@@ -22,6 +22,9 @@ public class AiChatMessageResponse {
     private String role;
     private String content;
     private LocalDateTime createdAt;
+    private java.util.List<String> sources;
+    private java.util.List<String> courseSources;
+    private java.util.List<String> noteSources;
     @Builder.Default
     private Boolean aiGenerated = true;
 }

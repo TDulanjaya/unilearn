@@ -24,6 +24,7 @@ public class ProctoringFlagServiceImpl implements ProctoringFlagService {
     private final ProctoringFlagRepository proctoringFlagRepository;
     private final ExamAttemptRepository examAttemptRepository;
     private final ProctoringFlagMapper proctoringFlagMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -34,6 +35,10 @@ public class ProctoringFlagServiceImpl implements ProctoringFlagService {
 
         ExamAttempt attempt = examAttemptRepository.findById(request.getAttemptId())
                 .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found with ID: " + request.getAttemptId()));
+
+        if (attempt.getExam() != null && attempt.getExam().getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(attempt.getExam().getCourseOffering().getOfferingId());
+        }
 
         ProctoringFlag flag = proctoringFlagMapper.toProctoringFlag(request, attempt);
         ProctoringFlag saved = proctoringFlagRepository.save(flag);
@@ -49,8 +54,11 @@ public class ProctoringFlagServiceImpl implements ProctoringFlagService {
         if (attemptId == null) {
             throw new ValidationException("Attempt ID cannot be null");
         }
-        if (!examAttemptRepository.existsById(attemptId)) {
-            throw new EntryNotFoundException("ExamAttempt not found with ID: " + attemptId);
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found with ID: " + attemptId));
+
+        if (attempt.getExam() != null && attempt.getExam().getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(attempt.getExam().getCourseOffering().getOfferingId());
         }
 
         return proctoringFlagRepository.findByAttempt_AttemptId(attemptId)

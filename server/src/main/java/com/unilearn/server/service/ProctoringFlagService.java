@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.ProctoringFlagResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing proctoring flags.
- */
+// Proctoring flags service
 public interface ProctoringFlagService {
 
     ProctoringFlagResponse flagAttempt(ProctoringFlagRequest request);

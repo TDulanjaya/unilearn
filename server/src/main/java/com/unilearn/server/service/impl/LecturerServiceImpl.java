@@ -35,6 +35,7 @@ public class LecturerServiceImpl implements LecturerService {
     private final CourseOfferingRepository courseOfferingRepository;
     private final LecturerMapper lecturerMapper;
     private final CourseOfferingMapper courseOfferingMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -111,6 +112,7 @@ public class LecturerServiceImpl implements LecturerService {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
+        ownershipValidator.checkHodDepartmentAccess(departmentId);
         if (!departmentRepository.existsById(departmentId)) {
             throw new EntryNotFoundException("Department not found with ID: " + departmentId);
         }
@@ -131,6 +133,13 @@ public class LecturerServiceImpl implements LecturerService {
     public List<CourseOfferingResponse> getCourseOfferingsForLecturer(Long lecturerId) {
         if (lecturerId == null) {
             throw new ValidationException("Lecturer ID cannot be null");
+        }
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority()))) {
+            Long loggedInUserId = ((com.unilearn.server.model.User) auth.getPrincipal()).getUserId();
+            if (!lecturerId.equals(loggedInUserId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: You can only view your own course offerings");
+            }
         }
         if (!lecturerRepository.existsById(lecturerId)) {
             throw new EntryNotFoundException("Lecturer not found with ID: " + lecturerId);

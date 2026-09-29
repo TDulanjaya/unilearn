@@ -18,6 +18,7 @@ import java.util.List;
 public class AttendanceSessionController {
 
     private final AttendanceSessionService attendanceSessionService;
+    private final com.unilearn.server.service.AttendanceQrTokenService attendanceQrTokenService;
 
     @PostMapping
     @PreAuthorize("hasRole('LECTURER')")
@@ -38,5 +39,11 @@ public class AttendanceSessionController {
     public ResponseEntity<List<AttendanceSessionResponse>> getSessionsByOffering(
             @PathVariable Long offeringId) {
         return ResponseEntity.ok(attendanceSessionService.getSessionsByOffering(offeringId));
+    }
+
+    @GetMapping("/{id}/qr-token")
+    @PreAuthorize("hasRole('LECTURER')")
+    public ResponseEntity<com.unilearn.server.dto.response.QrTokenResponse> getSessionQrToken(@PathVariable Long id) {
+        return ResponseEntity.ok(attendanceQrTokenService.generateOrRefreshToken(id));
     }
 }

@@ -36,6 +36,7 @@ public class ExamResultServiceImpl implements ExamResultService {
     private final ExamAttemptRepository examAttemptRepository;
     private final ExamAnswerRepository examAnswerRepository;
     private final ExamResultMapper examResultMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -46,6 +47,10 @@ public class ExamResultServiceImpl implements ExamResultService {
 
         Exam exam = examRepository.findById(request.getExamId())
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + request.getExamId()));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+        }
 
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
@@ -70,6 +75,10 @@ public class ExamResultServiceImpl implements ExamResultService {
 
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+        }
 
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + studentId));
@@ -102,6 +111,10 @@ public class ExamResultServiceImpl implements ExamResultService {
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
 
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+        }
+
         List<ExamAttempt> attempts = examAttemptRepository.findByExam_ExamId(examId);
         List<ExamResultResponse> responses = new ArrayList<>();
 
@@ -120,9 +133,14 @@ public class ExamResultServiceImpl implements ExamResultService {
         if (examId == null || studentId == null) {
             throw new ValidationException("Exam ID and Student ID cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(studentId);
 
         ExamResult result = examResultRepository.findByExam_ExamIdAndStudent_StudentId(examId, studentId)
                 .orElseThrow(() -> new EntryNotFoundException("ExamResult not found for exam ID: " + examId + " and student ID: " + studentId));
+
+        if (ownershipValidator.isStudent() && result.getPublishedAt() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Exam results have not been published yet.");
+        }
 
         return examResultMapper.toExamResultResponse(result);
     }
@@ -132,8 +150,11 @@ public class ExamResultServiceImpl implements ExamResultService {
         if (examId == null) {
             throw new ValidationException("Exam ID cannot be null");
         }
-        if (!examRepository.existsById(examId)) {
-            throw new EntryNotFoundException("Exam not found with ID: " + examId);
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
         }
 
         return examResultRepository.findByExam_ExamId(examId)

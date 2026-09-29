@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface ScheduledExam {
   id: string;
@@ -15,89 +18,111 @@ interface ScheduledExam {
   supervisor: string;
 }
 
-const INITIAL_SCHEDULED_EXAMS: ScheduledExam[] = [];
-
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { useEffect } from "react";
-
 export default function AdminExamSchedulingPage() {
-  const { data: rawExams } = useQuery({
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: rawExams, isLoading: examsLoading } = useQuery({
     queryKey: ["exams"],
-    queryFn: () => api.get<any>("/api/v1/exams/offering/1"),
+    queryFn: () => api.get<any[]>("/api/v1/exams"),
   });
 
-  const apiExams: ScheduledExam[] = Array.isArray(rawExams) && rawExams.length > 0
+  const { data: rawOfferings } = useQuery({
+    queryKey: ["courseOfferings"],
+    queryFn: () => api.get<any[]>("/api/v1/course-offerings"),
+  });
+
+  const offerings = Array.isArray(rawOfferings) ? rawOfferings : [];
+
+  const exams: ScheduledExam[] = Array.isArray(rawExams)
     ? rawExams.map((e: any) => ({
-        id: String(e.examId || `exam-${Math.random()}`),
-        courseCode: e.courseCode || "SE201",
-        courseTitle: e.title || e.courseName || (e.courseCode ? `${e.courseCode} Exam` : "Scheduled Exam"),
-        batch: e.batchName || e.batch || "SE Batch 2024",
-        date: e.examDate ? String(e.examDate) : (e.date ? String(e.date) : "2025-03-25"),
-        startTime: e.startTime ? String(e.startTime).substring(0, 5) : "10:00",
-        endTime: e.endTime ? String(e.endTime).substring(0, 5) : "11:00",
-        venue: e.venue || e.location || "Main Exam Hall A",
-        supervisor: e.scheduledByName || "Dr. Chathura Senanayake",
+        id: String(e.examId),
+        courseCode: e.courseCode || "—",
+        courseTitle: e.title || (e.courseCode ? `${e.courseCode} Exam` : "Scheduled Exam"),
+        batch: e.batchName || e.batch || "All Batches",
+        date: e.examDate ? String(e.examDate) : (e.date ? String(e.date) : "—"),
+        startTime: e.startTime ? String(e.startTime).substring(0, 5) : "—",
+        endTime: e.endTime ? String(e.endTime).substring(0, 5) : "—",
+        venue: e.venue || "TBD",
+        supervisor: e.scheduledByName || "—",
       }))
-    : INITIAL_SCHEDULED_EXAMS;
+    : [];
 
-  const [exams, setExams] = useState<ScheduledExam[]>(apiExams);
-
-  useEffect(() => {
-    if (rawExams) setExams(apiExams);
-  }, [rawExams]);
-
-  
-  const [courseCode, setCourseCode] = useState("SE309.3");
-  const [courseTitle, setCourseTitle] = useState("Software Verification & Validation");
-  const [batch, setBatch] = useState("CS2023-A");
-  const [date, setDate] = useState("2026-08-15");
-  const [startTime, setStartTime] = useState("10:00");
-  const [endTime, setEndTime] = useState("12:00");
-  const [venue, setVenue] = useState("Main Exam Hall B");
-  const [supervisor, setSupervisor] = useState("Prof. A. Fernando");
+  const [selectedOfferingId, setSelectedOfferingId] = useState<string>("");
+  const [date, setDate] = useState("");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("11:00");
+  const [venue, setVenue] = useState("");
+  const [supervisor, setSupervisor] = useState("");
 
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleScheduleExam = (e: React.FormEvent) => {
+  const scheduleMutation = useMutation({
+    mutationFn: (body: any) => api.post("/api/v1/exams/final", body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
+      setSuccessMessage("Final Exam scheduled successfully!");
+      setSelectedOfferingId("");
+      setDate("");
+      setVenue("");
+      setSupervisor("");
+    },
+    onError: (err: any) => {
+      setConflictError(err?.message || "Failed to schedule exam. Check parameters.");
+    },
+  });
+
+  const handleScheduleExam = async (e: React.FormEvent) => {
     e.preventDefault();
     setConflictError(null);
     setSuccessMessage(null);
 
-    
+    if (!selectedOfferingId) {
+      setConflictError("Please select a course offering.");
+      return;
+    }
+
+    const selectedOffering = offerings.find((o) => String(o.offeringId) === selectedOfferingId);
+    const targetBatch = selectedOffering?.batchName || "";
+
+    // Check for time conflicts
     const conflict = exams.find((exam) => {
-      if (exam.batch !== batch || exam.date !== date) return false;
-      
-      return startTime < exam.endTime && exam.startTime < endTime;
+      if (targetBatch && exam.batch === targetBatch && exam.date === date) {
+        return startTime < exam.endTime && exam.startTime < endTime;
+      }
+      return false;
     });
 
     if (conflict) {
       setConflictError(
-        `FR-EXAM-03 Violation: Batch ${batch} already has a conflicting final exam (${conflict.courseCode} at ${conflict.startTime}-${conflict.endTime}) scheduled on ${date}.`
+        `FR-EXAM-03 Violation: Batch ${targetBatch} already has a conflicting final exam (${conflict.courseCode} at ${conflict.startTime}-${conflict.endTime}) scheduled on ${date}.`
       );
       return;
     }
 
-    const newExam: ScheduledExam = {
-      id: `exam-${Date.now()}`,
-      courseCode,
-      courseTitle,
-      batch,
-      date,
-      startTime,
-      endTime,
-      venue,
-      supervisor,
-    };
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
 
-    setExams([...exams, newExam]);
-    setSuccessMessage(`Final Exam for ${courseCode} (${batch}) scheduled successfully!`);
+    try {
+      await scheduleMutation.mutateAsync({
+        offeringId: Number(selectedOfferingId),
+        examDate: date,
+        startTime: `${startTime}:00`,
+        endTime: `${endTime}:00`,
+        venue: venue || "Main Examination Hall",
+        durationMinutes: durationMinutes > 0 ? durationMinutes : 120,
+        scheduledById: user?.userId || 1,
+      });
+    } catch {
+      // Handled in onError
+    }
   };
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--background)] text-[var(--on-background)]">
-      <Sidebar role="admin" name="R. Jayawardena" sub="Staff Admin · Institution-wide" />
+      <Sidebar role="admin" name={user?.fullName || "Staff Admin"} sub={user?.email || "Institution-wide"} />
       <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-[1300px] w-full space-y-6">
         <div>
           <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)] mb-1">
@@ -110,13 +135,45 @@ export default function AdminExamSchedulingPage() {
 
         <div className="grid lg:grid-cols-[1fr_380px] gap-6">
           
-          <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+          <div className="card p-4 sm:p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
             <h3 className="font-display font-bold text-base text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)] flex items-center justify-between">
               <span>Scheduled Final Exams ({exams.length})</span>
               <span className="badge badge-accent text-[10px]">FR-EXAM-03 Guarded</span>
             </h3>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Card View (< md) */}
+            <div className="md:hidden divide-y divide-[var(--outline-variant)]">
+              {examsLoading ? (
+                <p className="py-8 text-center text-xs text-[var(--on-surface-variant)] animate-pulse">
+                  Loading scheduled exams...
+                </p>
+              ) : exams.length === 0 ? (
+                <p className="py-8 text-center text-xs text-[var(--on-surface-variant)]">
+                  No final exams scheduled yet.
+                </p>
+              ) : (
+                exams.map((ex) => (
+                  <div key={ex.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-xs text-[var(--on-surface)]">{ex.courseCode}</span>
+                      <span className="badge badge-gray text-[10px]">{ex.batch}</span>
+                    </div>
+                    <p className="text-xs text-[var(--on-surface-variant)]">{ex.courseTitle}</p>
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="font-mono text-[var(--on-surface)]">{ex.date}</span>
+                      <span className="font-mono text-[11px] text-[var(--tertiary)]">{ex.startTime} - {ex.endTime}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-[var(--on-surface-variant)]">
+                      <span>Venue: <b>{ex.venue}</b></span>
+                      <span>Supervisor: <b>{ex.supervisor}</b></span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table View (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] uppercase font-semibold">
@@ -128,30 +185,44 @@ export default function AdminExamSchedulingPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--outline-variant)]">
-                  {exams.map((ex) => (
-                    <tr key={ex.id} className="hover:bg-[var(--surface-container-low)]">
-                      <td className="py-3 px-3 font-semibold text-[var(--on-surface)]">
-                        <p>{ex.courseCode}</p>
-                        <p className="text-[10px] text-[var(--on-surface-variant)] font-normal">{ex.courseTitle}</p>
+                  {examsLoading ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-[var(--on-surface-variant)] animate-pulse">
+                        Loading scheduled exams...
                       </td>
-                      <td className="py-3 px-3">
-                        <span className="badge badge-gray">{ex.batch}</span>
-                      </td>
-                      <td className="py-3 px-3 font-mono font-medium">
-                        <p>{ex.date}</p>
-                        <p className="text-[10px] text-[var(--tertiary)]">{ex.startTime} - {ex.endTime}</p>
-                      </td>
-                      <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.venue}</td>
-                      <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.supervisor}</td>
                     </tr>
-                  ))}
+                  ) : exams.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-[var(--on-surface-variant)]">
+                        No final exams scheduled yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    exams.map((ex) => (
+                      <tr key={ex.id} className="hover:bg-[var(--surface-container-low)]">
+                        <td className="py-3 px-3 font-semibold text-[var(--on-surface)]">
+                          <p>{ex.courseCode}</p>
+                          <p className="text-[10px] text-[var(--on-surface-variant)] font-normal">{ex.courseTitle}</p>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="badge badge-gray">{ex.batch}</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono font-medium">
+                          <p>{ex.date}</p>
+                          <p className="text-[10px] text-[var(--tertiary)]">{ex.startTime} - {ex.endTime}</p>
+                        </td>
+                        <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.venue}</td>
+                        <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.supervisor}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          
-          <div className="card p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] self-start">
+          {/* Form */}
+          <div className="card p-4 sm:p-6 space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] self-start">
             <h3 className="font-display font-bold text-base text-[var(--on-surface)] pb-3 border-b border-[var(--outline-variant)]">
               Schedule New Final Exam
             </h3>
@@ -172,50 +243,50 @@ export default function AdminExamSchedulingPage() {
 
             <form onSubmit={handleScheduleExam} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold mb-1">Course Code & Title</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <input type="text" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="Code" className="text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
-                  <input type="text" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} placeholder="Title" className="col-span-2 text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">Target Student Batch</label>
-                <select value={batch} onChange={(e) => setBatch(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-                  <option value="CS2023-A">CS2023-A</option>
-                  <option value="CS2023-B">CS2023-B</option>
-                  <option value="SE2024-1">SE2024-1</option>
+                <label className="block text-xs font-semibold mb-1">Course Offering &amp; Batch</label>
+                <select
+                  value={selectedOfferingId}
+                  onChange={(e) => setSelectedOfferingId(e.target.value)}
+                  className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+                  required
+                >
+                  <option value="">-- Select Course Offering --</option>
+                  {offerings.map((o: any) => (
+                    <option key={o.offeringId} value={o.offeringId}>
+                      {o.courseCode} - {o.courseName} ({o.batchName || "Batch"})
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold mb-1">Exam Date</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-1">Start Time</label>
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
+                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold mb-1">End Time</label>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
+                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold mb-1">Exam Hall / Venue</label>
-                <input type="text" value={venue} onChange={(e) => setVenue(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
+                <input type="text" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="e.g. Hall A" className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold mb-1">Supervisor / Chief Invigilator</label>
-                <input type="text" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
+                <input type="text" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} placeholder="Supervisor name" className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
               </div>
 
-              <button type="submit" className="btn-primary w-full justify-center text-xs shadow-md mt-2">
-                <i className="ti ti-calendar-plus mr-1"></i> Schedule Exam Paper
+              <button type="submit" disabled={scheduleMutation.isPending} className="btn-primary w-full justify-center text-xs min-h-[44px] shadow-md mt-2">
+                <i className="ti ti-calendar-plus mr-1"></i> {scheduleMutation.isPending ? "Scheduling..." : "Schedule Exam Paper"}
               </button>
             </form>
           </div>

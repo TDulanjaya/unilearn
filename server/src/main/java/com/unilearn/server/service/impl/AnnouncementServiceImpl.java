@@ -36,6 +36,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     private final DepartmentRepository departmentRepository;
     private final FacultyRepository facultyRepository;
     private final AnnouncementMapper announcementMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -49,12 +50,14 @@ public class AnnouncementServiceImpl implements AnnouncementService {
 
         CourseOffering offering = null;
         if (request.getOfferingId() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
             offering = courseOfferingRepository.findById(request.getOfferingId())
                     .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
         }
 
         Department department = null;
         if (request.getDepartmentId() != null) {
+            ownershipValidator.checkHodDepartmentAccess(request.getDepartmentId());
             department = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
         }
@@ -83,17 +86,26 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         Announcement announcement = announcementRepository.findById(announcementId)
                 .orElseThrow(() -> new EntryNotFoundException("Announcement not found with ID: " + announcementId));
 
+        if (announcement.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(announcement.getCourseOffering().getOfferingId());
+        }
+        if (announcement.getDepartment() != null) {
+            ownershipValidator.checkHodDepartmentAccess(announcement.getDepartment().getDepartmentId());
+        }
+
         User postedBy = userRepository.findById(request.getPostedByUserId())
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getPostedByUserId()));
 
         CourseOffering offering = null;
         if (request.getOfferingId() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
             offering = courseOfferingRepository.findById(request.getOfferingId())
                     .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
         }
 
         Department department = null;
         if (request.getDepartmentId() != null) {
+            ownershipValidator.checkHodDepartmentAccess(request.getDepartmentId());
             department = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
         }
@@ -122,10 +134,17 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         if (announcementId == null) {
             throw new ValidationException("Announcement ID cannot be null");
         }
-        if (!announcementRepository.existsById(announcementId)) {
-            throw new EntryNotFoundException("Announcement not found with ID: " + announcementId);
+        Announcement announcement = announcementRepository.findById(announcementId)
+                .orElseThrow(() -> new EntryNotFoundException("Announcement not found with ID: " + announcementId));
+
+        if (announcement.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(announcement.getCourseOffering().getOfferingId());
         }
-        announcementRepository.deleteById(announcementId);
+        if (announcement.getDepartment() != null) {
+            ownershipValidator.checkHodDepartmentAccess(announcement.getDepartment().getDepartmentId());
+        }
+
+        announcementRepository.delete(announcement);
     }
 
     @Override

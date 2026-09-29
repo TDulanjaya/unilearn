@@ -36,6 +36,7 @@ public class UserMapper {
                 .role(user.getRole())
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())
+                .mustChangePassword(user.getMustChangePassword() != null && user.getMustChangePassword())
                 .build();
     }
 }

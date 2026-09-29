@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.ExamAnswerResponse;
 import java.math.BigDecimal;
 import java.util.List;
 
-/**
- * Service interface for managing exam answers.
- */
+// Exam answers service
 public interface ExamAnswerService {
 
     ExamAnswerResponse saveAnswer(ExamAnswerRequest request, Long studentId);

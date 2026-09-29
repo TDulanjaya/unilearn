@@ -21,33 +21,40 @@ public class FacultyController {
     private final FacultyService facultyService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<FacultyResponse> createFaculty(@Valid @RequestBody FacultyRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(facultyService.createFaculty(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<FacultyResponse> updateFaculty(@PathVariable Long id,
                                                          @Valid @RequestBody FacultyRequest request) {
         return ResponseEntity.ok(facultyService.updateFaculty(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteFaculty(@PathVariable Long id) {
         facultyService.deleteFaculty(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<FacultyResponse> getFacultyById(@PathVariable Long id) {
         return ResponseEntity.ok(facultyService.getFacultyById(id));
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<FacultyResponse>> getAllFaculties(
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(facultyService.getAllFaculties(pageable));
+    }
+
+    @GetMapping("/public")
+    public ResponseEntity<java.util.List<com.unilearn.server.dto.response.FacultyPublicResponse>> getPublicFaculties() {
+        return ResponseEntity.ok(facultyService.getPublicFaculties());
     }
 }

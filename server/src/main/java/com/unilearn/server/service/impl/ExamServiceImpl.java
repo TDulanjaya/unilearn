@@ -34,6 +34,8 @@ public class ExamServiceImpl implements ExamService {
     private final UserRepository userRepository;
     private final TimetableSlotRepository timetableSlotRepository;
     private final ExamMapper examMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
+    private final com.unilearn.server.repository.EnrollmentRepository enrollmentRepository;
 
     @Override
     @Transactional
@@ -41,6 +43,7 @@ public class ExamServiceImpl implements ExamService {
         if (request == null) {
             throw new ValidationException("Exam request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         LocalDate date = request.getExamDate() != null ? request.getExamDate() : (request.getScheduledAt() != null ? request.getScheduledAt().toLocalDate() : null);
         if (date != null && date.isBefore(LocalDate.now())) {
@@ -70,6 +73,7 @@ public class ExamServiceImpl implements ExamService {
         if (request == null) {
             throw new ValidationException("Exam request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         if (request.getExamDate() != null && request.getExamDate().isBefore(LocalDate.now())) {
             throw new com.unilearn.server.exception.IllegalStateException("Exam date cannot be in the past");
@@ -92,6 +96,7 @@ public class ExamServiceImpl implements ExamService {
         if (request == null) {
             throw new ValidationException("Exam request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
@@ -122,6 +127,11 @@ public class ExamServiceImpl implements ExamService {
 
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+        }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         LocalDate date = request.getExamDate() != null ? request.getExamDate() : (request.getScheduledAt() != null ? request.getScheduledAt().toLocalDate() : null);
         if (date != null && date.isBefore(LocalDate.now())) {
@@ -166,10 +176,14 @@ public class ExamServiceImpl implements ExamService {
         if (examId == null) {
             throw new ValidationException("Exam ID cannot be null");
         }
-        if (!examRepository.existsById(examId)) {
-            throw new EntryNotFoundException("Exam not found with ID: " + examId);
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
         }
-        examRepository.deleteById(examId);
+
+        examRepository.delete(exam);
     }
 
     @Override
@@ -179,6 +193,19 @@ public class ExamServiceImpl implements ExamService {
         }
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            Long offId = exam.getCourseOffering().getOfferingId();
+            if (ownershipValidator.isLecturer()) {
+                ownershipValidator.checkLecturerOfferingAccess(offId);
+            } else if (ownershipValidator.isStudent()) {
+                var currentUser = ownershipValidator.getCurrentUser();
+                if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offId)) {
+                    throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+                }
+            }
+        }
+
         return examMapper.toExamResponse(exam);
     }
 
@@ -189,6 +216,15 @@ public class ExamServiceImpl implements ExamService {
         }
         if (!courseOfferingRepository.existsById(offeringId)) {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
+        }
+
+        if (ownershipValidator.isLecturer()) {
+            ownershipValidator.checkLecturerOfferingAccess(offeringId);
+        } else if (ownershipValidator.isStudent()) {
+            var currentUser = ownershipValidator.getCurrentUser();
+            if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offeringId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+            }
         }
 
         return examRepository.findByCourseOffering_OfferingId(offeringId)
@@ -206,9 +242,26 @@ public class ExamServiceImpl implements ExamService {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
         }
 
+        if (ownershipValidator.isLecturer()) {
+            ownershipValidator.checkLecturerOfferingAccess(offeringId);
+        } else if (ownershipValidator.isStudent()) {
+            var currentUser = ownershipValidator.getCurrentUser();
+            if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offeringId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+            }
+        }
+
         return examRepository.findByCourseOffering_OfferingId(offeringId)
                 .stream()
                 .map(examMapper::toExamListItemDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ExamResponse> getAllExams() {
+        return examRepository.findAll()
+                .stream()
+                .map(examMapper::toExamResponse)
                 .toList();
     }
 }

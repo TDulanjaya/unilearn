@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.PageResponseDTO;
 import com.unilearn.server.dto.response.StaffAdminResponse;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing staff admins.
- */
+// Staff admins service
 public interface StaffAdminService {
 
     StaffAdminResponse createStaffAdmin(StaffAdminRequest request);

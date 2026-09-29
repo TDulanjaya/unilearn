@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.PageResponseDTO;
 import com.unilearn.server.dto.response.QuestionResponse;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing exam questions.
- */
+// Exam questions service
 public interface QuestionService {
 
     QuestionResponse createQuestion(QuestionRequest request);

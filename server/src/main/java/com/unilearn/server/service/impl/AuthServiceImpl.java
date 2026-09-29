@@ -65,10 +65,16 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
+    @org.springframework.beans.factory.annotation.Value("${app.registration.public-enabled:false}")
+    private boolean publicRegistrationEnabled;
+
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // Public registration MUST always create STUDENT accounts, ignoring client-supplied role
+        if (!publicRegistrationEnabled) {
+            throw new org.springframework.security.access.AccessDeniedException("Public registration is disabled");
+        }
+        // Always create student account on public register
         return createUserWithRole(request, "STUDENT");
     }
 
@@ -194,6 +200,7 @@ public class AuthServiceImpl implements AuthService {
                 .email(saved.getEmail())
                 .role(saved.getRole())
                 .status(saved.getStatus())
+                .mustChangePassword(false)
                 .build();
     }
 
@@ -232,10 +239,11 @@ public class AuthServiceImpl implements AuthService {
                     .email(user.getEmail())
                     .role(user.getRole())
                     .status(user.getStatus())
+                    .mustChangePassword(user.getMustChangePassword() != null && user.getMustChangePassword())
                     .build();
         } catch (AuthenticationException e) {
             logLoginAttempt(email, false, clientIp, user);
-            throw new ValidationException("Invalid credentials");
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
         }
     }
 
@@ -302,6 +310,12 @@ public class AuthServiceImpl implements AuthService {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .expiresIn(900000)
+                .userId(user.getUserId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .mustChangePassword(user.getMustChangePassword() != null && user.getMustChangePassword())
                 .build();
     }
 
@@ -314,7 +328,7 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
         if (user == null) {
-            // Do not reveal whether email exists to prevent user enumeration
+            // Do not reveal if email exists
             return;
         }
 
@@ -328,13 +342,6 @@ public class AuthServiceImpl implements AuthService {
                 .used(false)
                 .build();
         passwordResetTokenRepository.save(tokenEntity);
-
-        // Log reset link to console in dev profile
-        System.out.println("==========================================================================");
-        System.out.println("[DEV] Password reset requested for: " + user.getEmail());
-        System.out.println("[DEV] Reset link: http://localhost:3000/reset-password?token=" + resetTokenStr);
-        System.out.println("==========================================================================");
-        // TODO: Wire real EmailService / NotificationService for production email delivery
     }
 
     @Override
@@ -353,6 +360,7 @@ public class AuthServiceImpl implements AuthService {
 
         User user = resetToken.getUser();
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
         userRepository.save(user);
 
         resetToken.setUsed(true);
@@ -360,7 +368,32 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
+    public void changePassword(com.unilearn.server.dto.request.ChangePasswordRequest request) {
+        if (request == null || request.getCurrentPassword() == null || request.getNewPassword() == null) {
+            throw new ValidationException("Current password and new password are required");
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new org.springframework.security.access.AccessDeniedException("User is not authenticated");
+        }
+
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntryNotFoundException("User not found with email: " + email));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new ValidationException("Current password does not match");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+    }
+
+    @Override
     public void logout(String token) {
-        // Stateless JWT logout is handled on client side by clearing storage.
+        // Client clears token on logout
     }
 }

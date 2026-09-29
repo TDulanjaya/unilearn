@@ -104,9 +104,9 @@ export default function CalendarEntityPanel<T extends { id: string }>({
   };
 
   return (
-    <div className="card p-6">
+    <div className="card p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 pb-2 border-b border-[var(--outline-variant)]">
-        <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+        <h3 className="font-display font-bold text-sm sm:text-base text-[var(--on-surface)]">
           {title}
         </h3>
         <span className="text-xs text-[var(--on-surface-variant)]">{items.length} total</span>
@@ -125,13 +125,13 @@ export default function CalendarEntityPanel<T extends { id: string }>({
               })}
 
               {isConfirming && (
-                <div className="p-2 rounded-lg bg-[var(--surface-container-high)] text-xs flex items-center justify-between border border-[var(--error)] animate-fadeIn">
-                  <span className="text-[var(--on-surface)] text-[11px]">Delete item?</span>
-                  <div className="flex gap-1.5">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-container-high)] text-xs flex items-center justify-between border border-[var(--error)] animate-fadeIn gap-2">
+                  <span className="text-[var(--on-surface)] text-xs">Delete item?</span>
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(null)}
-                      className="btn-secondary text-[10px] !py-0.5 !px-2"
+                      className="btn-secondary text-xs min-h-[36px] px-3"
                     >
                       Cancel
                     </button>
@@ -141,7 +141,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
                         onDelete(item.id);
                         setConfirmDeleteId(null);
                       }}
-                      className="badge badge-danger text-[10px] cursor-pointer"
+                      className="badge badge-danger text-xs min-h-[36px] px-3 cursor-pointer flex items-center"
                     >
                       Confirm
                     </button>
@@ -162,7 +162,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
             openAddForm();
           }
         }}
-        className="btn-secondary text-xs !py-1.5 mt-4"
+        className="btn-secondary text-xs min-h-[44px] mt-4 w-full sm:w-auto justify-center"
       >
         {isFormOpen ? "Cancel" : `+ Add ${label}`}
       </button>
@@ -170,7 +170,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
       {isFormOpen && (
         <form
           onSubmit={handleSubmit}
-          className="mt-3 p-3 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] space-y-3 animate-fadeIn"
+          className="mt-3 p-3.5 sm:p-4 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] space-y-3 animate-fadeIn"
         >
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-bold text-[var(--on-surface)]">
@@ -181,7 +181,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {fields.map((field) => (
               <div key={field.key} className={fields.length === 1 ? "sm:col-span-2" : ""}>
-                <label className="block text-[10px] font-semibold text-[var(--on-surface-variant)] mb-1">
+                <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">
                   {field.label}
                 </label>
                 {field.type === "select" ? (
@@ -189,7 +189,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
                     value={formValues[field.key] ?? ""}
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     required={field.required !== false}
-                    className="w-full text-xs"
+                    className="w-full text-xs min-h-[44px] rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
                   >
                     {field.options?.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -204,7 +204,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     required={field.required !== false}
                     placeholder={field.placeholder}
-                    className="w-full text-xs"
+                    className="w-full text-xs min-h-[44px] rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
                   />
                 ) : field.type === "date" ? (
                   <input
@@ -212,7 +212,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
                     value={formValues[field.key] ?? ""}
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     required={field.required !== false}
-                    className="w-full text-xs"
+                    className="w-full text-xs min-h-[44px] rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
                   />
                 ) : (
                   <input
@@ -221,7 +221,7 @@ export default function CalendarEntityPanel<T extends { id: string }>({
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     required={field.required !== false}
                     placeholder={field.placeholder}
-                    className="w-full text-xs"
+                    className="w-full text-xs min-h-[44px] rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
                   />
                 )}
               </div>
@@ -230,15 +230,15 @@ export default function CalendarEntityPanel<T extends { id: string }>({
 
           {errorMsg && <p className="text-xs text-[var(--error)]">{errorMsg}</p>}
 
-          <div className="flex justify-end gap-1.5 pt-1">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
             <button
               type="button"
               onClick={handleCloseForm}
-              className="btn-secondary text-xs !py-1"
+              className="btn-secondary text-xs min-h-[44px] px-4"
             >
               Cancel
             </button>
-            <button type="submit" className="btn-primary text-xs !py-1">
+            <button type="submit" className="btn-primary text-xs min-h-[44px] px-5 shadow-sm">
               Save
             </button>
           </div>

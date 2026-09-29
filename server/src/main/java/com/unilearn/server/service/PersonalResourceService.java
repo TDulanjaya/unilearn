@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.PageResponseDTO;
 import com.unilearn.server.dto.response.PersonalResourceResponse;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing personal resources.
- */
+// Personal resources service
 public interface PersonalResourceService {
 
     PersonalResourceResponse createPersonalResource(PersonalResourceRequest request);

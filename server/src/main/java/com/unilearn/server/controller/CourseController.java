@@ -21,31 +21,33 @@ public class CourseController {
     private final CourseService courseService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(courseService.createCourse(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<CourseResponse> updateCourse(@PathVariable Long id,
-                                                       @Valid @RequestBody CourseRequest request) {
+                                                        @Valid @RequestBody CourseRequest request) {
         return ResponseEntity.ok(courseService.updateCourse(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<Void> deleteCourse(@PathVariable Long id) {
         courseService.deleteCourse(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CourseResponse> getCourseById(@PathVariable Long id) {
         return ResponseEntity.ok(courseService.getCourseById(id));
     }
 
     @GetMapping("/department/{departmentId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<CourseResponse>> getCoursesByDepartment(
             @PathVariable Long departmentId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -53,6 +55,7 @@ public class CourseController {
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<CourseResponse>> getAllCourses(
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(courseService.getAllCourses(pageable));

@@ -12,7 +12,7 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const [categoryFilter, setCategoryFilter] = useState<"All" | "Course" | "System" | "Grading">("All");
 
-  // 1. Fetch live notifications
+  // notifications
   const { data: notificationsData, isLoading } = useQuery({
     queryKey: ["notifications", user?.userId],
     queryFn: () => api.get<any>("/api/v1/notifications/me?size=100"),

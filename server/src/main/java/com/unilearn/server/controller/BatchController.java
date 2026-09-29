@@ -24,39 +24,39 @@ public class BatchController {
     private final BatchService batchService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<BatchResponse> createBatch(@Valid @RequestBody BatchRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(batchService.createBatch(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<BatchResponse> updateBatch(@PathVariable Long id,
                                                      @Valid @RequestBody BatchRequest request) {
         return ResponseEntity.ok(batchService.updateBatch(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteBatch(@PathVariable Long id) {
         batchService.deleteBatch(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<BatchResponse> getBatchById(@PathVariable Long id) {
         return ResponseEntity.ok(batchService.getBatchById(id));
     }
 
     @GetMapping("/department/{departmentId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<List<BatchResponse>> getBatchesByDepartment(@PathVariable Long departmentId) {
         return ResponseEntity.ok(batchService.getBatchesByDepartment(departmentId));
     }
 
     @GetMapping("/{id}/students")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<PageResponseDTO<StudentResponse>> getStudentsInBatch(
             @PathVariable Long id,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -64,7 +64,7 @@ public class BatchController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<List<BatchResponse>> getAllBatches() {
         return ResponseEntity.ok(batchService.getAllBatches());
     }

@@ -24,34 +24,33 @@ public class LecturerController {
     private final LecturerService lecturerService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<LecturerResponse> createLecturer(@Valid @RequestBody LecturerRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(lecturerService.createLecturer(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<LecturerResponse> updateLecturer(@PathVariable Long id,
                                                            @Valid @RequestBody LecturerRequest request) {
         return ResponseEntity.ok(lecturerService.updateLecturer(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteLecturer(@PathVariable Long id) {
         lecturerService.deleteLecturer(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
-    // TODO: Also allow the lecturer themself to view their own record
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<LecturerResponse> getLecturerById(@PathVariable Long id) {
         return ResponseEntity.ok(lecturerService.getLecturerById(id));
     }
 
     @GetMapping("/department/{departmentId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<PageResponseDTO<LecturerResponse>> getLecturersByDepartment(
             @PathVariable Long departmentId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -59,8 +58,7 @@ public class LecturerController {
     }
 
     @GetMapping("/{id}/course-offerings")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
-    // TODO: Also allow the lecturer themself to view their own offerings
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<List<CourseOfferingResponse>> getCourseOfferingsForLecturer(@PathVariable Long id) {
         return ResponseEntity.ok(lecturerService.getCourseOfferingsForLecturer(id));
     }

@@ -15,10 +15,11 @@ export default function LecturerCoursesPage() {
   const [materialCategory, setMaterialCategory] = useState<"Slide" | "Syllabus" | "Brief" | "Lab">("Slide");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch lecturer offerings
+  // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
@@ -31,7 +32,7 @@ export default function LecturerCoursesPage() {
     }
   }, [offerings]);
 
-  // 2. Fetch materials for selected offering
+  // materials for offering
   const { data: materialsData, isLoading: materialsLoading } = useQuery({
     queryKey: ["materials", activeOfferingId],
     queryFn: () => api.get<any>(`/api/v1/materials/offering/${activeOfferingId}?size=100`),
@@ -40,7 +41,7 @@ export default function LecturerCoursesPage() {
 
   const materials = materialsData?.dataList || [];
 
-  // 3. Fetch announcements for selected offering
+  // announcements for offering
   const { data: announcementsData } = useQuery({
     queryKey: ["courseAnnouncements", activeOfferingId],
     queryFn: () => api.get<any>(`/api/v1/announcements/me?scope=course&scopeId=${activeOfferingId}&size=50`),
@@ -49,7 +50,7 @@ export default function LecturerCoursesPage() {
 
   const announcements = announcementsData?.dataList || [];
 
-  // 4. Fetch exams for selected offering
+  // exams for offering
   const { data: examsList } = useQuery({
     queryKey: ["exams", activeOfferingId],
     queryFn: () => api.get<any[]>(`/api/v1/exams/offering/${activeOfferingId}`),
@@ -58,7 +59,7 @@ export default function LecturerCoursesPage() {
 
   const exams = examsList || [];
 
-  // 5. Fetch question bank questions
+  // question bank questions
   const activeOffering = offerings?.find((o: any) => o.offeringId === activeOfferingId);
   const courseId = activeOffering?.courseId;
 
@@ -105,19 +106,35 @@ export default function LecturerCoursesPage() {
   });
 
   const handleConfirmUpload = async () => {
-    if (uploadedFiles.length === 0 || !activeOfferingId) return;
+    if (uploadedFiles.length === 0 || !activeOfferingId || isUploading) return;
+    setIsUploading(true);
     try {
       for (const file of uploadedFiles) {
+        let fileUrl = `/uploads/${file.name}`;
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("folder", "materials");
+          const uploadRes = await api.post<{ url: string }>("/api/v1/files/upload", formData);
+          if (uploadRes?.url) {
+            fileUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.warn("Direct file upload endpoint failed, falling back to local path:", uploadErr);
+        }
+
         await uploadMaterialMutation.mutateAsync({
           offeringId: activeOfferingId,
           title: file.name.replace(/\.[^/.]+$/, ""),
           resourceType: materialCategory,
-          fileUrl: `/uploads/${file.name}`,
+          fileUrl: fileUrl,
           uploadedById: user?.userId,
         });
       }
     } catch (err: any) {
       alert("Upload failed: " + err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -392,9 +409,10 @@ export default function LecturerCoursesPage() {
             />
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--outline-variant)]">
-              <button onClick={() => setShowUploadModal(false)} className="btn-secondary text-xs">Cancel</button>
-              <button onClick={handleConfirmUpload} disabled={uploadedFiles.length === 0} className="btn-primary text-xs disabled:opacity-40">
-                Confirm & Upload
+              <button onClick={() => setShowUploadModal(false)} disabled={isUploading} className="btn-secondary text-xs">Cancel</button>
+              <button onClick={handleConfirmUpload} disabled={uploadedFiles.length === 0 || isUploading} className="btn-primary text-xs disabled:opacity-40 flex items-center gap-1.5">
+                {isUploading && <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>}
+                <span>{isUploading ? "Uploading & Processing..." : "Confirm & Upload"}</span>
               </button>
             </div>
           </div>

@@ -34,6 +34,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final SubmissionMapper submissionMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -41,6 +42,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (request == null) {
             throw new ValidationException("Submission request cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(request.getStudentId());
 
         Assignment assignment = assignmentRepository.findById(request.getAssignmentId())
                 .orElseThrow(() -> new EntryNotFoundException("Assignment not found with ID: " + request.getAssignmentId()));
@@ -86,6 +88,10 @@ public class SubmissionServiceImpl implements SubmissionService {
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new EntryNotFoundException("Submission not found with ID: " + submissionId));
 
+        if (submission.getAssignment() != null && submission.getAssignment().getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(submission.getAssignment().getCourseOffering().getOfferingId());
+        }
+
         BigDecimal maxScore = submission.getAssignment().getMaxScore();
         if (gradeRequest.getGrade().compareTo(BigDecimal.ZERO) < 0 || gradeRequest.getGrade().compareTo(maxScore) > 0) {
             throw new ValidationException("Score cannot exceed maximum score of " + maxScore);
@@ -104,8 +110,11 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (assignmentId == null) {
             throw new ValidationException("Assignment ID cannot be null");
         }
-        if (!assignmentRepository.existsById(assignmentId)) {
-            throw new EntryNotFoundException("Assignment not found with ID: " + assignmentId);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new EntryNotFoundException("Assignment not found with ID: " + assignmentId));
+
+        if (assignment.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(assignment.getCourseOffering().getOfferingId());
         }
 
         return submissionRepository.findByAssignment_AssignmentId(assignmentId)
@@ -119,6 +128,8 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (studentId == null) {
             throw new ValidationException("Student ID cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(studentId);
+
         if (!studentRepository.existsById(studentId)) {
             throw new EntryNotFoundException("Student not found with ID: " + studentId);
         }

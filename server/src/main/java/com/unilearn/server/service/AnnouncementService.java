@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.AnnouncementResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing announcements.
- */
+// Announcements service
 public interface AnnouncementService {
 
     AnnouncementResponse createAnnouncement(AnnouncementRequest request);

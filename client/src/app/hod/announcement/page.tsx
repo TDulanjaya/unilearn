@@ -20,15 +20,11 @@ const announcementSchema = z.object({
 
 type AnnouncementFormData = z.infer<typeof announcementSchema>;
 
-const PROGRAM_OPTIONS = ["BSc Software Engineering", "BSc Computer Science", "BSc Information Technology"];
-const SEMESTER_OPTIONS = ["Semester 1", "Semester 3", "Semester 5", "Semester 7"];
-const BATCH_OPTIONS = ["Batch 2023-A", "Batch 2023-B", "Batch 2024-A", "Batch 2025-A"];
-
 export default function HodAnnouncement() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // 1. Fetch HOD's active assignment
+  // active assignment
   const { data: assignments } = useQuery({
     queryKey: ["hodAssignments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/hod-dean-assignments/user/${user?.userId}`),
@@ -37,9 +33,37 @@ export default function HodAnnouncement() {
 
   const activeAssignment = assignments?.find((a: any) => a.active);
   const departmentId = activeAssignment?.departmentId;
-  const departmentName = activeAssignment?.departmentName || "Software Engineering";
+  const departmentName = activeAssignment?.departmentName || "Department";
 
-  // 2. Fetch HOD department announcements
+  // programs, semesters, and batches
+  const { data: deptData } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<any>("/api/v1/departments?size=100"),
+  });
+  const programOptions: string[] = (deptData?.dataList || (Array.isArray(deptData) ? deptData : []))
+    .map((d: any) => d.name)
+    .filter(Boolean);
+
+  const { data: semestersData } = useQuery({
+    queryKey: ["semesters"],
+    queryFn: () => api.get<any[]>("/api/v1/semesters"),
+  });
+  const semesterOptions: string[] = (Array.isArray(semestersData) ? semestersData : [])
+    .map((s: any) => s.name)
+    .filter(Boolean);
+
+  const { data: batchesData } = useQuery({
+    queryKey: ["batches", departmentId],
+    queryFn: () =>
+      departmentId
+        ? api.get<any[]>(`/api/v1/batches/department/${departmentId}`)
+        : api.get<any[]>("/api/v1/batches"),
+  });
+  const batchOptions: string[] = (Array.isArray(batchesData) ? batchesData : [])
+    .map((b: any) => b.name)
+    .filter(Boolean);
+
+  // announcements
   const { data: announcementsData, isLoading: announcementsLoading } = useQuery({
     queryKey: ["announcements", departmentId],
     queryFn: () => api.get<any>(`/api/v1/announcements/me?scope=department&scopeId=${departmentId}&size=50`),
@@ -57,9 +81,9 @@ export default function HodAnnouncement() {
   } = useForm<AnnouncementFormData>({
     resolver: zodResolver(announcementSchema),
     defaultValues: {
-      targetPrograms: ["BSc Software Engineering"],
-      targetSemesters: ["Semester 5"],
-      targetBatches: ["Batch 2023-A"],
+      targetPrograms: [],
+      targetSemesters: [],
+      targetBatches: [],
       priority: "Normal",
     },
   });
@@ -186,22 +210,26 @@ export default function HodAnnouncement() {
                   control={control}
                   render={({ field }) => (
                     <div className="grid sm:grid-cols-2 gap-2 text-xs">
-                      {PROGRAM_OPTIONS.map((prog) => (
-                        <label key={prog} className="flex items-center gap-2 text-[var(--on-surface-variant)] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={field.value.includes(prog)}
-                            onChange={(e) => {
-                              const updated = e.target.checked
-                                ? [...field.value, prog]
-                                : field.value.filter((val) => val !== prog);
-                              field.onChange(updated);
-                            }}
-                            className="rounded text-[var(--tertiary)]"
-                          />
-                          <span>{prog}</span>
-                        </label>
-                      ))}
+                      {programOptions.length === 0 ? (
+                        <span className="text-[var(--on-surface-variant)] text-xs italic">No programs available</span>
+                      ) : (
+                        programOptions.map((prog) => (
+                          <label key={prog} className="flex items-center gap-2 text-[var(--on-surface-variant)] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={field.value.includes(prog)}
+                              onChange={(e) => {
+                                const updated = e.target.checked
+                                  ? [...field.value, prog]
+                                  : field.value.filter((val) => val !== prog);
+                                field.onChange(updated);
+                              }}
+                              className="rounded text-[var(--tertiary)]"
+                            />
+                            <span>{prog}</span>
+                          </label>
+                        ))
+                      )}
                     </div>
                   )}
                 />
@@ -217,22 +245,26 @@ export default function HodAnnouncement() {
                   control={control}
                   render={({ field }) => (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      {SEMESTER_OPTIONS.map((sem) => (
-                        <label key={sem} className="flex items-center gap-2 text-[var(--on-surface-variant)] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={field.value.includes(sem)}
-                            onChange={(e) => {
-                              const updated = e.target.checked
-                                ? [...field.value, sem]
-                                : field.value.filter((val) => val !== sem);
-                              field.onChange(updated);
-                            }}
-                            className="rounded text-[var(--tertiary)]"
-                          />
-                          <span>{sem}</span>
-                        </label>
-                      ))}
+                      {semesterOptions.length === 0 ? (
+                        <span className="text-[var(--on-surface-variant)] text-xs italic">No semesters available</span>
+                      ) : (
+                        semesterOptions.map((sem) => (
+                          <label key={sem} className="flex items-center gap-2 text-[var(--on-surface-variant)] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={field.value.includes(sem)}
+                              onChange={(e) => {
+                                const updated = e.target.checked
+                                  ? [...field.value, sem]
+                                  : field.value.filter((val) => val !== sem);
+                                field.onChange(updated);
+                              }}
+                              className="rounded text-[var(--tertiary)]"
+                            />
+                            <span>{sem}</span>
+                          </label>
+                        ))
+                      )}
                     </div>
                   )}
                 />
@@ -248,22 +280,26 @@ export default function HodAnnouncement() {
                   control={control}
                   render={({ field }) => (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      {BATCH_OPTIONS.map((batch) => (
-                        <label key={batch} className="flex items-center gap-2 text-[var(--on-surface-variant)] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={field.value.includes(batch)}
-                            onChange={(e) => {
-                              const updated = e.target.checked
-                                ? [...field.value, batch]
-                                : field.value.filter((val) => val !== batch);
-                              field.onChange(updated);
-                            }}
-                            className="rounded text-[var(--tertiary)]"
-                          />
-                          <span>{batch}</span>
-                        </label>
-                      ))}
+                      {batchOptions.length === 0 ? (
+                        <span className="text-[var(--on-surface-variant)] text-xs italic">No batches available</span>
+                      ) : (
+                        batchOptions.map((batch) => (
+                          <label key={batch} className="flex items-center gap-2 text-[var(--on-surface-variant)] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={field.value.includes(batch)}
+                              onChange={(e) => {
+                                const updated = e.target.checked
+                                  ? [...field.value, batch]
+                                  : field.value.filter((val) => val !== batch);
+                                field.onChange(updated);
+                              }}
+                              className="rounded text-[var(--tertiary)]"
+                            />
+                            <span>{batch}</span>
+                          </label>
+                        ))
+                      )}
                     </div>
                   )}
                 />

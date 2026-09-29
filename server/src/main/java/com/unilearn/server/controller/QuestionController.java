@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/questions")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('LECTURER')")
+@PreAuthorize("hasAnyRole('LECTURER', 'STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
 public class QuestionController {
 
     private final QuestionService questionService;
@@ -50,6 +50,5 @@ public class QuestionController {
         return ResponseEntity.ok(questionService.getQuestionsByBank(bankId, pageable));
     }
 
-    // TODO: GET /bank/{bankId}/difficulty/{difficulty}
-    //       QuestionService does not have getQuestionsByBankAndDifficulty() yet.
+    // Filter questions by difficulty can be added here if needed
 }

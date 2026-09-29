@@ -26,9 +26,16 @@ public class PerformanceReportServiceImpl implements PerformanceReportService {
     private final EnrollmentRepository enrollmentRepository;
     private final AssignmentRepository assignmentRepository;
     private final SubmissionRepository submissionRepository;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     public List<PerformanceReportResponse> generateReport(Long facultyId, Long departmentId, Long offeringId) {
+        if (offeringId != null) {
+            ownershipValidator.checkLecturerOfferingAccess(offeringId);
+        }
+        if (departmentId != null) {
+            ownershipValidator.checkHodDepartmentAccess(departmentId);
+        }
         if (offeringId != null) {
             CourseOffering offering = courseOfferingRepository.findById(offeringId).orElse(null);
             if (offering != null) {

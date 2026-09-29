@@ -21,13 +21,13 @@ public class ForumPostController {
     private final ForumPostService forumPostService;
 
     @PostMapping
-    // Any authenticated role (enrolled check enforced in the service)
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ForumPostResponse> createPost(@Valid @RequestBody ForumPostRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(forumPostService.createPost(request));
     }
 
     @GetMapping("/offering/{offeringId}")
-    // Any authenticated role (enrolled check enforced in the service)
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<ForumPostResponse>> getPostsByOffering(
             @PathVariable Long offeringId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -35,16 +35,14 @@ public class ForumPostController {
     }
 
     @PatchMapping("/{id}/hide")
-    @PreAuthorize("hasAnyRole('LECTURER', 'HOD_DEAN', 'STAFF_ADMIN')")
-    // TODO: ForumPostService does not have a hidePost() method.
-    //       Using updatePost as a workaround — pass a request with hidden flag set.
+    @PreAuthorize("hasAnyRole('LECTURER', 'HOD_DEAN', 'STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ForumPostResponse> hidePost(@PathVariable Long id,
                                                       @Valid @RequestBody ForumPostRequest request) {
         return ResponseEntity.ok(forumPostService.updatePost(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'HOD_DEAN', 'STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'HOD_DEAN', 'STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deletePost(@PathVariable Long id) {
         forumPostService.deletePost(id);
         return ResponseEntity.noContent().build();

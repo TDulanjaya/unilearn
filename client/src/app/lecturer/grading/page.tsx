@@ -25,6 +25,7 @@ interface SubmissionItem {
   status: "graded" | "pending";
   fileName: string;
   fileNote: string;
+  fileUrl?: string;
   rubric: RubricCriterion[];
   feedback: string;
 }
@@ -56,7 +57,7 @@ export default function LecturerGradingPage() {
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [reviewingExamSub, setReviewingExamSub] = useState<ExamSubmissionItem | null>(null);
 
-  // 1. Fetch lecturer offerings
+  // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
@@ -69,7 +70,7 @@ export default function LecturerGradingPage() {
     }
   }, [offerings]);
 
-  // 2. Fetch assignments for active offering
+  // assignments for offering
   const { data: assignments } = useQuery({
     queryKey: ["assignments", activeOfferingId],
     queryFn: () => api.get<any[]>(`/api/v1/assignments/offering/${activeOfferingId}`),
@@ -78,7 +79,7 @@ export default function LecturerGradingPage() {
 
   const assignmentIds = assignments?.map((a: any) => a.assignmentId) || [];
 
-  // Parallel queries to fetch submissions for all assignments of the active offering
+  // submissions for assignments
   const submissionsQueries = useQueries({
     queries: assignmentIds.map((id: number) => ({
       queryKey: ["submissions", id],
@@ -103,6 +104,7 @@ export default function LecturerGradingPage() {
         status: sub.score != null ? "graded" : "pending",
         fileName: sub.fileUrl?.split("/").pop() || "submission.pdf",
         fileNote: sub.remarks || "No remarks",
+        fileUrl: sub.fileUrl || "",
         rubric: [
           { criterion: "Correctness", maxPoints: 50, awarded: Math.round((sub.score || 0) * 0.5) },
           { criterion: "Documentation", maxPoints: 30, awarded: Math.round((sub.score || 0) * 0.3) },
@@ -119,7 +121,7 @@ export default function LecturerGradingPage() {
     return s.assignmentTitle === selectedAssignmentFilter;
   });
 
-  // 3. Fetch exams for selected offering
+  // exams for offering
   const { data: examsList } = useQuery({
     queryKey: ["exams", activeOfferingId],
     queryFn: () => api.get<any[]>(`/api/v1/exams/offering/${activeOfferingId}`),
@@ -132,7 +134,7 @@ export default function LecturerGradingPage() {
     }
   }, [examsList]);
 
-  // 4. Fetch attempts for selected exam
+  // attempts for exam
   const { data: attempts } = useQuery({
     queryKey: ["examAttempts", selectedExamId],
     queryFn: () => api.get<any[]>(`/api/v1/exam-attempts/exam/${selectedExamId}`),
@@ -314,7 +316,7 @@ export default function LecturerGradingPage() {
               Course Gradebook & Final Exam Reviewer
             </h1>
             <p className="text-[var(--on-surface-variant)] text-xs sm:text-sm">
-              Per-offering assignment grading, mock file document preview, and blind exam paper evaluation.
+              Per-offering assignment grading, real file document preview, and blind exam paper evaluation.
             </p>
           </div>
 

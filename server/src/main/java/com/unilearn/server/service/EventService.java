@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.EventResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing events.
- */
+// Events service
 public interface EventService {
 
     EventResponse createEvent(EventRequest request);

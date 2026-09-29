@@ -21,7 +21,7 @@ export default function McqQuestion({
           <label
             key={idx}
             onClick={() => onAnswerChange(option)}
-            className={`flex items-center gap-3.5 p-4 rounded-2xl border cursor-pointer transition-all ${
+            className={`flex items-center gap-3.5 p-3.5 sm:p-4 min-h-[48px] rounded-2xl border cursor-pointer transition-all ${
               isSelected
                 ? "border-[var(--tertiary)] bg-[var(--tertiary-container)]/20 text-[var(--on-surface)] shadow-sm font-semibold"
                 : "border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] hover:bg-[var(--surface-container-low)] text-[var(--on-surface-variant)]"
@@ -36,7 +36,7 @@ export default function McqQuestion({
             >
               {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
             </div>
-            <span className="text-xs sm:text-sm leading-relaxed">{option}</span>
+            <span className="text-xs sm:text-sm leading-relaxed break-words">{option}</span>
           </label>
         );
       })}

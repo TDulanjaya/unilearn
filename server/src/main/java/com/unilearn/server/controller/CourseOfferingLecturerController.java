@@ -22,7 +22,7 @@ public class CourseOfferingLecturerController {
     private final CourseOfferingLecturerService courseOfferingLecturerService;
 
     @PostMapping("/{lecturerId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<CourseOfferingLecturerResponse> assignLecturer(
             @PathVariable Long offeringId,
             @PathVariable Long lecturerId) {
@@ -34,7 +34,7 @@ public class CourseOfferingLecturerController {
     }
 
     @DeleteMapping("/{lecturerId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<Void> removeLecturer(@PathVariable Long offeringId,
                                                @PathVariable Long lecturerId) {
         courseOfferingLecturerService.removeLecturer(offeringId, lecturerId);
@@ -42,11 +42,13 @@ public class CourseOfferingLecturerController {
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<LecturerResponse>> getLecturersForOffering(@PathVariable Long offeringId) {
         return ResponseEntity.ok(courseOfferingLecturerService.getLecturersForOffering(offeringId));
     }
 
     @GetMapping("/api/v1/lecturers/{lecturerId}/course-offerings")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseOfferingResponse>> getOfferingsForLecturer(
             @PathVariable Long lecturerId) {
         return ResponseEntity.ok(courseOfferingLecturerService.getOfferingsForLecturer(lecturerId));

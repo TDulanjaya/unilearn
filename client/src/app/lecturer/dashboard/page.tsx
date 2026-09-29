@@ -8,17 +8,17 @@ import { useAuth } from "@/context/AuthContext";
 export default function LecturerDashboard() {
   const { user } = useAuth();
 
-  // 1. Fetch all course offerings for the lecturer
+  // course offerings
   const { data: offerings, isLoading: offeringsLoading, isError: offeringsError } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
     enabled: !!user?.userId,
   });
 
-  // 2. Fetch assignments for each offering (to check for submissions)
+  // assignments
   const assignmentsList = offerings?.flatMap((o: any) => o.assignments || []) || [];
 
-  // Parallel queries to fetch submissions for all assignments of the lecturer
+  // submissions
   const submissionsQueries = useQueries({
     queries: assignmentsList.map((asm: any) => ({
       queryKey: ["submissions", asm.assignmentId],
@@ -26,14 +26,14 @@ export default function LecturerDashboard() {
     })),
   });
 
-  // Calculate pending grading items (submissions without a grade score)
+  // pending grading count
   const pendingGradingCount = submissionsQueries.reduce((acc: number, query: any) => {
     if (!query.data) return acc;
     const ungraded = query.data.filter((s: any) => s.score == null);
     return acc + ungraded.length;
   }, 0);
 
-  // 3. Fetch timetable slots for each offering
+  // timetable slots
   const slotsQueries = useQueries({
     queries: (offerings || []).map((o: any) => ({
       queryKey: ["slots", o.offeringId],
@@ -45,7 +45,7 @@ export default function LecturerDashboard() {
   const todaySlots = slotsQueries.flatMap((q: any) => q.data || [])
     .filter((slot: any) => slot.dayOfWeek === todayName);
 
-  // 4. Fetch notifications feed
+  // notifications
   const { data: notificationsData } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api.get<any>("/api/v1/notifications/me?size=10"),
@@ -137,7 +137,30 @@ export default function LecturerDashboard() {
                 Active Course Offerings
               </h3>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Mobile Card View (< md) */}
+            <div className="md:hidden divide-y divide-[var(--outline-variant)]">
+              {offerings?.length === 0 ? (
+                <p className="text-center py-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                  No active course offerings assigned.
+                </p>
+              ) : (
+                offerings?.map((off: any) => (
+                  <div key={off.offeringId} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                    <p className="font-bold text-xs text-[var(--on-surface)]">
+                      {off.courseCode} {off.courseName}
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-[var(--on-surface-variant)]">
+                      <span>Batch: <b className="text-[var(--on-surface)]">{off.batchName}</b></span>
+                      <span>Students: <b className="text-[var(--tertiary)]">{off.enrollments?.length || 0} / {off.capacity || 60}</b></span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table View (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] text-xs uppercase tracking-wider">

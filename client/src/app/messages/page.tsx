@@ -41,7 +41,7 @@ export default function MessagesPage() {
   const [inputText, setInputText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 1. Fetch live contacts & conversations
+  // contacts
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ["contacts", user?.userId],
     queryFn: () => api.get<Contact[]>("/api/v1/messages/contacts"),
@@ -49,14 +49,14 @@ export default function MessagesPage() {
     refetchInterval: 5000,
   });
 
-  // Set default active contact
+  // select first contact by default
   useEffect(() => {
     if (contacts && contacts.length > 0 && !activeContactId) {
       setActiveContactId(contacts[0].userId);
     }
   }, [contacts, activeContactId]);
 
-  // 2. Fetch active conversation thread
+  // active thread
   const { data: threadData, isLoading: threadLoading } = useQuery({
     queryKey: ["thread", user?.userId, activeContactId],
     queryFn: () => api.get<any>(`/api/v1/messages/thread/${activeContactId}?page=0&size=50`),
@@ -67,12 +67,12 @@ export default function MessagesPage() {
   const activeMessages: MessageItem[] = threadData?.dataList || [];
   const activeContact = contacts?.find((c) => c.userId === activeContactId) || contacts?.[0];
 
-  // Auto-scroll to bottom of chat
+  // scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeMessages.length, activeContactId]);
 
-  // 3. Send message mutation
+  // send message
   const sendMutation = useMutation({
     mutationFn: (content: string) =>
       api.post<MessageItem>("/api/v1/messages", {

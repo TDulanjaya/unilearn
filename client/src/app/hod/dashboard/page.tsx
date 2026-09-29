@@ -9,7 +9,7 @@ export default function HodDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // 1. Fetch HOD's own assignments to determine department
+  // department assignments
   const { data: assignments } = useQuery({
     queryKey: ["hodAssignments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/hod-dean-assignments/user/${user?.userId}`),
@@ -18,28 +18,28 @@ export default function HodDashboard() {
 
   const activeAssignment = assignments?.find((a: any) => a.active);
   const departmentId = activeAssignment?.departmentId;
-  const departmentName = activeAssignment?.departmentName || "Software Engineering";
+  const departmentName = activeAssignment?.departmentName || "Department";
 
-  // 2. Fetch lecturers of HOD's department
+  // department lecturers
   const { data: lecturersData, isLoading: lecturersLoading } = useQuery({
     queryKey: ["departmentLecturers", departmentId],
     queryFn: () => api.get<any>(`/api/v1/lecturers/department/${departmentId}`),
     enabled: !!departmentId,
   });
 
-  // 3. Fetch departmental KPIs
+  // kpis
   const { data: kpiData, isLoading: kpiLoading } = useQuery({
     queryKey: ["hodKpi"],
     queryFn: () => api.get<any>("/api/v1/reports/dashboard"),
   });
 
-  // 4. Fetch all course offerings
+  // course offerings
   const { data: allOfferings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["courseOfferings"],
     queryFn: () => api.get<any[]>("/api/v1/course-offerings"),
   });
 
-  // Update lecturer assignment mutation
+  // update assignment
   const updateMutation = useMutation({
     mutationFn: (data: { offeringId: number; courseId: number; batchId: number; semesterId: number; primaryLecturerId: number; capacity?: number }) =>
       api.put(`/api/v1/course-offerings/${data.offeringId}`, data),

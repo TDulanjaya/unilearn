@@ -42,7 +42,7 @@ export default function LecturerAnalyticsPage() {
   const { user } = useAuth();
   const [activeOfferingId, setActiveOfferingId] = useState<number | null>(null);
 
-  // 1. Fetch lecturer course offerings
+  // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
@@ -55,7 +55,7 @@ export default function LecturerAnalyticsPage() {
     }
   }, [offerings]);
 
-  // 2. Fetch performance report for active offering
+  // performance report
   const { data: reportList, isLoading: reportLoading } = useQuery({
     queryKey: ["performanceReport", activeOfferingId],
     queryFn: () => api.get<any[]>(`/api/v1/reports/performance?offeringId=${activeOfferingId}`),

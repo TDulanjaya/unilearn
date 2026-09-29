@@ -22,7 +22,7 @@ public class ExamController {
     private final ExamService examService;
 
     @PostMapping("/final")
-    @PreAuthorize("hasRole('LECTURER')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STAFF_ADMIN')")
     public ResponseEntity<ExamResponse> createFinalExam(@Valid @RequestBody ExamFinalCreateRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(examService.createFinalExam(request));
     }
@@ -35,8 +35,7 @@ public class ExamController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('LECTURER')")
-    // Note: LECTURER can update exams.
-    // Enforcing "owner of the exam" check should be done in the service layer.
+    // Lecturer can update exams
     public ResponseEntity<ExamResponse> updateExam(@PathVariable Long id,
                                                    @Valid @RequestBody ExamRequest request) {
         return ResponseEntity.ok(examService.updateExam(id, request));
@@ -44,19 +43,27 @@ public class ExamController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('LECTURER')")
-    // Note: Same owner-based authorization as updateExam above
+    // Lecturer can delete exams
     public ResponseEntity<Void> deleteExam(@PathVariable Long id) {
         examService.deleteExam(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT', 'STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<ExamResponse> getExamById(@PathVariable Long id) {
         return ResponseEntity.ok(examService.getExamById(id));
     }
 
     @GetMapping("/offering/{offeringId}")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT', 'STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<List<ExamResponse>> getExamsByOffering(@PathVariable Long offeringId) {
         return ResponseEntity.ok(examService.getExamsByOffering(offeringId));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT', 'STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
+    public ResponseEntity<List<ExamResponse>> getAllExams() {
+        return ResponseEntity.ok(examService.getAllExams());
     }
 }

@@ -21,20 +21,20 @@ public class EventController {
     private final EventService eventService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<EventResponse> createEvent(@Valid @RequestBody EventRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(eventService.createEvent(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<EventResponse> updateEvent(@PathVariable Long id,
                                                      @Valid @RequestBody EventRequest request) {
         return ResponseEntity.ok(eventService.updateEvent(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
         eventService.deleteEvent(id);
         return ResponseEntity.noContent().build();
@@ -51,5 +51,5 @@ public class EventController {
         return ResponseEntity.ok(eventService.getUpcomingEvents(pageable));
     }
 
-    // TODO: GET /faculty/{facultyId} — EventService does not have getEventsByFaculty() yet.
+    // Filter events by faculty can be added here if needed
 }

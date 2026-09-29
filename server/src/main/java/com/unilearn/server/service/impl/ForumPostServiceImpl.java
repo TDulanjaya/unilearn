@@ -30,6 +30,7 @@ public class ForumPostServiceImpl implements ForumPostService {
     private final CourseOfferingRepository courseOfferingRepository;
     private final UserRepository userRepository;
     private final ForumPostMapper forumPostMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -40,6 +41,11 @@ public class ForumPostServiceImpl implements ForumPostService {
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()))) {
+            ownershipValidator.checkStudentOwnership(request.getAuthorId());
+        }
 
         User author = userRepository.findById(request.getAuthorId())
                 .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getAuthorId()));
@@ -80,10 +86,14 @@ public class ForumPostServiceImpl implements ForumPostService {
         if (postId == null) {
             throw new ValidationException("Post ID cannot be null");
         }
-        if (!forumPostRepository.existsById(postId)) {
-            throw new EntryNotFoundException("ForumPost not found with ID: " + postId);
+        ForumPost post = forumPostRepository.findById(postId)
+                .orElseThrow(() -> new EntryNotFoundException("ForumPost not found with ID: " + postId));
+
+        if (post.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(post.getCourseOffering().getOfferingId());
         }
-        forumPostRepository.deleteById(postId);
+
+        forumPostRepository.delete(post);
     }
 
     @Override

@@ -156,4 +156,11 @@ public class FacultyServiceImpl implements FacultyService {
                 .map(facultyMapper::toFacultyOptionDTO)
                 .toList();
     }
+
+    @Override
+    public List<com.unilearn.server.dto.response.FacultyPublicResponse> getPublicFaculties() {
+        return facultyRepository.findAll().stream()
+                .map(facultyMapper::toFacultyPublicResponse)
+                .toList();
+    }
 }

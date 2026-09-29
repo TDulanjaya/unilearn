@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.TimetableSlotResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing timetable slots.
- */
+// Timetable slots service
 public interface TimetableSlotService {
 
     TimetableSlotResponse createSlot(TimetableSlotRequest request);

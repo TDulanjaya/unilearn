@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.MaterialResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing course materials.
- */
+// Course materials service
 public interface MaterialService {
 
     MaterialResponse createMaterial(MaterialRequest request);

@@ -1,5 +1,9 @@
 "use client";
-import React, { createContext, useContext, useState, useCallback } from "react";
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export interface AppNotification {
   id: number;
@@ -9,54 +13,83 @@ export interface AppNotification {
   title: string;
   detail: string;
   time: string;
+  read?: boolean;
 }
 
 interface NotificationContextType {
   notifications: AppNotification[];
+  unreadCount: number;
+  isLoading: boolean;
   addNotification: (n: Omit<AppNotification, "id">) => void;
+  markAsRead: (id: number) => Promise<void>;
+  refetch: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-const SEED_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 1,
-    icon: "ti-file-text",
+export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [localNotifications, setLocalNotifications] = useState<AppNotification[]>([]);
+
+  const { data: notificationsData, isLoading, refetch } = useQuery({
+    queryKey: ["notifications", user?.userId],
+    queryFn: () => api.get<any>("/api/v1/notifications/me?size=50"),
+    enabled: !!user?.userId,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: number) => api.patch(`/api/v1/notifications/${id}/read`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications", user?.userId] });
+    },
+  });
+
+  const rawList = notificationsData?.dataList || notificationsData?.content || [];
+
+  const fetchedNotifications: AppNotification[] = rawList.map((n: any) => ({
+    id: n.notificationId,
+    title: n.title,
+    detail: n.message,
+    time: n.createdAt ? new Date(n.createdAt).toLocaleString() : "Just now",
+    read: n.read || false,
+    icon: "ti-bell",
     iconBg: "bg-[var(--surface-container)]",
     iconColor: "text-[var(--tertiary)]",
-    title: "New Assignment Posted: SE308.3",
-    detail: "Assignment 2: Test Case Design is due on Dec 18, 2025.",
-    time: "10 mins ago",
-  },
-  {
-    id: 2,
-    icon: "ti-calendar",
-    iconBg: "bg-[var(--warning-container)]",
-    iconColor: "text-[var(--on-warning-container)]",
-    title: "Exam Scheduled: SE308.3 Software Process Mgmt",
-    detail: "Final exam scheduled for Dec 12, 2025 at Main Hall A.",
-    time: "2 hours ago",
-  },
-  {
-    id: 3,
-    icon: "ti-certificate",
-    iconBg: "bg-[var(--secondary-container)]",
-    iconColor: "text-[var(--on-secondary-container)]",
-    title: "Grade Published: SE202.2 Mid-term Exam",
-    detail: "You received 84% (Grade A-) in SE202.2 Database Systems.",
-    time: "Yesterday",
-  },
-];
+  }));
 
-export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const [notifications, setNotifications] = useState<AppNotification[]>(SEED_NOTIFICATIONS);
+  useEffect(() => {
+    setLocalNotifications(fetchedNotifications);
+  }, [notificationsData]);
 
   const addNotification = useCallback((n: Omit<AppNotification, "id">) => {
-    setNotifications((prev) => [{ ...n, id: Date.now() }, ...prev]);
+    setLocalNotifications((prev) => [{ ...n, id: Date.now() }, ...prev]);
   }, []);
 
+  const markAsRead = async (id: number) => {
+    setLocalNotifications((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, read: true } : item))
+    );
+    try {
+      await markReadMutation.mutateAsync(id);
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
+  const unreadCount = localNotifications.filter((n) => !n.read).length;
+
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification }}>
+    <NotificationContext.Provider
+      value={{
+        notifications: localNotifications,
+        unreadCount,
+        isLoading,
+        addNotification,
+        markAsRead,
+        refetch,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

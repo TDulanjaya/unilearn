@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.AttendanceRecordResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing attendance records.
- */
+// Attendance records service
 public interface AttendanceRecordService {
 
     AttendanceRecordResponse markAttendance(AttendanceRecordRequest request);

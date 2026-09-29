@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.GradebookEntryResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing gradebook entries.
- */
+// Gradebook entries service
 public interface GradebookEntryService {
 
     GradebookEntryResponse createGradebookEntry(GradebookEntryRequest request);

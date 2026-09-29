@@ -36,7 +36,7 @@ public class AiQuizController {
     public ResponseEntity<AiQuizSessionResponse> startQuizSession(
             @AuthenticationPrincipal User principal,
             @Valid @RequestBody AiQuizSessionRequest request) {
-        // Derive studentId from principal, never trust client-supplied studentId
+        // use student id from auth token
         request.setStudentId(principal.getUserId());
         AiQuizSessionResponse response = aiQuizSessionService.startQuizSession(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

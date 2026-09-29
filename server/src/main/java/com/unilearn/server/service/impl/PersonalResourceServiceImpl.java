@@ -30,12 +30,24 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
     private final StudentRepository studentRepository;
     private final CourseOfferingRepository courseOfferingRepository;
     private final PersonalResourceMapper personalResourceMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
+    private final com.unilearn.server.ai.MaterialChunkService materialChunkService;
+
+    // Limit: 20 files per student, 10MB each
+    private static final int MAX_PERSONAL_RESOURCES_PER_STUDENT = 20;
+    private static final int MAX_FILE_SIZE_KB = 10 * 1024; // 10MB
 
     @Override
     @Transactional
     public PersonalResourceResponse createPersonalResource(PersonalResourceRequest request) {
         if (request == null) {
             throw new ValidationException("PersonalResource request cannot be null");
+        }
+        ownershipValidator.checkStudentOwnership(request.getStudentId());
+
+        // Check file size (max 10MB)
+        if (request.getFileSizeKb() != null && request.getFileSizeKb() > MAX_FILE_SIZE_KB) {
+            throw new ValidationException("File size exceeds the 10MB limit for personal resources.");
         }
 
         Student student = studentRepository.findById(request.getStudentId())
@@ -44,8 +56,15 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
+        // Check file count (max 20 files)
+        long currentCount = personalResourceRepository.countByStudent_StudentId(student.getStudentId());
+        if (currentCount >= MAX_PERSONAL_RESOURCES_PER_STUDENT) {
+            throw new ValidationException("Personal upload limit reached (maximum " + MAX_PERSONAL_RESOURCES_PER_STUDENT + " files per student). Please delete older files first.");
+        }
+
         PersonalResource resource = personalResourceMapper.toPersonalResource(request, student, offering);
         PersonalResource saved = personalResourceRepository.save(resource);
+        materialChunkService.processPersonalResource(saved);
         return personalResourceMapper.toPersonalResourceResponse(saved);
     }
 
@@ -75,6 +94,7 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
         resource.setFileSizeKb(request.getFileSizeKb());
 
         PersonalResource updated = personalResourceRepository.save(resource);
+        materialChunkService.processPersonalResource(updated);
         return personalResourceMapper.toPersonalResourceResponse(updated);
     }
 
@@ -90,6 +110,7 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
                 && !currentUserId.equals(resource.getStudent().getStudentId())) {
             throw new org.springframework.security.access.AccessDeniedException("Access denied: You do not own this resource");
         }
+        materialChunkService.deleteChunksForPersonalResource(resourceId);
         personalResourceRepository.delete(resource);
     }
 
@@ -138,6 +159,8 @@ public class PersonalResourceServiceImpl implements PersonalResourceService {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(userId);
+
         if (!studentRepository.existsById(userId)) {
             throw new EntryNotFoundException("Student not found with ID: " + userId);
         }

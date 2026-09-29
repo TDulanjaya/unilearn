@@ -27,6 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final NotificationMapper notificationMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -51,6 +52,8 @@ public class NotificationServiceImpl implements NotificationService {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
+        ownershipValidator.checkUserOwnership(userId);
+
         if (!userRepository.existsById(userId)) {
             throw new EntryNotFoundException("User not found with ID: " + userId);
         }
@@ -77,6 +80,10 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new EntryNotFoundException("Notification not found with ID: " + notificationId));
 
+        if (notification.getUser() != null) {
+            ownershipValidator.checkUserOwnership(notification.getUser().getUserId());
+        }
+
         notification.setIsRead(true);
         notificationRepository.save(notification);
     }
@@ -87,6 +94,8 @@ public class NotificationServiceImpl implements NotificationService {
         if (userId == null) {
             throw new ValidationException("User ID cannot be null");
         }
+        ownershipValidator.checkUserOwnership(userId);
+
         if (!userRepository.existsById(userId)) {
             throw new EntryNotFoundException("User not found with ID: " + userId);
         }

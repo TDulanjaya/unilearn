@@ -70,7 +70,7 @@ public class MessageServiceImpl implements MessageService {
             throw new EntryNotFoundException("User not found with ID: " + user2Id);
         }
 
-        // Mark unread messages sent to user1 from user2 as read
+        // Mark incoming messages as read
         List<Message> unread = messageRepository.findByReceiver_UserIdAndReadAtIsNull(user1Id);
         for (Message m : unread) {
             if (m.getSender() != null && m.getSender().getUserId().equals(user2Id)) {
@@ -85,7 +85,7 @@ public class MessageServiceImpl implements MessageService {
                 .map(messageMapper::toMessageResponse)
                 .toList());
 
-        // Sort ascending for chat timeline rendering
+        // Sort by time
         content.sort(Comparator.comparing(MessageResponse::getSentAt, Comparator.nullsLast(Comparator.naturalOrder())));
 
         return PageResponseDTO.<MessageResponse>builder()

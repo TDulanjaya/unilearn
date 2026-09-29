@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.AuditLogResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing audit logs.
- */
+// Audit logs service
 public interface AuditLogService {
 
     AuditLogResponse logAction(AuditLogRequest request);

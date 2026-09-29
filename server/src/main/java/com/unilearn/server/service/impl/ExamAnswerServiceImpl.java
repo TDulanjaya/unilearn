@@ -28,7 +28,9 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
     private final ExamAnswerRepository examAnswerRepository;
     private final ExamAttemptRepository examAttemptRepository;
     private final QuestionRepository questionRepository;
+    private final com.unilearn.server.repository.ExamResultRepository examResultRepository;
     private final ExamAnswerMapper examAnswerMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -59,13 +61,17 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
         if (existingOpt.isPresent()) {
             answer = existingOpt.get();
             answer.setAnswerText(text);
-            // Marks can only be set by lecturer via gradeAnswer
+            // Only lecturer sets marks
         } else {
             answer = examAnswerMapper.toExamAnswer(request, attempt, question);
         }
 
         ExamAnswer saved = examAnswerRepository.save(answer);
-        return examAnswerMapper.toExamAnswerResponse(saved);
+        ExamAnswerResponse response = examAnswerMapper.toExamAnswerResponse(saved);
+        // Hide score and answer status during submission
+        response.setIsCorrect(null);
+        response.setMarksAwarded(null);
+        return response;
     }
 
     @Override
@@ -81,9 +87,35 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
             throw new org.springframework.security.access.AccessDeniedException("Access denied: Attempt belongs to another student");
         }
 
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isStudent = (studentId != null) || (auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority())));
+
+        if (!isStudent && attempt.getExam() != null && attempt.getExam().getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(attempt.getExam().getCourseOffering().getOfferingId());
+        }
+
+        boolean isPublished = false;
+        if (attempt.getExam() != null && attempt.getStudent() != null) {
+            java.util.Optional<com.unilearn.server.model.ExamResult> resultOpt =
+                    examResultRepository.findByExam_ExamIdAndStudent_StudentId(
+                            attempt.getExam().getExamId(), attempt.getStudent().getStudentId());
+            if (resultOpt.isPresent() && resultOpt.get().getPublishedAt() != null) {
+                isPublished = true;
+            }
+        }
+
+        final boolean published = isPublished;
         return examAnswerRepository.findByAttempt_AttemptId(attemptId)
                 .stream()
                 .map(examAnswerMapper::toExamAnswerResponse)
+                .map(resp -> {
+                    if (isStudent && !published) {
+                        resp.setIsCorrect(null);
+                        resp.setMarksAwarded(null);
+                    }
+                    return resp;
+                })
                 .toList();
     }
 
@@ -96,6 +128,10 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
 
         ExamAnswer answer = examAnswerRepository.findByAttempt_AttemptIdAndQuestion_QuestionId(attemptId, questionId)
                 .orElseThrow(() -> new EntryNotFoundException("ExamAnswer not found for attempt ID: " + attemptId + " and question ID: " + questionId));
+
+        if (answer.getAttempt() != null && answer.getAttempt().getExam() != null && answer.getAttempt().getExam().getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(answer.getAttempt().getExam().getCourseOffering().getOfferingId());
+        }
 
         answer.setMarksAwarded(marksAwarded);
         if (answer.getQuestion() != null && answer.getQuestion().getCorrectAnswer() != null) {

@@ -5,9 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-/**
- * Service interface for bulk importing users/students/lecturers.
- */
+// Bulk importing users/students/lecturers service
 public interface BulkImportService {
 
     List<BulkImportResponse> importUsers(MultipartFile file, String role);

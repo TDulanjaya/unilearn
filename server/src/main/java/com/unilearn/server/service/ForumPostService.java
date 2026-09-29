@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.ForumPostResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing forum posts.
- */
+// Forum posts service
 public interface ForumPostService {
 
     ForumPostResponse createPost(ForumPostRequest request);

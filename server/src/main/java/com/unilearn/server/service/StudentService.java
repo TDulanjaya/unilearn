@@ -9,9 +9,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing students.
- */
+// Students service
 public interface StudentService {
 
     StudentResponse createStudent(StudentRequest request);

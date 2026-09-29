@@ -33,76 +33,44 @@ function resolvePosterUrl(url?: string): string {
   return `${apiBase.replace(/\/+$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
-// Academic Programs & Faculties
-const FACULTIES_DATA = [
-  {
-    id: "computing",
-    name: "Faculty of Computing",
-    tagline: "Pioneering Software Engineering, AI & Cybersecurity",
-    icon: "ti-code",
-    color: "from-blue-950 via-teal-900 to-emerald-950",
-    badge: "Accredited by BCS & IESL",
-    stats: "3,400+ Undergraduates · 18 Research Labs",
-    programs: [
-      { name: "BSc (Hons) in Software Engineering", duration: "4 Years", type: "Undergraduate" },
-      { name: "BSc (Hons) in Artificial Intelligence & Data Science", duration: "4 Years", type: "Undergraduate" },
-      { name: "BSc (Hons) in Cybersecurity & Cloud Computing", duration: "4 Years", type: "Undergraduate" },
-      { name: "MSc in Computer Science & Applied AI", duration: "2 Years", type: "Postgraduate" },
-    ],
-  },
-  {
-    id: "business",
-    name: "Faculty of Business & Management",
-    tagline: "Cultivating Next-Generation Enterprise Leaders & Innovators",
-    icon: "ti-building-bank",
-    color: "from-blue-950 via-indigo-950 to-slate-900",
-    badge: "AACSB Member Institution",
-    stats: "2,200+ Undergraduates · 95% Placement",
-    programs: [
-      { name: "BBA (Hons) in Management Information Systems", duration: "3-4 Years", type: "Undergraduate" },
-      { name: "BSc (Hons) in Financial Technology & Analytics", duration: "4 Years", type: "Undergraduate" },
-      { name: "BBA (Hons) in International Business & Marketing", duration: "3-4 Years", type: "Undergraduate" },
-      { name: "Master of Business Administration (Executive MBA)", duration: "2 Years", type: "Postgraduate" },
-    ],
-  },
-  {
-    id: "engineering",
-    name: "Faculty of Engineering & Technology",
-    tagline: "Designing Intelligent Systems, Robotics & Infrastructure",
-    icon: "ti-settings",
-    color: "from-slate-950 via-cyan-950 to-blue-950",
-    badge: "Washington Accord Recognized",
-    stats: "1,800+ Undergraduates · 12 Maker Spaces",
-    programs: [
-      { name: "BSc (Eng) Hons in Electronic & Mechatronics Engineering", duration: "4 Years", type: "Undergraduate" },
-      { name: "BSc (Eng) Hons in Computer Systems & IoT", duration: "4 Years", type: "Undergraduate" },
-      { name: "BSc (Eng) Hons in Electrical & Smart Grid Systems", duration: "4 Years", type: "Undergraduate" },
-      { name: "MSc in Autonomous Systems & Robotics", duration: "2 Years", type: "Postgraduate" },
-    ],
-  },
-  {
-    id: "science",
-    name: "Faculty of Applied Sciences",
-    tagline: "Discovery-Driven Research in Mathematics & Bio-Sciences",
-    icon: "ti-flask",
-    color: "from-teal-950 via-emerald-950 to-slate-900",
-    badge: "National Science Foundation Partner",
-    stats: "1,200+ Undergraduates · 8 Centers of Excellence",
-    programs: [
-      { name: "BSc (Hons) in Computational Mathematics & Statistics", duration: "4 Years", type: "Undergraduate" },
-      { name: "BSc (Hons) in Bioinformatics & Genomic Analytics", duration: "4 Years", type: "Undergraduate" },
-      { name: "BSc (Hons) in Data Science & Operational Research", duration: "4 Years", type: "Undergraduate" },
-      { name: "MSc in Quantitative Modeling & Analytics", duration: "2 Years", type: "Postgraduate" },
-    ],
-  },
-];
+interface PublicFaculty {
+  name: string;
+  code: string;
+  description: string;
+}
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [selectedFaculty, setSelectedFaculty] = useState<string>("computing");
+  const [faculties, setFaculties] = useState<PublicFaculty[]>([]);
+  const [selectedFacultyCode, setSelectedFacultyCode] = useState<string>("");
+  const [isLoadingFaculties, setIsLoadingFaculties] = useState(true);
   const [liveEvents, setLiveEvents] = useState<EventDisplayItem[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [selectedPosterModal, setSelectedPosterModal] = useState<{ title: string; url: string } | null>(null);
+
+  useEffect(() => {
+    async function fetchPublicFaculties() {
+      setIsLoadingFaculties(true);
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+        const res = await fetch(`${apiBase.replace(/\/+$/, "")}/api/v1/faculties/public`);
+        if (res.ok) {
+          const data: PublicFaculty[] = await res.json();
+          setFaculties(data || []);
+          if (data && data.length > 0) {
+            setSelectedFacultyCode(data[0].code);
+          }
+        } else {
+          setFaculties([]);
+        }
+      } catch {
+        setFaculties([]);
+      } finally {
+        setIsLoadingFaculties(false);
+      }
+    }
+    fetchPublicFaculties();
+  }, []);
 
   useEffect(() => {
     async function fetchUpcomingEvents() {
@@ -150,8 +118,6 @@ export default function Home() {
     }
     fetchUpcomingEvents();
   }, []);
-
-  const currentFaculty = FACULTIES_DATA.find((f) => f.id === selectedFaculty) || FACULTIES_DATA[0];
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--on-background)] transition-colors duration-300 antialiased selection:bg-[#006a61] selection:text-white">
@@ -341,84 +307,72 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Faculty Selector Tabs */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
-            {FACULTIES_DATA.map((fac) => {
-              const isSelected = selectedFaculty === fac.id;
-              return (
-                <button
-                  key={fac.id}
-                  onClick={() => setSelectedFaculty(fac.id)}
-                  className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-display font-bold text-sm transition-all duration-200 border ${
-                    isSelected
-                      ? "bg-[var(--primary)] text-[var(--on-primary)] border-[var(--primary)] shadow-lg shadow-[var(--primary)]/15 scale-105"
-                      : "bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
-                  }`}
-                >
-                  <i className={`ti ${fac.icon} text-lg ${isSelected ? "text-[var(--secondary-container)]" : ""}`}></i>
-                  <span>{fac.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Selected Faculty Details Card */}
-          <div className="glass rounded-3xl p-6 sm:p-10 border border-[var(--glass-border)] shadow-2xl max-w-5xl mx-auto space-y-8">
-            
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--outline-variant)]">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] text-xs font-bold mb-2">
-                  <span>{currentFaculty.badge}</span>
-                </div>
-                <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
-                  {currentFaculty.name}
-                </h3>
-                <p className="text-sm text-[var(--on-surface-variant)] mt-1">
-                  {currentFaculty.tagline}
-                </p>
+          {isLoadingFaculties ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="flex gap-3">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-11 w-36 rounded-2xl bg-[var(--surface-container-high)] animate-pulse" />
+                ))}
               </div>
-              <div className="text-left md:text-right">
-                <span className="text-xs font-bold text-[var(--secondary)] bg-[var(--secondary-container)]/30 px-3 py-1.5 rounded-xl border border-[var(--secondary)]/20">
-                  {currentFaculty.stats}
-                </span>
+              <div className="w-full max-w-5xl h-64 rounded-3xl bg-[var(--surface-container-high)]/40 animate-pulse border border-[var(--outline-variant)]" />
+            </div>
+          ) : faculties.length === 0 ? (
+            <div className="text-center py-16 text-sm text-[var(--on-surface-variant)] card max-w-lg mx-auto p-8 border border-[var(--outline-variant)]">
+              <i className="ti ti-school-off text-3xl mb-2 text-[var(--outline)] block"></i>
+              No academic faculties registered yet.
+            </div>
+          ) : (
+            <>
+              {/* Faculty Selector Tabs */}
+              <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
+                {faculties.map((fac) => {
+                  const isSelected = (selectedFacultyCode || faculties[0]?.code) === fac.code;
+                  return (
+                    <button
+                      key={fac.code}
+                      onClick={() => setSelectedFacultyCode(fac.code)}
+                      className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-display font-bold text-sm transition-all duration-200 border ${
+                        isSelected
+                          ? "bg-[var(--primary)] text-[var(--on-primary)] border-[var(--primary)] shadow-lg shadow-[var(--primary)]/15 scale-105"
+                          : "bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                      }`}
+                    >
+                      <i className={`ti ti-school text-lg ${isSelected ? "text-[var(--secondary-container)]" : ""}`}></i>
+                      <span>{fac.name}</span>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
 
-            {/* Degree Programs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {currentFaculty.programs.map((prog, idx) => (
-                <div
-                  key={idx}
-                  className="p-5 rounded-2xl bg-[var(--surface-container-low)] border border-[var(--outline-variant)] hover:border-[var(--tertiary)] transition-all flex flex-col justify-between space-y-3 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]">
-                      {prog.type}
-                    </span>
-                    <span className="text-xs font-semibold text-[var(--on-surface-variant)] flex items-center gap-1">
-                      <i className="ti ti-clock text-xs text-[var(--tertiary)]"></i>
-                      <span>{prog.duration}</span>
-                    </span>
+              {/* Selected Faculty Details Card */}
+              {(() => {
+                const currentFaculty = faculties.find((f) => f.code === selectedFacultyCode) || faculties[0];
+                if (!currentFaculty) return null;
+                return (
+                  <div className="glass rounded-3xl p-6 sm:p-10 border border-[var(--glass-border)] shadow-2xl max-w-5xl mx-auto space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--outline-variant)]">
+                      <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] text-xs font-bold mb-2">
+                          <span>Faculty Code: {currentFaculty.code}</span>
+                        </div>
+                        <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
+                          {currentFaculty.name}
+                        </h3>
+                        <p className="text-sm text-[var(--on-surface-variant)] mt-2 max-w-2xl leading-relaxed">
+                          {currentFaculty.description}
+                        </p>
+                      </div>
+                      <div className="text-left md:text-right">
+                        <span className="text-xs font-bold text-[var(--secondary)] bg-[var(--secondary-container)]/30 px-3.5 py-1.5 rounded-xl border border-[var(--secondary)]/20">
+                          Official Academic Faculty
+                        </span>
+                      </div>
+                    </div>
                   </div>
-
-                  <h4 className="font-display font-bold text-base text-[var(--on-surface)] group-hover:text-[var(--tertiary)] transition-colors">
-                    {prog.name}
-                  </h4>
-
-                  <div className="pt-2 border-t border-[var(--outline-variant)]/60 flex items-center justify-between text-xs font-semibold text-[var(--on-surface-variant)]">
-                    <span className="flex items-center gap-1.5">
-                      <i className="ti ti-certificate text-xs text-[var(--tertiary)]"></i>
-                      <span>Accredited Degree</span>
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--tertiary)]">
-                      Full-Time
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-          </div>
+                );
+              })()}
+            </>
+          )}
 
         </section>
 

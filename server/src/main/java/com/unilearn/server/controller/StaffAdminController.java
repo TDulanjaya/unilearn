@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/staff-admins")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('STAFF_ADMIN')")
+@PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
 public class StaffAdminController {
 
     private final StaffAdminService staffAdminService;

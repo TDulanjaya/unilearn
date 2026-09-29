@@ -21,7 +21,7 @@ export default function ShortTextQuestion({
         value={selectedAnswer}
         onChange={(e) => onAnswerChange(e.target.value)}
         placeholder="Type your concise response here..."
-        className="w-full px-4 py-3 text-xs sm:text-sm rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)] transition-colors"
+        className="w-full px-4 py-3 min-h-[48px] text-xs sm:text-sm rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)] transition-colors"
       />
     </div>
   );

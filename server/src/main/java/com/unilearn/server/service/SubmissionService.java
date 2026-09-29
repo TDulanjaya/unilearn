@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.SubmissionResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing assignment submissions.
- */
+// Assignment submissions service
 public interface SubmissionService {
 
     SubmissionResponse submitAssignment(SubmissionCreateRequestDTO request);

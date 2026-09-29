@@ -29,6 +29,8 @@ public class UserResponse {
     private String facultyName;
     private Long departmentId;
     private String departmentName;
+    private Boolean mustChangePassword;
+    private String temporaryPassword;
 
     public boolean isActive() {
         return "active".equalsIgnoreCase(status);

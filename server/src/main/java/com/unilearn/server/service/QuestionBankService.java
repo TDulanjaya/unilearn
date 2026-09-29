@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.QuestionBankResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing question banks.
- */
+// Question banks service
 public interface QuestionBankService {
 
     QuestionBankResponse createQuestionBank(QuestionBankRequest request);

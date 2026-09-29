@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.HodDeanAssignmentResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing HOD and Dean assignments.
- */
+// Hod and dean assignments service
 public interface HodDeanAssignmentService {
 
     HodDeanAssignmentResponse assignHodOrDean(HodDeanAssignRequestDTO request);

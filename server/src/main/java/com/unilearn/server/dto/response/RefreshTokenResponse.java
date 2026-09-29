@@ -17,4 +17,10 @@ public class RefreshTokenResponse {
     private String accessToken;
     private String refreshToken;
     private long expiresIn;
+    private Long userId;
+    private String fullName;
+    private String email;
+    private String role;
+    private String status;
+    private Boolean mustChangePassword;
 }

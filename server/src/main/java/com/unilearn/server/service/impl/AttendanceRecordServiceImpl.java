@@ -29,7 +29,10 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final AttendanceSessionRepository attendanceSessionRepository;
     private final StudentRepository studentRepository;
+    private final com.unilearn.server.repository.EnrollmentRepository enrollmentRepository;
+    private final com.unilearn.server.service.AttendanceQrTokenService attendanceQrTokenService;
     private final AttendanceRecordMapper attendanceRecordMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -40,6 +43,10 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
 
         AttendanceSession session = attendanceSessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new EntryNotFoundException("AttendanceSession not found with ID: " + request.getSessionId()));
+
+        if (session.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(session.getCourseOffering().getOfferingId());
+        }
 
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
@@ -68,8 +75,11 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         AttendanceSession session = attendanceSessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new EntryNotFoundException("AttendanceSession not found with ID: " + request.getSessionId()));
 
-        List<AttendanceRecordResponse> responses = new ArrayList<>();
+        if (session.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(session.getCourseOffering().getOfferingId());
+        }
 
+        List<AttendanceRecordResponse> responses = new ArrayList<>();
         if (request.getRecords() != null) {
             for (AttendanceBulkMarkRequest.StudentAttendanceItem item : request.getRecords()) {
                 Student student = studentRepository.findById(item.getStudentId())
@@ -102,8 +112,11 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         if (sessionId == null) {
             throw new ValidationException("Session ID cannot be null");
         }
-        if (!attendanceSessionRepository.existsById(sessionId)) {
-            throw new EntryNotFoundException("AttendanceSession not found with ID: " + sessionId);
+        AttendanceSession session = attendanceSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new EntryNotFoundException("AttendanceSession not found with ID: " + sessionId));
+
+        if (session.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(session.getCourseOffering().getOfferingId());
         }
 
         return attendanceRecordRepository.findBySession_SessionId(sessionId)
@@ -117,6 +130,8 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         if (studentId == null) {
             throw new ValidationException("Student ID cannot be null");
         }
+        ownershipValidator.checkStudentOwnership(studentId);
+
         if (!studentRepository.existsById(studentId)) {
             throw new EntryNotFoundException("Student not found with ID: " + studentId);
         }
@@ -130,41 +145,20 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
     @Override
     @Transactional
     public AttendanceRecordResponse checkIn(String sessionCode, Long studentId) {
+        if (studentId == null) {
+            throw new ValidationException("Student ID cannot be null");
+        }
+        ownershipValidator.checkStudentOwnership(studentId);
+
         if (sessionCode == null || sessionCode.trim().isEmpty()) {
-            throw new ValidationException("Session code is required");
+            throw new ValidationException("Session code / QR token is required");
         }
 
-        Long sessionId = null;
-        String trimmed = sessionCode.trim();
-        if (trimmed.contains("-")) {
-            String[] parts = trimmed.split("-");
-            if (parts.length >= 2) {
-                try {
-                    sessionId = Long.parseLong(parts[1]);
-                } catch (NumberFormatException ignored) {}
-            }
-            if (sessionId == null || !attendanceSessionRepository.existsById(sessionId)) {
-                for (String part : parts) {
-                    try {
-                        long candidate = Long.parseLong(part);
-                        if (attendanceSessionRepository.existsById(candidate)) {
-                            sessionId = candidate;
-                            break;
-                        }
-                    } catch (NumberFormatException ignored) {}
-                }
-            }
-        } else {
-            try {
-                sessionId = Long.parseLong(trimmed);
-            } catch (NumberFormatException ignored) {}
-        }
+        // Validate QR token
+        com.unilearn.server.dto.response.QrTokenResponse tokenInfo = attendanceQrTokenService.validateToken(sessionCode);
+        Long resolvedSessionId = tokenInfo.getSessionId();
+        Long offeringId = tokenInfo.getOfferingId();
 
-        if (sessionId == null) {
-            throw new ValidationException("Invalid session code or session ID not found");
-        }
-
-        final Long resolvedSessionId = sessionId;
         AttendanceSession session = attendanceSessionRepository.findById(resolvedSessionId)
                 .orElseThrow(() -> new EntryNotFoundException("Attendance session not found with ID: " + resolvedSessionId));
 
@@ -175,10 +169,15 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new EntryNotFoundException("Student profile not found for ID: " + studentId));
 
+        // Check course enrollment
+        if (!enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(studentId, offeringId)) {
+            throw new ValidationException("Access denied: You are not enrolled in this course offering");
+        }
+
         // Check if already checked in
         java.util.Optional<AttendanceRecord> existingOpt = attendanceRecordRepository.findBySession_SessionIdAndStudent_StudentId(resolvedSessionId, studentId);
         if (existingOpt.isPresent()) {
-            return attendanceRecordMapper.toAttendanceRecordResponse(existingOpt.get());
+            throw new com.unilearn.server.exception.IllegalStateException("You have already checked in to this attendance session");
         }
 
         AttendanceRecord record = AttendanceRecord.builder()

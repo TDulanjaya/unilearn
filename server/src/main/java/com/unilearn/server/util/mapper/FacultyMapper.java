@@ -48,4 +48,15 @@ public class FacultyMapper {
                 .name(faculty.getName())
                 .build();
     }
+
+    public com.unilearn.server.dto.response.FacultyPublicResponse toFacultyPublicResponse(Faculty faculty) {
+        if (faculty == null) {
+            throw new ValidationException("Faculty cannot be null");
+        }
+        return com.unilearn.server.dto.response.FacultyPublicResponse.builder()
+                .name(faculty.getName())
+                .code(faculty.getCode())
+                .description("Faculty of " + faculty.getName() + " dedicated to higher academic learning and research.")
+                .build();
+    }
 }

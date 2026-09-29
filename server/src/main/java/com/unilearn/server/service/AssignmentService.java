@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.AssignmentResponse;
 
 import java.util.List;
 
-/**
- * Service interface for managing assignments.
- */
+// Assignments service
 public interface AssignmentService {
 
     AssignmentResponse createAssignment(AssignmentRequest request);

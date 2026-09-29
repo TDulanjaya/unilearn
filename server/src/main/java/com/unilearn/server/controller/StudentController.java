@@ -21,35 +21,33 @@ public class StudentController {
     private final StudentService studentService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<StudentResponse> createStudent(@Valid @RequestBody StudentRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(studentService.createStudent(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
-    // TODO: Also allow the student themself — enforce by comparing authenticated principal's email
-    //       against the student's linked user. Requires a custom SpEL expression or service-layer check.
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'STUDENT')")
     public ResponseEntity<StudentResponse> updateStudent(@PathVariable Long id,
                                                          @Valid @RequestBody StudentRequest request) {
         return ResponseEntity.ok(studentService.updateStudent(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteStudent(@PathVariable Long id) {
         studentService.deleteStudent(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER', 'STUDENT')")
     public ResponseEntity<StudentResponse> getStudentById(@PathVariable Long id) {
         return ResponseEntity.ok(studentService.getStudentById(id));
     }
 
     @GetMapping("/batch/{batchId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<PageResponseDTO<StudentResponse>> getStudentsByBatch(
             @PathVariable Long batchId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -57,7 +55,7 @@ public class StudentController {
     }
 
     @GetMapping("/department/{departmentId}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN', 'LECTURER')")
     public ResponseEntity<PageResponseDTO<StudentResponse>> getStudentsByDepartment(
             @PathVariable Long departmentId,
             @PageableDefault(size = 20) Pageable pageable) {

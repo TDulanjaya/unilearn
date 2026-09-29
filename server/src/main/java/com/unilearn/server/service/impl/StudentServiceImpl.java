@@ -35,6 +35,7 @@ public class StudentServiceImpl implements StudentService {
     private final BatchRepository batchRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final StudentMapper studentMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -69,6 +70,11 @@ public class StudentServiceImpl implements StudentService {
         }
         if (request == null) {
             throw new ValidationException("Student request cannot be null");
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()))) {
+            ownershipValidator.checkStudentOwnership(studentId);
         }
 
         Student student = studentRepository.findById(studentId)
@@ -118,6 +124,10 @@ public class StudentServiceImpl implements StudentService {
         if (studentId == null) {
             throw new ValidationException("Student ID cannot be null");
         }
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()))) {
+            ownershipValidator.checkStudentOwnership(studentId);
+        }
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + studentId));
         return studentMapper.toStudentResponse(student);
@@ -155,6 +165,7 @@ public class StudentServiceImpl implements StudentService {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
+        ownershipValidator.checkHodDepartmentAccess(departmentId);
         if (!departmentRepository.existsById(departmentId)) {
             throw new EntryNotFoundException("Department not found with ID: " + departmentId);
         }

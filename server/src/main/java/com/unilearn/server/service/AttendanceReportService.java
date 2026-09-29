@@ -4,9 +4,7 @@ import com.unilearn.server.dto.response.AttendanceReportResponse;
 
 import java.util.List;
 
-/**
- * Service interface for generating attendance reports.
- */
+// Attendance reports service
 public interface AttendanceReportService {
 
     List<AttendanceReportResponse> generateReport(Long facultyId, Long departmentId, Long offeringId);

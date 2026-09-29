@@ -20,14 +20,14 @@ public class CourseOfferingController {
     private final CourseOfferingService courseOfferingService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<CourseOfferingResponse> createCourseOffering(
             @Valid @RequestBody CourseOfferingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(courseOfferingService.createCourseOffering(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<CourseOfferingResponse> updateCourseOffering(
             @PathVariable Long id,
             @Valid @RequestBody CourseOfferingRequest request) {
@@ -35,43 +35,50 @@ public class CourseOfferingController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'HOD_DEAN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN', 'HOD_DEAN')")
     public ResponseEntity<Void> deleteCourseOffering(@PathVariable Long id) {
         courseOfferingService.deleteCourseOffering(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CourseOfferingResponse> getCourseOfferingById(@PathVariable Long id) {
         return ResponseEntity.ok(courseOfferingService.getCourseOfferingById(id));
     }
 
     @GetMapping("/course/{courseId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseOfferingResponse>> getOfferingsByCourse(@PathVariable Long courseId) {
         return ResponseEntity.ok(courseOfferingService.getOfferingsByCourse(courseId));
     }
 
     @GetMapping("/batch/{batchId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseOfferingResponse>> getOfferingsByBatch(@PathVariable Long batchId) {
         return ResponseEntity.ok(courseOfferingService.getOfferingsByBatch(batchId));
     }
 
     @GetMapping("/semester/{semesterId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseOfferingResponse>> getOfferingsBySemester(@PathVariable Long semesterId) {
         return ResponseEntity.ok(courseOfferingService.getOfferingsBySemester(semesterId));
     }
 
     @GetMapping("/lecturer/{lecturerId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseOfferingResponse>> getOfferingsByLecturer(@PathVariable Long lecturerId) {
         return ResponseEntity.ok(courseOfferingService.getOfferingsByLecturer(lecturerId));
     }
 
     @GetMapping("/{id}/enrollment-count")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Long> getEnrollmentCount(@PathVariable Long id) {
         return ResponseEntity.ok(courseOfferingService.getEnrollmentCount(id));
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseOfferingResponse>> getAllCourseOfferings() {
         return ResponseEntity.ok(courseOfferingService.getAllCourseOfferings());
     }

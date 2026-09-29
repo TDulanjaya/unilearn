@@ -21,38 +21,40 @@ public class AcademicYearController {
     private final AcademicYearService academicYearService;
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<AcademicYearResponse> createAcademicYear(@Valid @RequestBody AcademicYearRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(academicYearService.createAcademicYear(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<AcademicYearResponse> updateAcademicYear(@PathVariable Long id,
                                                                    @Valid @RequestBody AcademicYearRequest request) {
         return ResponseEntity.ok(academicYearService.updateAcademicYear(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteAcademicYear(@PathVariable Long id) {
         academicYearService.deleteAcademicYear(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AcademicYearResponse> getAcademicYearById(@PathVariable Long id) {
         return ResponseEntity.ok(academicYearService.getAcademicYearById(id));
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<AcademicYearResponse>> getAllAcademicYears(
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(academicYearService.getAllAcademicYears(pageable));
     }
 
     @PatchMapping("/{id}/set-current")
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<AcademicYearResponse> setCurrentAcademicYear(@PathVariable Long id) {
         return ResponseEntity.ok(academicYearService.setCurrentAcademicYear(id));
     }

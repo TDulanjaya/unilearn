@@ -52,7 +52,6 @@ interface BatchItem {
 }
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const FALLBACK_DEPARTMENTS = ["Software Engineering", "Computer Science", "Information Technology"];
 
 function formatTimeTo24h(timeStr: string): string {
   if (!timeStr) return "09:00:00";
@@ -76,7 +75,7 @@ export default function Page() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>("fac");
 
-  // --- Toast Notification State ---
+  // toast state
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -100,9 +99,7 @@ export default function Page() {
     refetchSlots,
   } = useAcademicData();
 
-  // ==========================================
-  // 1. ALL DEPARTMENTS & FACULTIES (Database)
-  // ==========================================
+  // departments and faculties
   const { data: allDeptsData } = useQuery({
     queryKey: ["allDepartments"],
     queryFn: () => api.get<any>("/api/v1/departments?size=100"),
@@ -112,9 +109,7 @@ export default function Page() {
     allDeptsData?.dataList ||
     (Array.isArray(allDeptsData) ? allDeptsData : []);
 
-  const departmentOptions = allDepartments.length > 0
-    ? allDepartments.map((d: any) => d.name)
-    : FALLBACK_DEPARTMENTS;
+  const departmentOptions: string[] = allDepartments.map((d: any) => d.name).filter(Boolean);
 
   const { data: facultiesData, isLoading: isLoadingFaculties } = useQuery({
     queryKey: ["faculties"],
@@ -225,9 +220,7 @@ export default function Page() {
 
   const selectedFaculty = faculties.find((f: any) => f.facultyId === selectedFacultyId);
 
-  // ==========================================
-  // 2. COURSES (Database)
-  // ==========================================
+  // courses
   const { data: rawCoursesData } = useQuery({
     queryKey: ["courses"],
     queryFn: () => api.get<any>("/api/v1/courses?size=100"),
@@ -240,7 +233,7 @@ export default function Page() {
         title: c.name || c.title || c.courseName || "Untitled Course",
         credits: c.credits || c.creditHours || 4,
         version: c.syllabusVersion || c.version || "v1",
-        department: c.departmentName || "Software Engineering",
+        department: c.departmentName || "—",
         departmentId: c.departmentId,
       }))
     : [];
@@ -248,7 +241,7 @@ export default function Page() {
   const [newCourseCode, setNewCourseCode] = useState("");
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [newCourseCredits, setNewCourseCredits] = useState("4");
-  const [newCourseDept, setNewCourseDept] = useState(departmentOptions[0] || "Software Engineering");
+  const [newCourseDept, setNewCourseDept] = useState(departmentOptions[0] || "");
   const [newCourseVersion, setNewCourseVersion] = useState("v1");
 
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -324,10 +317,8 @@ export default function Page() {
     });
   };
 
-  // ==========================================
-  // 3. ACADEMIC CALENDAR (Database)
-  // ==========================================
-  // --- Academic Years ---
+  // academic calendar
+  // academic years
   const { data: rawYearsData } = useQuery({
     queryKey: ["academicYears"],
     queryFn: () => api.get<any>("/api/v1/academic-years?size=100"),
@@ -407,7 +398,7 @@ export default function Page() {
     deleteYearMutation.mutate(id);
   };
 
-  // --- Semesters ---
+  // semesters
   const { data: rawSemestersData } = useQuery({
     queryKey: ["semesters"],
     queryFn: () => api.get<any>("/api/v1/semesters"),
@@ -496,7 +487,7 @@ export default function Page() {
     deleteSemMutation.mutate(id);
   };
 
-  // --- Batches ---
+  // batches
   const { data: rawBatchesData } = useQuery({
     queryKey: ["batches"],
     queryFn: () => api.get<any>("/api/v1/batches"),
@@ -592,9 +583,7 @@ export default function Page() {
     deleteBatchMutation.mutate(id);
   };
 
-  // ==========================================
-  // 4. USERS / LECTURERS (Database)
-  // ==========================================
+  // lecturers
   const { data: usersData } = useQuery({
     queryKey: ["users"],
     queryFn: () => api.get<any>("/api/v1/users?size=100"),
@@ -615,9 +604,7 @@ export default function Page() {
       fullName: u.fullName || u.name,
     }));
 
-  // ==========================================
-  // 5. COURSE OFFERINGS & TIMETABLE (Database)
-  // ==========================================
+  // offerings and timetable
   const [newOffCourseCode, setNewOffCourseCode] = useState("");
   const [newOffBatch, setNewOffBatch] = useState("");
   const [newOffSemester, setNewOffSemester] = useState("");
@@ -782,27 +769,25 @@ export default function Page() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)] overflow-x-auto">
-          <span className={`tab-btn ${activeTab === "fac" ? "active" : ""}`} onClick={() => setActiveTab("fac")}>
+        <div className="flex gap-2 mb-6 border-b border-[var(--outline-variant)] overflow-x-auto no-scrollbar flex-nowrap">
+          <button type="button" className={`tab-btn whitespace-nowrap shrink-0 min-h-[44px] ${activeTab === "fac" ? "active" : ""}`} onClick={() => setActiveTab("fac")}>
             Faculties & departments
-          </span>
-          <span className={`tab-btn ${activeTab === "courses" ? "active" : ""}`} onClick={() => setActiveTab("courses")}>
+          </button>
+          <button type="button" className={`tab-btn whitespace-nowrap shrink-0 min-h-[44px] ${activeTab === "courses" ? "active" : ""}`} onClick={() => setActiveTab("courses")}>
             Courses
-          </span>
-          <span className={`tab-btn ${activeTab === "cal" ? "active" : ""}`} onClick={() => setActiveTab("cal")}>
+          </button>
+          <button type="button" className={`tab-btn whitespace-nowrap shrink-0 min-h-[44px] ${activeTab === "cal" ? "active" : ""}`} onClick={() => setActiveTab("cal")}>
             Academic calendar
-          </span>
-          <span className={`tab-btn ${activeTab === "offerings" ? "active" : ""}`} onClick={() => setActiveTab("offerings")}>
+          </button>
+          <button type="button" className={`tab-btn whitespace-nowrap shrink-0 min-h-[44px] ${activeTab === "offerings" ? "active" : ""}`} onClick={() => setActiveTab("offerings")}>
             Course Offerings
-          </span>
-          <span className={`tab-btn ${activeTab === "timetable" ? "active" : ""}`} onClick={() => setActiveTab("timetable")}>
+          </button>
+          <button type="button" className={`tab-btn whitespace-nowrap shrink-0 min-h-[44px] ${activeTab === "timetable" ? "active" : ""}`} onClick={() => setActiveTab("timetable")}>
             Timetable
-          </span>
+          </button>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* TAB 1: FACULTIES & DEPARTMENTS                       */}
-        {/* ---------------------------------------------------- */}
+        {/* faculties & departments */}
         <div id="acs-fac" className={activeTab !== "fac" ? "hidden" : ""}>
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Faculties Panel */}
@@ -1220,9 +1205,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* TAB 2: COURSES                                       */}
-        {/* ---------------------------------------------------- */}
+        {/* courses */}
         <div id="acs-courses" className={activeTab !== "courses" ? "hidden" : ""}>
           <div className="card p-6">
             <h3 className="font-display font-bold text-lg text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
@@ -1357,7 +1340,7 @@ export default function Page() {
             )}
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-sm text-left min-w-[600px]">
                 <thead>
                   <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] text-xs uppercase tracking-wider">
                     <th className="pb-3 px-3 font-semibold">Code</th>
@@ -1435,9 +1418,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* TAB 3: ACADEMIC CALENDAR (Years, Semesters, Batches) */}
-        {/* ---------------------------------------------------- */}
+        {/* academic calendar */}
         <div id="acs-cal" className={activeTab !== "cal" ? "hidden" : ""}>
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Academic Years Panel */}
@@ -1617,9 +1598,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* TAB 4: COURSE OFFERINGS                              */}
-        {/* ---------------------------------------------------- */}
+        {/* course offerings */}
         <div id="acs-offerings" className={activeTab !== "offerings" ? "hidden" : ""}>
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="card p-6 lg:col-span-1">
@@ -1874,9 +1853,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* TAB 5: TIMETABLE                                     */}
-        {/* ---------------------------------------------------- */}
+        {/* timetable */}
         <div id="acs-timetable" className={activeTab !== "timetable" ? "hidden" : ""}>
           <div className="grid lg:grid-cols-3 gap-6 mb-6">
             <div className="card p-6 lg:col-span-1">

@@ -27,7 +27,7 @@ public class EventRegistrationController {
             @PathVariable Long eventId,
             @AuthenticationPrincipal User principal,
             @Valid @RequestBody EventRegistrationCreateRequestDTO request) {
-        // Use logged-in user id to prevent IDOR
+        // Use logged-in user id
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(eventRegistrationService.registerForEvent(request, principal.getUserId()));
     }
@@ -42,7 +42,7 @@ public class EventRegistrationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('STAFF_ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<EventRegistrationResponse>> getRegistrationsByEvent(
             @PathVariable Long eventId) {
         return ResponseEntity.ok(eventRegistrationService.getRegistrationsByEvent(eventId));

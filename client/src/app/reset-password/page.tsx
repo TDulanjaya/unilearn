@@ -62,7 +62,7 @@ function ResetPasswordFormContent() {
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md glass rounded-3xl p-6 sm:p-8 border border-[var(--glass-border)] shadow-2xl">
+      <div className="w-full max-w-md glass rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-[var(--glass-border)] shadow-2xl">
         <div className="flex items-center gap-3 mb-6 justify-center">
           <Link href="/">
             <Logo />

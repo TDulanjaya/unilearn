@@ -8,9 +8,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing faculties within the UniLearn platform.
- */
+// Faculties service
 public interface FacultyService {
 
     FacultyResponse createFaculty(FacultyRequest request);
@@ -26,4 +24,6 @@ public interface FacultyService {
     PageResponseDTO<FacultyResponse> getAllFaculties(Pageable pageable);
 
     List<FacultyOptionDTO> getFacultyOptions(String searchText);
+
+    List<com.unilearn.server.dto.response.FacultyPublicResponse> getPublicFaculties();
 }

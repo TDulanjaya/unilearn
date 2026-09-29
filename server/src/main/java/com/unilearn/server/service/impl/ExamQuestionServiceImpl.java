@@ -29,6 +29,7 @@ public class ExamQuestionServiceImpl implements ExamQuestionService {
     private final ExamRepository examRepository;
     private final QuestionRepository questionRepository;
     private final ExamQuestionMapper examQuestionMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -39,6 +40,10 @@ public class ExamQuestionServiceImpl implements ExamQuestionService {
 
         Exam exam = examRepository.findById(request.getExamId())
                 .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + request.getExamId()));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+        }
 
         Question question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new EntryNotFoundException("Question not found with ID: " + request.getQuestionId()));
@@ -64,6 +69,13 @@ public class ExamQuestionServiceImpl implements ExamQuestionService {
             throw new ValidationException("Exam ID and Question ID cannot be null");
         }
 
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+        }
+
         ExamQuestionId id = new ExamQuestionId(examId, questionId);
         if (!examQuestionRepository.existsById(id)) {
             throw new EntryNotFoundException("ExamQuestion mapping not found");
@@ -77,13 +89,48 @@ public class ExamQuestionServiceImpl implements ExamQuestionService {
         if (examId == null) {
             throw new ValidationException("Exam ID cannot be null");
         }
-        if (!examRepository.existsById(examId)) {
-            throw new EntryNotFoundException("Exam not found with ID: " + examId);
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority()))) {
+            if (exam.getCourseOffering() != null) {
+                ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
+            }
+        }
+        if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()))) {
+            if (exam.getExamDate() != null && exam.getStartTime() != null) {
+                java.time.LocalDateTime examStart = java.time.LocalDateTime.of(exam.getExamDate(), exam.getStartTime());
+                if (java.time.LocalDateTime.now().isBefore(examStart)) {
+                    throw new org.springframework.security.access.AccessDeniedException("Exam has not started yet. Questions are not available prior to start time.");
+                }
+            }
         }
 
         return examQuestionRepository.findByExam_ExamId(examId)
                 .stream()
                 .map(examQuestionMapper::toExamQuestionResponse)
+                .toList();
+    }
+
+    @Override
+    public List<com.unilearn.server.dto.response.StudentExamQuestionResponse> getStudentQuestionsForExam(Long examId) {
+        if (examId == null) {
+            throw new ValidationException("Exam ID cannot be null");
+        }
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getExamDate() != null && exam.getStartTime() != null) {
+            java.time.LocalDateTime examStart = java.time.LocalDateTime.of(exam.getExamDate(), exam.getStartTime());
+            if (java.time.LocalDateTime.now().isBefore(examStart)) {
+                throw new org.springframework.security.access.AccessDeniedException("Exam has not started yet. Questions are not available prior to start time.");
+            }
+        }
+
+        return examQuestionRepository.findByExam_ExamId(examId)
+                .stream()
+                .map(examQuestionMapper::toStudentExamQuestionResponse)
                 .toList();
     }
 
@@ -96,8 +143,11 @@ public class ExamQuestionServiceImpl implements ExamQuestionService {
         if (questionIdsInOrder == null || questionIdsInOrder.isEmpty()) {
             throw new ValidationException("Question IDs list cannot be empty");
         }
-        if (!examRepository.existsById(examId)) {
-            throw new EntryNotFoundException("Exam not found with ID: " + examId);
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new EntryNotFoundException("Exam not found with ID: " + examId));
+
+        if (exam.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(exam.getCourseOffering().getOfferingId());
         }
 
         List<ExamQuestionResponse> responses = new ArrayList<>();

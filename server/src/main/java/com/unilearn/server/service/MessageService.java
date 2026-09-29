@@ -8,9 +8,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing direct messages.
- */
+// Direct messages service
 public interface MessageService {
 
     MessageResponse sendMessage(Long senderId, MessageRequest request);

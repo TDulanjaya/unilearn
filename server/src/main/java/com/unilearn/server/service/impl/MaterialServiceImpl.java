@@ -30,6 +30,9 @@ public class MaterialServiceImpl implements MaterialService {
     private final CourseOfferingRepository courseOfferingRepository;
     private final LecturerRepository lecturerRepository;
     private final MaterialMapper materialMapper;
+    private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
+    private final com.unilearn.server.repository.EnrollmentRepository enrollmentRepository;
+    private final com.unilearn.server.ai.MaterialChunkService materialChunkService;
 
     @Override
     @Transactional
@@ -37,6 +40,7 @@ public class MaterialServiceImpl implements MaterialService {
         if (request == null) {
             throw new ValidationException("Material request cannot be null");
         }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
@@ -46,6 +50,7 @@ public class MaterialServiceImpl implements MaterialService {
 
         Material material = materialMapper.toMaterial(request, offering, lecturer);
         Material saved = materialRepository.save(material);
+        materialChunkService.processMaterial(saved);
         return materialMapper.toMaterialResponse(saved);
     }
 
@@ -62,6 +67,11 @@ public class MaterialServiceImpl implements MaterialService {
         Material material = materialRepository.findById(materialId)
                 .orElseThrow(() -> new EntryNotFoundException("Material not found with ID: " + materialId));
 
+        if (material.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(material.getCourseOffering().getOfferingId());
+        }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
+
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
@@ -76,6 +86,7 @@ public class MaterialServiceImpl implements MaterialService {
         material.setUploadedBy(lecturer);
 
         Material updated = materialRepository.save(material);
+        materialChunkService.processMaterial(updated);
         return materialMapper.toMaterialResponse(updated);
     }
 
@@ -85,10 +96,15 @@ public class MaterialServiceImpl implements MaterialService {
         if (materialId == null) {
             throw new ValidationException("Material ID cannot be null");
         }
-        if (!materialRepository.existsById(materialId)) {
-            throw new EntryNotFoundException("Material not found with ID: " + materialId);
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new EntryNotFoundException("Material not found with ID: " + materialId));
+
+        if (material.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(material.getCourseOffering().getOfferingId());
         }
-        materialRepository.deleteById(materialId);
+
+        materialChunkService.deleteChunksForMaterial(materialId);
+        materialRepository.delete(material);
     }
 
     @Override
@@ -98,6 +114,19 @@ public class MaterialServiceImpl implements MaterialService {
         }
         Material material = materialRepository.findById(materialId)
                 .orElseThrow(() -> new EntryNotFoundException("Material not found with ID: " + materialId));
+
+        if (material.getCourseOffering() != null) {
+            Long offId = material.getCourseOffering().getOfferingId();
+            if (ownershipValidator.isLecturer()) {
+                ownershipValidator.checkLecturerOfferingAccess(offId);
+            } else if (ownershipValidator.isStudent()) {
+                var currentUser = ownershipValidator.getCurrentUser();
+                if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offId)) {
+                    throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+                }
+            }
+        }
+
         return materialMapper.toMaterialResponse(material);
     }
 
@@ -111,6 +140,15 @@ public class MaterialServiceImpl implements MaterialService {
         }
         if (!courseOfferingRepository.existsById(offeringId)) {
             throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
+        }
+
+        if (ownershipValidator.isLecturer()) {
+            ownershipValidator.checkLecturerOfferingAccess(offeringId);
+        } else if (ownershipValidator.isStudent()) {
+            var currentUser = ownershipValidator.getCurrentUser();
+            if (currentUser.isPresent() && !enrollmentRepository.existsByStudent_StudentIdAndCourseOffering_OfferingId(currentUser.get().getUserId(), offeringId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not enrolled in this course offering");
+            }
         }
 
         Page<Material> page = materialRepository.findByCourseOffering_OfferingId(offeringId, pageable);

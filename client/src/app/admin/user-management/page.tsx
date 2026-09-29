@@ -123,19 +123,8 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [editPassword, setEditPassword] = useState("");
   const [showEditPasswordText, setShowEditPasswordText] = useState(false);
-
-  
-function generateSmartPassword(name: string, role: string): string {
-  const cleanName = name.trim().replace(/[^a-zA-Z]/g, "");
-  const baseName = cleanName.length > 0
-    ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1, 6).toLowerCase()
-    : "User";
-  const roleCode = (role || "Student").replace(/[^a-zA-Z]/g, "").substring(0, 3).toUpperCase();
-  const randomDigits = Math.floor(100 + Math.random() * 900);
-  const symbols = ["@", "#", "!", "$", "%"];
-  const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-  return `${baseName}${symbol}${roleCode}${randomDigits}`;
-}
+  const [tempPasswordNotice, setTempPasswordNotice] = useState<{ user: string; email: string; pass: string } | null>(null);
+  const [copiedTempPassword, setCopiedTempPassword] = useState(false);
 
   
   const [newFullName, setNewFullName] = useState("");
@@ -168,11 +157,6 @@ function generateSmartPassword(name: string, role: string): string {
       setSelectedFacultyId(String(facultiesList[0].facultyId));
     }
   }, [facultiesResponse]);
-
-  const handleGeneratePassword = (name = newFullName, role = newRole) => {
-    const generated = generateSmartPassword(name, role);
-    setNewPassword(generated);
-  };
 
   const [parsedRows, setParsedRows] = useState<CsvValidationRow[] | null>(null);
 
@@ -249,14 +233,14 @@ function generateSmartPassword(name: string, role: string): string {
     e.preventDefault();
     if (!newFullName.trim() || !newEmail.trim()) return;
 
-    const finalPassword = newPassword.trim() || generateSmartPassword(newFullName, newRole);
-
     const payload: any = {
       fullName: newFullName.trim(),
       email: newEmail.trim(),
-      password: finalPassword,
       role: mapRoleToBackend(newRole),
     };
+    if (newPassword.trim()) {
+      payload.password = newPassword.trim();
+    }
 
     const roleName = mapRoleToBackend(newRole);
     if (roleName === "STUDENT") {
@@ -303,7 +287,16 @@ function generateSmartPassword(name: string, role: string): string {
       setNewEmail("");
       setNewPassword("");
       setShowAddModal(false);
-      showToast(`User ${newUser.fullName} created! Password: ${finalPassword}`);
+
+      if (createdRes?.temporaryPassword) {
+        setTempPasswordNotice({
+          user: newUser.fullName,
+          email: newUser.email,
+          pass: createdRes.temporaryPassword,
+        });
+      } else {
+        showToast(`User ${newUser.fullName} created successfully!`);
+      }
     } catch (err: any) {
       console.error("Backend register user error:", err);
       showToast(`Registration failed: ${err.message || "Server error"}`);
@@ -356,22 +349,27 @@ function generateSmartPassword(name: string, role: string): string {
     reader.readAsText(file);
   };
 
-  const handleConfirmBulkImport = () => {
+  const handleConfirmBulkImport = async () => {
     if (!parsedRows) return;
     const validRows = parsedRows.filter((r) => r.isValid);
-    const newUsers: UserRecord[] = validRows.map((r) => ({
-      id: `u-${Date.now()}-${r.rowNumber}`,
-      fullName: r.fullName,
-      email: r.email,
-      role: r.role,
-      department: r.department,
-      status: "Active",
-    }));
+    let successCount = 0;
+    for (const r of validRows) {
+      try {
+        await createMutation.mutateAsync({
+          fullName: r.fullName,
+          email: r.email,
+          role: mapRoleToBackend(r.role),
+        });
+        successCount++;
+      } catch (err) {
+        console.error("Failed to import user:", r.email, err);
+      }
+    }
 
-    setUsers([...newUsers, ...users]);
     setParsedRows(null);
     setShowAddModal(false);
-    showToast(`Bulk imported ${newUsers.length} valid users.`);
+    queryClient.invalidateQueries({ queryKey: ["users"] });
+    showToast(`Bulk imported ${successCount} users to database.`);
   };
 
   const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
@@ -618,11 +616,11 @@ function generateSmartPassword(name: string, role: string): string {
       </main>
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-xl w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="card max-w-xl w-full p-4 sm:p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Add User or Bulk Import</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-[var(--on-surface-variant)]">
+              <button onClick={() => setShowAddModal(false)} className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
                 <i className="ti ti-x text-lg"></i>
               </button>
             </div>
@@ -719,7 +717,7 @@ function generateSmartPassword(name: string, role: string): string {
                     </span>
                   </div>
 
-                  <div className="flex gap-4 p-2 bg-[var(--surface-container-lowest)] rounded-xl border border-[var(--outline-variant)]">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 p-2.5 bg-[var(--surface-container-lowest)] rounded-xl border border-[var(--outline-variant)]">
                     <label className="flex items-center gap-1.5 text-xs text-[var(--on-surface)] cursor-pointer">
                       <input
                         type="radio"
@@ -824,7 +822,7 @@ function generateSmartPassword(name: string, role: string): string {
                   <p className="text-[11px] font-bold text-[var(--tertiary)] flex items-center gap-1">
                     <i className="ti ti-shield-check"></i> HOD / Dean Scope Level
                   </p>
-                  <div className="flex gap-4 p-2 bg-[var(--surface-container-lowest)] rounded-xl border border-[var(--outline-variant)]">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 p-2.5 bg-[var(--surface-container-lowest)] rounded-xl border border-[var(--outline-variant)]">
                     <label className="flex items-center gap-1.5 text-xs text-[var(--on-surface)] cursor-pointer">
                       <input
                         type="radio"
@@ -856,22 +854,17 @@ function generateSmartPassword(name: string, role: string): string {
                   <label className="text-[11px] font-semibold text-[var(--on-surface-variant)]">
                     User Password (derived from details or custom):
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => handleGeneratePassword()}
-                    className="text-[11px] text-[var(--tertiary)] font-bold hover:underline flex items-center gap-1"
-                  >
-                    <i className="ti ti-wand"></i> Auto-Generate Unique Password
-                  </button>
+                  <span className="text-[11px] text-[var(--on-surface-variant)]">
+                    Auto-generated securely if blank
+                  </span>
                 </div>
                 <div className="relative">
                   <input
                     type={showPasswordText ? "text" : "password"}
-                    placeholder="Enter or generate password..."
+                    placeholder="Temporary password (leave blank to auto-generate securely)"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full text-xs p-2.5 pr-10 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-mono"
-                    required
                   />
                   <button
                     type="button"
@@ -895,8 +888,8 @@ function generateSmartPassword(name: string, role: string): string {
               {parsedRows && (
                 <div className="space-y-2 border-t border-[var(--outline-variant)] pt-3">
                   <p className="text-xs font-bold text-[var(--on-surface)]">CSV Validation Preview ({parsedRows.length} Rows):</p>
-                  <div className="max-h-44 overflow-y-auto border border-[var(--outline-variant)] rounded-xl text-xs">
-                    <table className="w-full text-left">
+                  <div className="max-h-44 overflow-y-auto overflow-x-auto border border-[var(--outline-variant)] rounded-xl text-xs">
+                    <table className="w-full text-left min-w-[340px]">
                       <thead className="bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] sticky top-0">
                         <tr>
                           <th className="p-2">Row</th>
@@ -941,11 +934,11 @@ function generateSmartPassword(name: string, role: string): string {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-md w-full p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="card max-w-md w-full p-4 sm:p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)]">Edit User Details</h3>
-              <button onClick={() => setEditingUser(null)} className="text-[var(--on-surface-variant)]">
+              <button onClick={() => setEditingUser(null)} className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
                 <i className="ti ti-x text-lg"></i>
               </button>
             </div>
@@ -971,7 +964,7 @@ function generateSmartPassword(name: string, role: string): string {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-[var(--on-surface)]">Phone</label>
                   <input
@@ -1016,16 +1009,6 @@ function generateSmartPassword(name: string, role: string): string {
                   <label className="font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
                     <i className="ti ti-key text-[var(--tertiary)] text-base"></i> Reset / Change User Password
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const gen = generateSmartPassword(editingUser.fullName, editingUser.role);
-                      setEditPassword(gen);
-                    }}
-                    className="text-[11px] text-[var(--tertiary)] font-bold hover:underline flex items-center gap-1"
-                  >
-                    <i className="ti ti-wand"></i> Auto-Generate
-                  </button>
                 </div>
                 <div className="relative">
                   <input
@@ -1123,6 +1106,66 @@ function generateSmartPassword(name: string, role: string): string {
                 className="px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-xs font-bold hover:opacity-90 shadow-md flex items-center gap-1.5"
               >
                 <i className="ti ti-user-off"></i> Deactivate Account Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tempPasswordNotice && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="card max-w-md w-full p-4 sm:p-6 space-y-4 animate-scaleIn bg-[var(--surface-container-lowest)] border border-[var(--primary)]/30 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center gap-3 text-[var(--primary)]">
+              <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
+                <i className="ti ti-key text-xl"></i>
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-base text-[var(--on-surface)]">User Account Created</h3>
+                <p className="text-[11px] text-[var(--on-surface-variant)]">One-Time Temporary Password</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">
+              Account created for <b>{tempPasswordNotice.user}</b> (<span className="font-mono">{tempPasswordNotice.email}</span>).
+              Please securely share this temporary password with the user.
+            </p>
+
+            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-500">Temporary Password</span>
+                <span className="text-[10px] text-amber-500/80">Shown once only</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 font-mono text-sm font-bold bg-[var(--surface-container-lowest)] p-2.5 rounded-lg border border-amber-500/20 text-[var(--on-surface)] select-all break-all">
+                  {tempPasswordNotice.pass}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(tempPasswordNotice.pass);
+                    setCopiedTempPassword(true);
+                    setTimeout(() => setCopiedTempPassword(false), 2000);
+                  }}
+                  className="px-3 py-2.5 rounded-lg bg-[var(--primary)] text-white text-xs font-semibold hover:opacity-90 transition-all flex items-center gap-1 shrink-0"
+                >
+                  <i className={`ti ${copiedTempPassword ? "ti-check" : "ti-copy"}`} />
+                  <span>{copiedTempPassword ? "Copied!" : "Copy"}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                The user will be required to change this password immediately upon their first login.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[var(--outline-variant)]">
+              <button
+                onClick={() => {
+                  setTempPasswordNotice(null);
+                  setCopiedTempPassword(false);
+                }}
+                className="btn-primary text-xs px-5 py-2.5 shadow-md"
+              >
+                I have noted the password
               </button>
             </div>
           </div>

@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.AcademicYearResponse;
 import com.unilearn.server.dto.response.PageResponseDTO;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing academic years.
- */
+// Academic years service
 public interface AcademicYearService {
 
     AcademicYearResponse createAcademicYear(AcademicYearRequest request);

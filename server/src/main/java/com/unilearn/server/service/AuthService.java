@@ -18,5 +18,7 @@ public interface AuthService {
 
     void processResetPassword(com.unilearn.server.dto.request.ResetPasswordRequest request);
 
+    void changePassword(com.unilearn.server.dto.request.ChangePasswordRequest request);
+
     void logout(String token);
 }

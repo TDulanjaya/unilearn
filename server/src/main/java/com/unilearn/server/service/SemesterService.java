@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.semester.SemesterOptionDTO;
 
 import java.util.List;
 
-/**
- * Service interface for managing semesters.
- */
+// Semesters service
 public interface SemesterService {
 
     SemesterResponse createSemester(SemesterRequest request);

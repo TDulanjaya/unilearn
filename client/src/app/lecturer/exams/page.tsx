@@ -42,7 +42,7 @@ export default function LecturerExamsPage() {
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [examTimer, setExamTimer] = useState(120);
 
-  // 1. Fetch lecturer offerings
+  // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
     queryKey: ["lecturerOfferings", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/course-offerings/lecturer/${user?.userId}`),
@@ -58,7 +58,7 @@ export default function LecturerExamsPage() {
   const activeOffering = offerings?.find((o: any) => o.offeringId === activeOfferingId);
   const courseId = activeOffering?.courseId;
 
-  // 2. Fetch question bank for course
+  // question bank for course
   const { data: qbs } = useQuery({
     queryKey: ["qbs", courseId],
     queryFn: () => api.get<any[]>(`/api/v1/question-banks/course/${courseId}`),
@@ -67,7 +67,7 @@ export default function LecturerExamsPage() {
 
   const activeBankId = qbs && qbs.length > 0 ? qbs[0].bankId : null;
 
-  // 3. Fetch questions in bank
+  // questions in bank
   const { data: questionsResponse } = useQuery({
     queryKey: ["questions", activeBankId],
     queryFn: () => api.get<any>(`/api/v1/questions/bank/${activeBankId}?size=100`),
@@ -82,7 +82,7 @@ export default function LecturerExamsPage() {
     difficulty: (q.difficulty || "Medium") as any,
   }));
 
-  // 4. Fetch scheduled exams for selected offering
+  // scheduled exams
   const { data: exams } = useQuery({
     queryKey: ["exams", activeOfferingId],
     queryFn: () => api.get<any[]>(`/api/v1/exams/offering/${activeOfferingId}`),
@@ -91,14 +91,14 @@ export default function LecturerExamsPage() {
 
   const activeExamId = exams && exams.length > 0 ? exams[0].examId : null;
 
-  // 5. Fetch attempts for active exam
+  // attempts for exam
   const { data: attempts } = useQuery({
     queryKey: ["examAttempts", activeExamId],
     queryFn: () => api.get<any[]>(`/api/v1/exam-attempts/exam/${activeExamId}`),
     enabled: !!activeExamId,
   });
 
-  // 6. Fetch proctoring flags for all attempts of the exam
+  // proctoring flags
   const attemptIds = attempts?.map((att: any) => att.attemptId) || [];
   const flagsQueries = useQueries({
     queries: attemptIds.map((id: number) => ({
@@ -346,7 +346,7 @@ export default function LecturerExamsPage() {
           </button>
           <button
             onClick={() => setActiveTab("proctoring")}
-            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === "proctoring" ? "border-b-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all min-h-[44px] shrink-0 whitespace-nowrap ${activeTab === "proctoring" ? "border-b-[var(--tertiary)] text-[var(--tertiary)]" : "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"}`}
           >
             <i className="ti ti-shield-check mr-1.5 text-red-500"></i> Live Exam Proctoring
           </button>
@@ -354,11 +354,37 @@ export default function LecturerExamsPage() {
 
         {activeTab === "qb" && (
           <div className="grid lg:grid-cols-[1fr_360px] gap-6">
-            <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+            <div className="card p-4 sm:p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
               <h3 className="font-display font-bold text-base text-[var(--on-surface)] mb-4 pb-3 border-b border-[var(--outline-variant)]">
                 Question Bank ({questions.length} Items)
               </h3>
-              <div className="overflow-x-auto">
+
+              {/* Mobile Card View (< md) */}
+              <div className="md:hidden divide-y divide-[var(--outline-variant)]">
+                {questions.length === 0 ? (
+                  <p className="text-center py-6 text-xs text-[var(--on-surface-variant)] font-semibold">
+                    No questions added to the bank yet.
+                  </p>
+                ) : (
+                  questions.map((q) => (
+                    <div key={q.id} className="py-3 first:pt-0 last:pb-0 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-[var(--on-surface-variant)] font-semibold">{q.type}</span>
+                        <span className={`badge ${q.difficulty === "Easy" ? "badge-success" : q.difficulty === "Medium" ? "badge-accent" : "badge-danger"}`}>
+                          {q.difficulty}
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-[var(--on-surface)]">{q.text}</p>
+                      <div className="text-[11px] text-[var(--on-surface-variant)] font-semibold">
+                        Marks: <span className="font-bold text-[var(--tertiary)]">{q.marks}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Table View (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead>
                     <tr className="border-b border-[var(--outline-variant)] text-[var(--on-surface-variant)] uppercase font-semibold">

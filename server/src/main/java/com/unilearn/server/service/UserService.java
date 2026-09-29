@@ -5,9 +5,7 @@ import com.unilearn.server.dto.response.PageResponseDTO;
 import com.unilearn.server.dto.response.UserResponse;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Service interface for managing users.
- */
+// Users service
 public interface UserService {
 
     UserResponse createUser(UserRequest request);

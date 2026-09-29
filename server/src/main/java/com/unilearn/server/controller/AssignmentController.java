@@ -41,14 +41,14 @@ public class AssignmentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: STUDENT should only see assignments from offerings they are enrolled in
+    // Get assignment by id
     public ResponseEntity<AssignmentResponse> getAssignmentById(@PathVariable Long id) {
         return ResponseEntity.ok(assignmentService.getAssignmentById(id));
     }
 
     @GetMapping("/offering/{offeringId}")
     @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT')")
-    // TODO: STUDENT enrollment check in service layer
+    // Get assignments for offering
     public ResponseEntity<List<AssignmentResponse>> getAssignmentsByOffering(@PathVariable Long offeringId) {
         return ResponseEntity.ok(assignmentService.getAssignmentsByOffering(offeringId));
     }

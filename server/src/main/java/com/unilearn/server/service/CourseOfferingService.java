@@ -6,9 +6,7 @@ import com.unilearn.server.dto.response.courseoffering.CourseOfferingListItemDTO
 
 import java.util.List;
 
-/**
- * Service interface for managing course offerings.
- */
+// Course offerings service
 public interface CourseOfferingService {
 
     CourseOfferingResponse createCourseOffering(CourseOfferingRequest request);

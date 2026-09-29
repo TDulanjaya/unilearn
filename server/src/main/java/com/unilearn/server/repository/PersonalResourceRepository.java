@@ -18,4 +18,10 @@ public interface PersonalResourceRepository extends JpaRepository<PersonalResour
     List<PersonalResource> findByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId);
 
     Page<PersonalResource> findByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId, Pageable pageable);
+
+    List<PersonalResource> findByCourseOffering_OfferingId(Long offeringId);
+
+    long countByStudent_StudentId(Long studentId);
+
+    long countByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId);
 }
