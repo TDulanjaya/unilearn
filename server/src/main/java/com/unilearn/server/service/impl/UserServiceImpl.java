@@ -229,7 +229,8 @@ public class UserServiceImpl implements UserService {
             user.setStatus(request.getStatus().toLowerCase());
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
-            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
+            user.setMustChangePassword(true);
         }
 
         User updated = userRepository.save(user);
@@ -417,6 +418,7 @@ public class UserServiceImpl implements UserService {
         checkSuperAdminModification(user);
 
         user.setPasswordHash(passwordEncoder.encode(newPassword.trim()));
+        user.setMustChangePassword(true);
         User updated = userRepository.save(user);
         return enrichUserResponse(updated);
     }

@@ -10,7 +10,7 @@ export function PasswordChangeGuard({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
-  const isBypassedRoute = pathname === "/change-password" || pathname === "/login" || pathname === "/reset-password";
+  const isBypassedRoute = pathname === "/change-password" || pathname === "/login";
 
   useEffect(() => {
     if (!isLoading && user?.mustChangePassword) {

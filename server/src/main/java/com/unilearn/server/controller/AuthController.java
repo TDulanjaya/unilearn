@@ -104,18 +104,6 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/forgot-password")
-    public ResponseEntity<java.util.Map<String, String>> forgotPassword(@Valid @RequestBody com.unilearn.server.dto.request.ForgotPasswordRequest request) {
-        authService.processForgotPassword(request);
-        return ResponseEntity.ok(java.util.Map.of("message", "If an account with that email exists, a password reset link has been sent."));
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<java.util.Map<String, String>> resetPassword(@Valid @RequestBody com.unilearn.server.dto.request.ResetPasswordRequest request) {
-        authService.processResetPassword(request);
-        return ResponseEntity.ok(java.util.Map.of("message", "Password has been reset successfully."));
-    }
-
     @PostMapping("/change-password")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<java.util.Map<String, String>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {

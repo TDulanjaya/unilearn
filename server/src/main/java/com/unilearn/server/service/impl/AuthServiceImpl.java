@@ -35,16 +35,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.unilearn.server.model.AuditLog;
-import com.unilearn.server.model.PasswordResetToken;
 import com.unilearn.server.repository.AuditLogRepository;
-import com.unilearn.server.repository.PasswordResetTokenRepository;
-import com.unilearn.server.dto.request.ForgotPasswordRequest;
-import com.unilearn.server.dto.request.ResetPasswordRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -59,7 +54,6 @@ public class AuthServiceImpl implements AuthService {
     private final BatchRepository batchRepository;
     private final HodDeanAssignmentRepository hodDeanAssignmentRepository;
     private final FacultyRepository facultyRepository;
-    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final AuditLogRepository auditLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -317,54 +311,6 @@ public class AuthServiceImpl implements AuthService {
                 .status(user.getStatus())
                 .mustChangePassword(user.getMustChangePassword() != null && user.getMustChangePassword())
                 .build();
-    }
-
-    @Override
-    @Transactional
-    public void processForgotPassword(ForgotPasswordRequest request) {
-        if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
-            throw new ValidationException("Email is required");
-        }
-
-        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
-        if (user == null) {
-            // Do not reveal if email exists
-            return;
-        }
-
-        passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
-
-        String resetTokenStr = UUID.randomUUID().toString();
-        PasswordResetToken tokenEntity = PasswordResetToken.builder()
-                .token(resetTokenStr)
-                .user(user)
-                .expiryDate(LocalDateTime.now().plusHours(1))
-                .used(false)
-                .build();
-        passwordResetTokenRepository.save(tokenEntity);
-    }
-
-    @Override
-    @Transactional
-    public void processResetPassword(ResetPasswordRequest request) {
-        if (request == null || request.getToken() == null || request.getNewPassword() == null) {
-            throw new ValidationException("Token and new password are required");
-        }
-
-        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
-                .orElseThrow(() -> new ValidationException("Invalid or expired password reset token"));
-
-        if (resetToken.isUsed() || LocalDateTime.now().isAfter(resetToken.getExpiryDate())) {
-            throw new ValidationException("Invalid or expired password reset token");
-        }
-
-        User user = resetToken.getUser();
-        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-        user.setMustChangePassword(false);
-        userRepository.save(user);
-
-        resetToken.setUsed(true);
-        passwordResetTokenRepository.save(resetToken);
     }
 
     @Override

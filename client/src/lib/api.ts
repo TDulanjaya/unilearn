@@ -73,8 +73,7 @@ export async function apiFetch<T = any>(
     if (
       typeof window !== "undefined" &&
       window.location.pathname !== "/" &&
-      !window.location.pathname.startsWith("/login") &&
-      !window.location.pathname.startsWith("/reset-password")
+      !window.location.pathname.startsWith("/login")
     ) {
       window.location.href = "/login";
     }
