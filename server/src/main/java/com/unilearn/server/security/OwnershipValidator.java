@@ -3,6 +3,7 @@ package com.unilearn.server.security;
 import com.unilearn.server.model.HodDeanAssignment;
 import com.unilearn.server.model.User;
 import com.unilearn.server.repository.CourseOfferingLecturerRepository;
+import com.unilearn.server.repository.CourseOfferingRepository;
 import com.unilearn.server.repository.DepartmentRepository;
 import com.unilearn.server.repository.HodDeanAssignmentRepository;
 import com.unilearn.server.repository.UserRepository;
@@ -21,6 +22,7 @@ public class OwnershipValidator {
 
     private final UserRepository userRepository;
     private final CourseOfferingLecturerRepository courseOfferingLecturerRepository;
+    private final CourseOfferingRepository courseOfferingRepository;
     private final HodDeanAssignmentRepository hodDeanAssignmentRepository;
     private final DepartmentRepository departmentRepository;
     private final com.unilearn.server.repository.NotificationRepository notificationRepository;
@@ -103,10 +105,61 @@ public class OwnershipValidator {
                     .orElseThrow(() -> new AccessDeniedException("User not authenticated"));
             boolean assigned = courseOfferingLecturerRepository
                     .existsById(new com.unilearn.server.model.CourseOfferingLecturer.CourseOfferingLecturerId(offeringId, user.getUserId()));
+            // the main lecturer of the offering is allowed too
+            if (!assigned) {
+                assigned = courseOfferingRepository.findById(offeringId)
+                        .map(o -> o.getPrimaryLecturer() != null
+                                && user.getUserId().equals(o.getPrimaryLecturer().getLecturerId()))
+                        .orElse(false);
+            }
             if (!assigned) {
                 throw new AccessDeniedException("Access denied: You are not assigned to course offering #" + offeringId);
             }
         }
+    }
+
+    // true if the lecturer teaches any offering of this course (main or co-lecturer)
+    public boolean lecturerTeachesCourse(Long courseId, Long lecturerId) {
+        if (courseId == null || lecturerId == null) return false;
+        return courseOfferingRepository.existsByCourse_CourseIdAndPrimaryLecturer_LecturerId(courseId, lecturerId)
+                || courseOfferingLecturerRepository.countByCourseAndLecturer(courseId, lecturerId) > 0;
+    }
+
+    // Ensure lecturer teaches an offering of this course
+    public void checkLecturerCourseAccess(Long courseId) {
+        if (courseId == null) return;
+        if (isLecturer() && !isStaffOrSuperAdmin()) {
+            User user = getCurrentUser()
+                    .orElseThrow(() -> new AccessDeniedException("User not authenticated"));
+            if (!lecturerTeachesCourse(courseId, user.getUserId())) {
+                throw new AccessDeniedException("Access denied: You do not teach course #" + courseId);
+            }
+        }
+    }
+
+    // question banks: staff admins, HOD of the course's department,
+    // lecturers of the course and the bank's creator
+    public void checkQuestionBankAccess(com.unilearn.server.model.Course course, Long creatorUserId) {
+        if (isStaffOrSuperAdmin()) return;
+        if (course == null) {
+            throw new AccessDeniedException("Access denied: Course not found for this question bank");
+        }
+        if (isHodDean()) {
+            Long departmentId = course.getDepartment() != null ? course.getDepartment().getDepartmentId() : null;
+            if (departmentId == null) {
+                throw new AccessDeniedException("Access denied: Department not found for this course");
+            }
+            checkHodDepartmentAccess(departmentId);
+            return;
+        }
+        if (isLecturer()) {
+            User user = getCurrentUser()
+                    .orElseThrow(() -> new AccessDeniedException("User not authenticated"));
+            if (creatorUserId != null && creatorUserId.equals(user.getUserId())) return;
+            checkLecturerCourseAccess(course.getCourseId());
+            return;
+        }
+        throw new AccessDeniedException("Access denied: You cannot use this question bank");
     }
 
     // Ensure HOD only accesses their own department

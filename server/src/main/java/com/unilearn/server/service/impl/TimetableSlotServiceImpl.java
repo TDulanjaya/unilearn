@@ -25,6 +25,7 @@ public class TimetableSlotServiceImpl implements TimetableSlotService {
     private final TimetableSlotRepository timetableSlotRepository;
     private final CourseOfferingRepository courseOfferingRepository;
     private final TimetableSlotMapper timetableSlotMapper;
+    private final com.unilearn.server.security.AdminScopeValidator adminScopeValidator;
 
     @Override
     @Transactional
@@ -35,6 +36,7 @@ public class TimetableSlotServiceImpl implements TimetableSlotService {
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
+        adminScopeValidator.checkOfferingWriteAccess(offering);
 
         checkVenueOverlap(request.getVenue(), request.getDayOfWeek(), request.getStartTime(), request.getEndTime(), null);
 
@@ -55,9 +57,12 @@ public class TimetableSlotServiceImpl implements TimetableSlotService {
 
         TimetableSlot slot = timetableSlotRepository.findById(slotId)
                 .orElseThrow(() -> new EntryNotFoundException("TimetableSlot not found with ID: " + slotId));
+        // check the slot's current offering and the new one
+        adminScopeValidator.checkOfferingWriteAccess(slot.getCourseOffering());
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
+        adminScopeValidator.checkOfferingWriteAccess(offering);
 
         checkVenueOverlap(request.getVenue(), request.getDayOfWeek(), request.getStartTime(), request.getEndTime(), slotId);
 
@@ -80,9 +85,9 @@ public class TimetableSlotServiceImpl implements TimetableSlotService {
         if (slotId == null) {
             throw new ValidationException("Slot ID cannot be null");
         }
-        if (!timetableSlotRepository.existsById(slotId)) {
-            throw new EntryNotFoundException("TimetableSlot not found with ID: " + slotId);
-        }
+        TimetableSlot slot = timetableSlotRepository.findById(slotId)
+                .orElseThrow(() -> new EntryNotFoundException("TimetableSlot not found with ID: " + slotId));
+        adminScopeValidator.checkOfferingWriteAccess(slot.getCourseOffering());
         timetableSlotRepository.deleteById(slotId);
     }
 

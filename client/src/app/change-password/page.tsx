@@ -53,12 +53,12 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      await api.post("/api/v1/auth/change-password", {
+      const res = await api.post<{ message?: string; accessToken?: string }>("/api/v1/auth/change-password", {
         currentPassword,
         newPassword,
       });
-
-      markPasswordChanged();
+      // old tokens stop working after a password change, use the new one
+      markPasswordChanged(res?.accessToken);
       setSuccess("Password updated successfully! Redirecting to your dashboard...");
 
       setTimeout(() => {

@@ -90,7 +90,7 @@ export default function Sidebar({ role, name = "Administrator", sub = "Staff Adm
               <div className="flex items-center justify-between gap-1">
                 <p className="text-xs font-bold text-[var(--on-surface)] truncate">{displayName}</p>
                 {isSuperAdmin && (
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/30 uppercase tracking-wider shrink-0">
+                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/30 uppercase tracking-wider shrink-0">
                     SUPER
                   </span>
                 )}
@@ -167,7 +167,7 @@ export default function Sidebar({ role, name = "Administrator", sub = "Staff Adm
         {renderNavContent()}
       </div>
 
-      <aside className="hidden lg:flex w-64 glass border-r border-[var(--glass-border)] p-5 flex-col justify-between shrink-0 sticky top-0 h-screen overflow-y-auto">
+      <aside className="hidden lg:flex w-64 glass border-r border-[var(--glass-border)] p-5 flex-col justify-between shrink-0 sticky top-0 self-start h-screen overflow-y-auto z-20">
         {renderNavContent()}
       </aside>
     </>

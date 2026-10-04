@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Assignment, SubmissionStatus, SubmissionAttempt } from "@/types/course";
+import { useQueryClient } from "@tanstack/react-query";
+import { Assignment, SubmissionStatus } from "@/types/course";
 import FileDropzone from "@/components/FileDropzone";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export function SubmissionStatusBadge({ status }: { status: SubmissionStatus }) {
   const styles: Record<SubmissionStatus, string> = {
@@ -34,44 +37,51 @@ export default function CourseAssignmentsTab({
   const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
   const [submitFiles, setSubmitFiles] = useState<File[]>([]);
   const [submitNotes, setSubmitNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const handleConfirmSubmit = (e: React.FormEvent) => {
+  const handleConfirmSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!submittingAssignment) return;
+    if (!submittingAssignment || isSubmitting) return;
+    if (!user?.userId) {
+      showToast("Please log in again to submit.");
+      return;
+    }
+    if (submitFiles.length === 0) {
+      showToast("Please choose a file to submit.");
+      return;
+    }
 
-    const fileName =
-      submitFiles.length > 0
-        ? submitFiles[0].name
-        : `Submission_${submittingAssignment.id}_Nadeesha.pdf`;
-    const nowStr = new Date().toLocaleString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    setIsSubmitting(true);
+    try {
+      // upload the file first
+      const formData = new FormData();
+      formData.append("file", submitFiles[0]);
+      formData.append("folder", "submissions");
+      const uploadRes = await api.post<{ url: string }>("/api/v1/files/upload", formData);
+      if (!uploadRes?.url) {
+        throw new Error("File upload failed.");
+      }
 
-    const newAttempt: SubmissionAttempt = {
-      version: submittingAssignment.attempts.length + 1,
-      fileName,
-      timestamp: nowStr,
-      status: "Submitted",
-      notes: submitNotes || "Client dropzone submission",
-    };
+      // then save the submission on the server
+      await api.post("/api/v1/submissions", {
+        assignmentId: submittingAssignment.id,
+        studentId: user.userId,
+        fileUrl: uploadRes.url,
+      });
 
-    const updatedAssignment: Assignment = {
-      ...submittingAssignment,
-      status: "Submitted",
-      submittedFile: fileName,
-      submittedAt: nowStr,
-      attempts: [newAttempt, ...submittingAssignment.attempts],
-    };
+      await queryClient.invalidateQueries({ queryKey: ["mySubmissions"] });
 
-    onUpdateAssignment(updatedAssignment);
-    setSubmittingAssignment(null);
-    setSubmitFiles([]);
-    setSubmitNotes("");
-    showToast(`Assignment "${submittingAssignment.title}" submitted successfully!`);
+      showToast(`Assignment "${submittingAssignment.title}" submitted successfully!`);
+      setSubmittingAssignment(null);
+      setSubmitFiles([]);
+      setSubmitNotes("");
+    } catch (err: any) {
+      showToast("Submission failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -195,8 +205,12 @@ export default function CourseAssignmentsTab({
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-primary text-xs shadow-md min-h-[44px] justify-center">
-                Confirm & Submit
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn-primary text-xs shadow-md min-h-[44px] justify-center disabled:opacity-60"
+              >
+                {isSubmitting ? "Submitting..." : "Confirm & Submit"}
               </button>
             </div>
           </form>

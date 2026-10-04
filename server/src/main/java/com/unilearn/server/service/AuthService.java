@@ -14,7 +14,8 @@ public interface AuthService {
 
     com.unilearn.server.dto.response.RefreshTokenResponse refresh(com.unilearn.server.dto.request.RefreshTokenRequest request);
 
-    void changePassword(com.unilearn.server.dto.request.ChangePasswordRequest request);
+    // returns new tokens, the old ones stop working
+    com.unilearn.server.dto.response.RefreshTokenResponse changePassword(com.unilearn.server.dto.request.ChangePasswordRequest request);
 
-    void logout(String token);
+    void logout(String authHeader, String refreshToken);
 }

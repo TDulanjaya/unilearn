@@ -62,6 +62,9 @@ public class AuthServiceImpl implements AuthService {
     @org.springframework.beans.factory.annotation.Value("${app.registration.public-enabled:false}")
     private boolean publicRegistrationEnabled;
 
+    @org.springframework.beans.factory.annotation.Value("${app.security.trust-forwarded-for:false}")
+    private boolean trustForwardedFor;
+
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -182,8 +185,8 @@ public class AuthServiceImpl implements AuthService {
             hodDeanAssignmentRepository.save(assignment);
         }
 
-        String token = jwtService.generateAccessToken(saved.getEmail(), saved.getRole());
-        String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
+        String token = jwtService.generateAccessToken(saved.getEmail(), saved.getRole(), saved.getTokenVersion());
+        String refreshToken = jwtService.generateRefreshToken(saved.getEmail(), saved.getTokenVersion());
 
         return AuthResponse.builder()
                 .token(token)
@@ -221,8 +224,8 @@ public class AuthServiceImpl implements AuthService {
 
             logLoginAttempt(email, true, clientIp, user);
 
-            String token = jwtService.generateAccessToken(user.getEmail(), user.getRole());
-            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+            String token = jwtService.generateAccessToken(user.getEmail(), user.getRole(), user.getTokenVersion());
+            String refreshToken = jwtService.generateRefreshToken(user.getEmail(), user.getTokenVersion());
 
             return AuthResponse.builder()
                     .token(token)
@@ -270,6 +273,9 @@ public class AuthServiceImpl implements AuthService {
             ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs != null) {
                 HttpServletRequest req = attrs.getRequest();
+                if (!trustForwardedFor) {
+                    return req.getRemoteAddr();
+                }
                 String ip = req.getHeader("X-Forwarded-For");
                 if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
                     ip = req.getRemoteAddr();
@@ -290,15 +296,28 @@ public class AuthServiceImpl implements AuthService {
             throw new ValidationException("Refresh token is required");
         }
         String refreshToken = request.getRefreshToken();
-        if (!jwtService.validateToken(refreshToken)) {
+        if (!jwtService.validateToken(refreshToken) || !jwtService.isRefreshToken(refreshToken)) {
             throw new ValidationException("Invalid refresh token");
         }
         String email = jwtService.getEmailFromToken(refreshToken);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntryNotFoundException("User not found with email: " + email));
+        // no new tokens for deactivated users
+        if (!user.isEnabled()) {
+            throw new org.springframework.security.authentication.DisabledException("This account is deactivated. Please contact your administrator.");
+        }
+        // refresh token from before a logout or password change
+        if (!jwtService.isTokenVersionValid(refreshToken, user.getTokenVersion())) {
+            throw new ValidationException("Invalid refresh token");
+        }
 
-        String newAccessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole());
-        String newRefreshToken = jwtService.generateRefreshToken(user.getEmail());
+        return buildTokens(user);
+    }
+
+    // new access + refresh tokens for the user's current token version
+    private RefreshTokenResponse buildTokens(User user) {
+        String newAccessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole(), user.getTokenVersion());
+        String newRefreshToken = jwtService.generateRefreshToken(user.getEmail(), user.getTokenVersion());
 
         return RefreshTokenResponse.builder()
                 .accessToken(newAccessToken)
@@ -315,7 +334,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public void changePassword(com.unilearn.server.dto.request.ChangePasswordRequest request) {
+    public RefreshTokenResponse changePassword(com.unilearn.server.dto.request.ChangePasswordRequest request) {
         if (request == null || request.getCurrentPassword() == null || request.getNewPassword() == null) {
             throw new ValidationException("Current password and new password are required");
         }
@@ -335,11 +354,34 @@ public class AuthServiceImpl implements AuthService {
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setMustChangePassword(false);
-        userRepository.save(user);
+        // log out other sessions, this one gets new tokens below
+        user.setTokenVersion(currentVersion(user) + 1);
+        User saved = userRepository.save(user);
+        return buildTokens(saved);
     }
 
     @Override
-    public void logout(String token) {
-        // Client clears token on logout
+    @Transactional
+    public void logout(String authHeader, String refreshToken) {
+        String accessToken = (authHeader != null && authHeader.startsWith("Bearer ")) ? authHeader.substring(7) : null;
+        String email = null;
+        if (accessToken != null && jwtService.validateToken(accessToken) && jwtService.isAccessToken(accessToken)) {
+            email = jwtService.getEmailFromToken(accessToken);
+        } else if (refreshToken != null && !refreshToken.isBlank()
+                && jwtService.validateToken(refreshToken) && jwtService.isRefreshToken(refreshToken)) {
+            email = jwtService.getEmailFromToken(refreshToken);
+        }
+        if (email == null) {
+            return;
+        }
+        // bump the version so every old token of this user stops working
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setTokenVersion(currentVersion(user) + 1);
+            userRepository.save(user);
+        });
+    }
+
+    private int currentVersion(User user) {
+        return user.getTokenVersion() != null ? user.getTokenVersion() : 0;
     }
 }

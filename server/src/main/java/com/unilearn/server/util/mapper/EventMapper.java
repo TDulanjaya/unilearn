@@ -21,6 +21,7 @@ public class EventMapper {
                 .venue(request.getVenue())
                 .eventDate(request.getEventDate())
                 .posterUrl(request.getPosterUrl())
+                .capacity(request.getCapacity())
                 .faculty(faculty)
                 .createdBy(createdBy)
                 .build();
@@ -37,6 +38,7 @@ public class EventMapper {
                 .description(event.getDescription())
                 .venue(event.getVenue())
                 .posterUrl(event.getPosterUrl())
+                .capacity(event.getCapacity())
                 .eventDate(event.getEventDate())
                 .startDateTime(event.getEventDate())
                 .endDateTime(event.getEventDate() != null ? event.getEventDate().plusHours(2) : null)

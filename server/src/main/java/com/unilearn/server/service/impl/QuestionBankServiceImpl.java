@@ -11,6 +11,7 @@ import com.unilearn.server.model.User;
 import com.unilearn.server.repository.CourseRepository;
 import com.unilearn.server.repository.QuestionBankRepository;
 import com.unilearn.server.repository.UserRepository;
+import com.unilearn.server.security.OwnershipValidator;
 import com.unilearn.server.service.QuestionBankService;
 import com.unilearn.server.util.mapper.QuestionBankMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final QuestionBankMapper questionBankMapper;
+    private final OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -39,8 +41,12 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
 
-        User user = userRepository.findById(request.getCreatedByLecturerId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByLecturerId()));
+        ownershipValidator.checkQuestionBankAccess(course, null);
+
+        // the creator is the logged in user, not the id sent by the browser
+        User user = ownershipValidator.getCurrentUser()
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("User not authenticated"));
+        request.setCreatedByLecturerId(user.getUserId());
 
         QuestionBank bank = questionBankMapper.toQuestionBank(request, course, user);
         QuestionBank saved = questionBankRepository.save(bank);
@@ -60,14 +66,17 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         QuestionBank bank = questionBankRepository.findById(bankId)
                 .orElseThrow(() -> new EntryNotFoundException("QuestionBank not found with ID: " + bankId));
 
+        ownershipValidator.checkQuestionBankAccess(bank.getCourse(), creatorId(bank));
+
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
+        // moving the bank to another course needs access to that course too
+        if (bank.getCourse() == null || !course.getCourseId().equals(bank.getCourse().getCourseId())) {
+            ownershipValidator.checkQuestionBankAccess(course, null);
+        }
 
-        User user = userRepository.findById(request.getCreatedByLecturerId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getCreatedByLecturerId()));
-
+        // the creator stays the same
         bank.setCourse(course);
-        bank.setCreatedBy(user);
 
         QuestionBank updated = questionBankRepository.save(bank);
         return questionBankMapper.toQuestionBankResponse(updated);
@@ -79,10 +88,10 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         if (bankId == null) {
             throw new ValidationException("Bank ID cannot be null");
         }
-        if (!questionBankRepository.existsById(bankId)) {
-            throw new EntryNotFoundException("QuestionBank not found with ID: " + bankId);
-        }
-        questionBankRepository.deleteById(bankId);
+        QuestionBank bank = questionBankRepository.findById(bankId)
+                .orElseThrow(() -> new EntryNotFoundException("QuestionBank not found with ID: " + bankId));
+        ownershipValidator.checkQuestionBankAccess(bank.getCourse(), creatorId(bank));
+        questionBankRepository.delete(bank);
     }
 
     @Override
@@ -92,6 +101,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         }
         QuestionBank bank = questionBankRepository.findById(bankId)
                 .orElseThrow(() -> new EntryNotFoundException("QuestionBank not found with ID: " + bankId));
+        ownershipValidator.checkQuestionBankAccess(bank.getCourse(), creatorId(bank));
         return questionBankMapper.toQuestionBankResponse(bank);
     }
 
@@ -100,13 +110,30 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         if (courseId == null) {
             throw new ValidationException("Course ID cannot be null");
         }
-        if (!courseRepository.existsById(courseId)) {
-            throw new EntryNotFoundException("Course not found with ID: " + courseId);
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + courseId));
+
+        List<QuestionBank> banks = questionBankRepository.findByCourse_CourseId(courseId);
+
+        // a lecturer who doesn't teach the course only sees banks they made
+        if (ownershipValidator.isLecturer() && !ownershipValidator.isStaffOrSuperAdmin()) {
+            User me = ownershipValidator.getCurrentUser()
+                    .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("User not authenticated"));
+            if (!ownershipValidator.lecturerTeachesCourse(courseId, me.getUserId())) {
+                banks = banks.stream()
+                        .filter(b -> me.getUserId().equals(creatorId(b)))
+                        .toList();
+            }
+        } else {
+            ownershipValidator.checkQuestionBankAccess(course, null);
         }
 
-        return questionBankRepository.findByCourse_CourseId(courseId)
-                .stream()
+        return banks.stream()
                 .map(questionBankMapper::toQuestionBankResponse)
                 .toList();
+    }
+
+    private Long creatorId(QuestionBank bank) {
+        return bank.getCreatedBy() != null ? bank.getCreatedBy().getUserId() : null;
     }
 }

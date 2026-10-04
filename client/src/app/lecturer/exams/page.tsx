@@ -7,10 +7,21 @@ import { useAuth } from "@/context/AuthContext";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import DataTable from "@/components/DataTable";
 
+// values allowed by the questions table
+type QuestionTypeValue = "mcq" | "essay" | "short_answer";
+
+const questionTypeLabel = (t: string) => {
+  const v = (t || "").toLowerCase().replace(" ", "_");
+  if (v === "mcq") return "MCQ";
+  if (v === "essay") return "Essay";
+  if (v === "short_answer") return "Short answer";
+  return t;
+};
+
 interface Question {
   id: string;
   text: string;
-  type: "MCQ" | "Essay" | "Short answer";
+  type: string;
   marks: number;
   difficulty: "Easy" | "Medium" | "Hard";
 }
@@ -35,12 +46,17 @@ export default function LecturerExamsPage() {
 
   // Form states
   const [qText, setQText] = useState("");
-  const [qType, setQType] = useState<"MCQ" | "Essay" | "Short answer">("MCQ");
+  const [qType, setQType] = useState<QuestionTypeValue>("mcq");
+  const [qOptions, setQOptions] = useState("");
+  const [qCorrectAnswer, setQCorrectAnswer] = useState("");
   const [qMarks, setQMarks] = useState(5);
   const [qDifficulty, setQDifficulty] = useState<"Easy" | "Medium" | "Hard">("Medium");
 
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [examTimer, setExamTimer] = useState(120);
+  const [examSlotId, setExamSlotId] = useState<number | "">("");
+  const [examDate, setExamDate] = useState("");
+  const [isScheduling, setIsScheduling] = useState(false);
 
   // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
@@ -77,10 +93,20 @@ export default function LecturerExamsPage() {
   const questions: Question[] = (questionsResponse?.dataList || []).map((q: any) => ({
     id: String(q.questionId),
     text: q.questionText,
-    type: q.questionType as any,
+    type: questionTypeLabel(q.questionType),
     marks: Number(q.marks),
-    difficulty: (q.difficulty || "Medium") as any,
+    // db keeps lowercase, show it with a capital letter
+    difficulty: (q.difficulty
+      ? q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase()
+      : "Medium") as any,
   }));
+
+  // class slots for this offering (in-class exams are linked to one)
+  const { data: slots } = useQuery({
+    queryKey: ["timetableSlots", activeOfferingId],
+    queryFn: () => api.get<any[]>(`/api/v1/timetable-slots/offering/${activeOfferingId}`),
+    enabled: !!activeOfferingId,
+  });
 
   // scheduled exams
   const { data: exams } = useQuery({
@@ -142,7 +168,10 @@ export default function LecturerExamsPage() {
   });
 
   const scheduleExamMutation = useMutation({
-    mutationFn: (data: any) => api.post("/api/v1/exams/inclass", data),
+    mutationFn: (data: any) => api.post<any>("/api/v1/exams/inclass", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams", activeOfferingId] });
+    },
   });
 
   const createFlagMutation = useMutation({
@@ -155,6 +184,19 @@ export default function LecturerExamsPage() {
   const handleAddQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!qText.trim() || !courseId) return;
+
+    // mcq needs options and the right one, short answer needs the expected answer
+    const optionList = qOptions.split("\n").map((o) => o.trim()).filter(Boolean);
+    if (qType === "mcq") {
+      if (optionList.length < 2) {
+        alert("Please add at least two options (one per line).");
+        return;
+      }
+      if (!optionList.some((o) => o.toLowerCase() === qCorrectAnswer.trim().toLowerCase())) {
+        alert("The correct answer must be one of the options.");
+        return;
+      }
+    }
 
     try {
       let bankId = activeBankId;
@@ -171,29 +213,66 @@ export default function LecturerExamsPage() {
         bankId,
         questionText: qText.trim(),
         questionType: qType,
+        options: qType === "mcq" ? JSON.stringify(optionList) : null,
+        correctAnswer: qType === "essay" ? null : qCorrectAnswer.trim() || null,
         marks: qMarks,
-        difficulty: qDifficulty,
+        difficulty: qDifficulty.toLowerCase(),
         topic: "General",
       });
 
       setQText("");
+      setQOptions("");
+      setQCorrectAnswer("");
     } catch (err: any) {
       alert("Failed to save question: " + err.message);
     }
   };
 
   const handleSaveExamDraft = async () => {
-    if (!activeOfferingId) return;
+    if (!activeOfferingId || isScheduling) return;
+    if (!examSlotId) {
+      alert("Please choose the class slot for this in-class exam.");
+      return;
+    }
+    if (!examDate) {
+      alert("Please choose the exam date.");
+      return;
+    }
+
+    setIsScheduling(true);
+    let created: any = null;
     try {
-      await scheduleExamMutation.mutateAsync({
+      created = await scheduleExamMutation.mutateAsync({
         offeringId: activeOfferingId,
         title: `Mid-Term Examination - ${activeOffering?.courseCode}`,
+        linkedSlotId: examSlotId,
+        examDate,
         durationMinutes: examTimer,
         scheduledById: user?.userId,
       });
-      alert("In-class exam scheduled successfully!");
     } catch (err: any) {
       alert("Failed to schedule exam: " + err.message);
+      setIsScheduling(false);
+      return;
+    }
+
+    // add the selected questions to the new exam
+    const failed: string[] = [];
+    for (const qid of selectedQuestionIds) {
+      try {
+        await api.post(`/api/v1/exams/${created.examId}/questions/${qid}`, {});
+      } catch (err: any) {
+        failed.push(`#${qid}: ${err.message}`);
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ["exams", activeOfferingId] });
+    setIsScheduling(false);
+
+    if (failed.length > 0) {
+      alert(`Exam scheduled, but some questions could not be added:\n${failed.join("\n")}`);
+    } else {
+      alert("In-class exam scheduled successfully!");
+      setSelectedQuestionIds([]);
     }
   };
 
@@ -319,7 +398,7 @@ export default function LecturerExamsPage() {
             <label className="text-xs font-bold text-[var(--on-surface-variant)] shrink-0">Course Offering:</label>
             <select
               value={activeOfferingId || ""}
-              onChange={(e) => setActiveOfferingId(Number(e.target.value))}
+              onChange={(e) => { setActiveOfferingId(Number(e.target.value)); setExamSlotId(""); setSelectedQuestionIds([]); }}
               className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
             >
               {offerings?.map((o: any) => (
@@ -428,9 +507,9 @@ export default function LecturerExamsPage() {
                 <div>
                   <label className="block text-xs font-semibold mb-1">Question Type</label>
                   <select value={qType} onChange={(e) => setQType(e.target.value as any)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-                    <option value="MCQ">MCQ</option>
-                    <option value="Essay">Essay</option>
-                    <option value="Short answer">Short answer</option>
+                    <option value="mcq">MCQ</option>
+                    <option value="essay">Essay</option>
+                    <option value="short_answer">Short answer</option>
                   </select>
                 </div>
 
@@ -438,6 +517,20 @@ export default function LecturerExamsPage() {
                   <label className="block text-xs font-semibold mb-1">Question Prompt</label>
                   <textarea rows={3} value={qText} onChange={(e) => setQText(e.target.value)} placeholder="Type question text..." className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required></textarea>
                 </div>
+
+                {qType === "mcq" && (
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Options (one per line)</label>
+                    <textarea rows={4} value={qOptions} onChange={(e) => setQOptions(e.target.value)} placeholder={"Option A\nOption B\nOption C"} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"></textarea>
+                  </div>
+                )}
+
+                {qType !== "essay" && (
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Correct Answer</label>
+                    <input type="text" value={qCorrectAnswer} onChange={(e) => setQCorrectAnswer(e.target.value)} placeholder={qType === "mcq" ? "Same text as the right option" : "Expected answer"} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -508,8 +601,29 @@ export default function LecturerExamsPage() {
                 <input type="number" value={examTimer} onChange={(e) => setExamTimer(Number(e.target.value))} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
               </div>
 
-              <button onClick={handleSaveExamDraft} className="btn-primary w-full justify-center text-xs shadow-md">
-                Save Exam Draft & Schedule
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Class Slot</label>
+                  <select value={examSlotId} onChange={(e) => setExamSlotId(e.target.value ? Number(e.target.value) : "")} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
+                    <option value="">Select slot</option>
+                    {(slots || []).map((sl: any) => (
+                      <option key={sl.slotId} value={sl.slotId}>
+                        {sl.dayOfWeek} {String(sl.startTime || "").slice(0, 5)}-{String(sl.endTime || "").slice(0, 5)}{sl.venue ? ` (${sl.venue})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[var(--on-surface)]">Exam Date</label>
+                  <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
+                </div>
+              </div>
+              {slots && slots.length === 0 && (
+                <p className="text-[11px] text-[var(--on-surface-variant)]">No class slots found for this offering. Ask the admin to add a timetable slot first.</p>
+              )}
+
+              <button onClick={handleSaveExamDraft} disabled={isScheduling} className="btn-primary w-full justify-center text-xs shadow-md disabled:opacity-60">
+                {isScheduling ? "Scheduling..." : "Save Exam Draft & Schedule"}
               </button>
             </div>
           </div>

@@ -42,8 +42,8 @@ interface AcademicDataContextType {
   refetchOfferings: () => void;
   refetchSlots: () => void;
   addOffering: (offering: Omit<CourseOffering, "offeringId">) => void;
-  assignLecturer: (offeringId: number, lecturerId: number, lecturerName: string) => void;
-  removeLecturer: (offeringId: number, lecturerName: string) => void;
+  assignLecturer: (offeringId: number, lecturerId: number, lecturerName: string) => Promise<void>;
+  removeLecturer: (offeringId: number, lecturerId: number) => Promise<void>;
   addSlot: (slot: Omit<TimetableSlot, "slotId">) => void;
   updateSlot: (slotId: number, updated: Partial<TimetableSlot>) => void;
   deleteSlot: (slotId: number) => void;
@@ -154,20 +154,21 @@ export function AcademicDataProvider({ children }: { children: React.ReactNode }
     addOfferingMutation.mutate(offeringData);
   };
 
-  const assignLecturer = (offeringId: number, lecturerId: number, lecturerName: string) => {
-    api.post(`/api/v1/course-offerings/${offeringId}/lecturers`, { lecturerId, lecturerName })
-      .catch(() => {})
-      .finally(() => {
-        queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
-      });
+  // server wants the lecturer id in the URL; errors go back to the page
+  const assignLecturer = async (offeringId: number, lecturerId: number, lecturerName: string) => {
+    try {
+      await api.post(`/api/v1/course-offerings/${offeringId}/lecturers/${lecturerId}`);
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
+    }
   };
 
-  const removeLecturer = (offeringId: number, lecturerName: string) => {
-    api.delete(`/api/v1/course-offerings/${offeringId}/lecturers/${encodeURIComponent(lecturerName)}`)
-      .catch(() => {})
-      .finally(() => {
-        queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
-      });
+  const removeLecturer = async (offeringId: number, lecturerId: number) => {
+    try {
+      await api.delete(`/api/v1/course-offerings/${offeringId}/lecturers/${lecturerId}`);
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ["courseOfferings"] });
+    }
   };
 
   const addSlot = (slotData: Omit<TimetableSlot, "slotId">) => {

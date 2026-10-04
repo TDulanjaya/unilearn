@@ -20,6 +20,20 @@ interface TeachingSlot {
   enrolledStudents: { id: string; name: string; indexNo: string }[];
 }
 
+// session date and times in local time, end is 2 hours later
+function getSessionTimes() {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+  const sessionDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const startTime = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  // don't go past midnight
+  const endTime = end.getDate() !== now.getDate()
+    ? "23:59:59"
+    : `${pad(end.getHours())}:${pad(end.getMinutes())}:${pad(end.getSeconds())}`;
+  return { sessionDate, startTime, endTime };
+}
+
 function getSlotScheduleStatus(slotTimeStr: string, dayOfWeek: string) {
   const now = new Date();
   const currentDayIndex = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
@@ -68,7 +82,7 @@ function getSlotScheduleStatus(slotTimeStr: string, dayOfWeek: string) {
       isToday: true,
       canGenerateQr: false,
       statusLabel: "Class Ended Today",
-      badgeStyle: "bg-red-500/10 text-red-400 border border-red-500/20",
+      badgeStyle: "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20",
       reason: "Class duration for today has ended.",
     };
   }
@@ -77,7 +91,7 @@ function getSlotScheduleStatus(slotTimeStr: string, dayOfWeek: string) {
     isToday: true,
     canGenerateQr: true,
     statusLabel: "Live Today",
-    badgeStyle: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+    badgeStyle: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30",
     reason: "",
   };
 }
@@ -148,11 +162,7 @@ export default function LecturerSchedulePage() {
 
   const handleGenerateQr = async (slot: TeachingSlot) => {
     try {
-      const now = new Date();
-      const sessionDate = now.toISOString().split("T")[0];
-      const startTime = now.toTimeString().split(" ")[0];
-      const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      const endTime = end.toTimeString().split(" ")[0];
+      const { sessionDate, startTime, endTime } = getSessionTimes();
 
       const res = await startSessionMutation.mutateAsync({
         offeringId: slot.offeringId,
@@ -217,11 +227,7 @@ export default function LecturerSchedulePage() {
   const handleSaveAttendance = async () => {
     if (!selectedAttendanceSlot) return;
     try {
-      const now = new Date();
-      const sessionDate = now.toISOString().split("T")[0];
-      const startTime = now.toTimeString().split(" ")[0];
-      const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      const endTime = end.toTimeString().split(" ")[0];
+      const { sessionDate, startTime, endTime } = getSessionTimes();
 
       // active session for today
       const session = await startSessionMutation.mutateAsync({
@@ -312,7 +318,7 @@ export default function LecturerSchedulePage() {
         <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--outline-variant)]">
             <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
-              <i className="ti ti-qrcode text-emerald-400 text-xl"></i>
+              <i className="ti ti-qrcode text-emerald-600 dark:text-emerald-400 text-xl"></i>
               Today's Classes ({todaySlots.length}) — {currentDayName}
             </h3>
           </div>

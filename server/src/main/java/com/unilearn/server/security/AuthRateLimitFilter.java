@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -52,7 +53,14 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final Map<String, TokenBucket> buckets = new ConcurrentHashMap<>();
     private long lastCleanupTime = System.currentTimeMillis();
 
+    // only read X-Forwarded-For when the app runs behind a proxy we trust
+    @Value("${app.security.trust-forwarded-for:false}")
+    private boolean trustForwardedFor;
+
     private String getClientIp(HttpServletRequest request) {
+        if (!trustForwardedFor) {
+            return request.getRemoteAddr();
+        }
         String xf = request.getHeader("X-Forwarded-For");
         if (xf != null && !xf.isBlank()) {
             return xf.split(",")[0].trim();

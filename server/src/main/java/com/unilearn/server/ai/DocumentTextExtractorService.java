@@ -80,8 +80,8 @@ public class DocumentTextExtractorService {
             }
         }
 
-        // fall back to remote url stream
-        if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+        // fall back to remote url stream (only our Storj storage, never other sites)
+        if (isAllowedRemoteUrl(fileUrl)) {
             if (isImage) {
                 return "text not available";
             }
@@ -152,6 +152,19 @@ public class DocumentTextExtractorService {
         return "text not available";
     }
 
+    // only https links to Storj storage can be read from the internet
+    private boolean isAllowedRemoteUrl(String fileUrl) {
+        try {
+            URI uri = URI.create(fileUrl.trim());
+            String host = uri.getHost();
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && host != null
+                    && (host.equalsIgnoreCase("storjshare.io") || host.toLowerCase().endsWith(".storjshare.io"));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String getFileExtension(String path) {
         if (path == null) return "";
         int dot = path.lastIndexOf('.');
@@ -175,23 +188,31 @@ public class DocumentTextExtractorService {
             fileName = cleanUrl.substring(cleanUrl.lastIndexOf("/") + 1);
         }
 
+        // only a plain file name, so nobody can point us at other server files
+        if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..") || fileName.isBlank()) {
+            return null;
+        }
+
         // local uploads dir
-        Path p1 = localUploadDir.resolve(fileName).normalize();
-        if (Files.exists(p1)) return p1;
+        Path p1 = insideDir(localUploadDir, fileName);
+        if (p1 != null && Files.exists(p1)) return p1;
 
         // root relative uploads dir
-        Path p2 = serverUploadDir.resolve(fileName).normalize();
-        if (Files.exists(p2)) return p2;
+        Path p2 = insideDir(serverUploadDir, fileName);
+        if (p2 != null && Files.exists(p2)) return p2;
 
         // sibling uploads dir
-        Path p3 = Paths.get("..", "server", "uploads").resolve(fileName).normalize();
-        if (Files.exists(p3)) return p3;
+        Path p3 = insideDir(Paths.get("..", "server", "uploads"), fileName);
+        if (p3 != null && Files.exists(p3)) return p3;
 
-        // direct path check
-        Path p4 = Paths.get(cleanUrl).normalize();
-        if (Files.exists(p4)) return p4;
+        return null;
+    }
 
-        return p1;
+    // resolve the file and make sure it stays inside the uploads folder
+    private Path insideDir(Path dir, String fileName) {
+        Path base = dir.toAbsolutePath().normalize();
+        Path p = base.resolve(fileName).normalize();
+        return p.startsWith(base) ? p : null;
     }
 
     private String cleanExtractedText(String text) {

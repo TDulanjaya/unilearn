@@ -17,8 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +29,7 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
     private final ExamAttemptRepository examAttemptRepository;
     private final QuestionRepository questionRepository;
     private final com.unilearn.server.repository.ExamResultRepository examResultRepository;
+    private final com.unilearn.server.repository.ExamQuestionRepository examQuestionRepository;
     private final ExamAnswerMapper examAnswerMapper;
     private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
 
@@ -51,16 +52,26 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
             throw new com.unilearn.server.exception.IllegalStateException("Cannot submit or modify answers after exam attempt has been submitted");
         }
 
+        // stop here if the exam time is over (1 minute grace)
+        LocalDateTime deadline = examAttemptRepository.deadlineOf(attempt);
+        if (deadline != null && LocalDateTime.now().isAfter(deadline.plusMinutes(1))) {
+            throw new com.unilearn.server.exception.IllegalStateException("Exam time is over. New answers can no longer be saved. Please submit your exam.");
+        }
+
         Question question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new EntryNotFoundException("Question not found with ID: " + request.getQuestionId()));
 
-        Optional<ExamAnswer> existingOpt = examAnswerRepository.findByAttempt_AttemptIdAndQuestion_QuestionId(request.getAttemptId(), request.getQuestionId());
+        List<ExamAnswer> existing = examAnswerRepository.findAllByAttempt_AttemptIdAndQuestion_QuestionIdOrderByAnswerIdAsc(request.getAttemptId(), request.getQuestionId());
 
         ExamAnswer answer;
         String text = request.getAnswerText() != null ? request.getAnswerText() : request.getSelectedOption();
-        if (existingOpt.isPresent()) {
-            answer = existingOpt.get();
+        if (!existing.isEmpty()) {
+            // old rows are updated, not added again
+            answer = existing.get(0);
             answer.setAnswerText(text);
+            if (existing.size() > 1) {
+                examAnswerRepository.deleteAll(existing.subList(1, existing.size()));
+            }
             // Only lecturer sets marks
         } else {
             answer = examAnswerMapper.toExamAnswer(request, attempt, question);
@@ -126,11 +137,27 @@ public class ExamAnswerServiceImpl implements ExamAnswerService {
             throw new ValidationException("Attempt ID and Question ID cannot be null");
         }
 
-        ExamAnswer answer = examAnswerRepository.findByAttempt_AttemptIdAndQuestion_QuestionId(attemptId, questionId)
-                .orElseThrow(() -> new EntryNotFoundException("ExamAnswer not found for attempt ID: " + attemptId + " and question ID: " + questionId));
+        List<ExamAnswer> found = examAnswerRepository.findAllByAttempt_AttemptIdAndQuestion_QuestionIdOrderByAnswerIdAsc(attemptId, questionId);
+        if (found.isEmpty()) {
+            throw new EntryNotFoundException("ExamAnswer not found for attempt ID: " + attemptId + " and question ID: " + questionId);
+        }
+        ExamAnswer answer = found.get(0);
 
         if (answer.getAttempt() != null && answer.getAttempt().getExam() != null && answer.getAttempt().getExam().getCourseOffering() != null) {
             ownershipValidator.checkLecturerOfferingAccess(answer.getAttempt().getExam().getCourseOffering().getOfferingId());
+        }
+
+        if (marksAwarded == null) {
+            throw new ValidationException("Marks awarded is required");
+        }
+        if (marksAwarded.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException("Marks awarded cannot be negative");
+        }
+        // marks can't be more than the question is worth
+        Long examId = answer.getAttempt() != null && answer.getAttempt().getExam() != null ? answer.getAttempt().getExam().getExamId() : null;
+        BigDecimal maxMarks = examQuestionRepository.maxMarksFor(examId, answer.getQuestion());
+        if (maxMarks != null && marksAwarded.compareTo(maxMarks) > 0) {
+            throw new ValidationException("Marks awarded cannot be more than " + maxMarks.stripTrailingZeros().toPlainString() + " for this question");
         }
 
         answer.setMarksAwarded(marksAwarded);

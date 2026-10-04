@@ -89,7 +89,8 @@ export default function AttendanceQrModal({
   }, [slot.id]);
 
   useEffect(() => {
-    const presentCount = Object.values(attendance).filter((st) => st === "Present").length;
+    // present and late both count as checked in
+    const presentCount = Object.values(attendance).filter((st) => ["present", "late"].includes(String(st).toLowerCase())).length;
     setCheckedInCount(presentCount);
   }, [attendance]);
 
@@ -144,7 +145,7 @@ export default function AttendanceQrModal({
           {token ? (
             <QRCodeSVG value={token} size={230} className="w-[200px] h-[200px] sm:w-[260px] sm:h-[260px]" level="H" includeMargin={true} />
           ) : (
-            <div className="w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] flex items-center justify-center text-slate-400 text-xs">Loading QR...</div>
+            <div className="w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] flex items-center justify-center text-[var(--on-surface-variant)] text-xs">Loading QR...</div>
           )}
         </div>
         {tokenError && (

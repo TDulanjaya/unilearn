@@ -24,4 +24,8 @@ public interface PersonalResourceRepository extends JpaRepository<PersonalResour
     long countByStudent_StudentId(Long studentId);
 
     long countByStudent_StudentIdAndCourseOffering_OfferingId(Long studentId, Long offeringId);
+
+    // used by file download to find who owns a file
+    @org.springframework.data.jpa.repository.Query("SELECT r FROM PersonalResource r WHERE r.fileUrl LIKE CONCAT('%', :fileUrl, '%')")
+    List<PersonalResource> findAllByFileUrlLike(@org.springframework.data.repository.query.Param("fileUrl") String fileUrl);
 }

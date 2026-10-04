@@ -27,11 +27,20 @@ export default function HodDashboard() {
     enabled: !!departmentId,
   });
 
-  // kpis
+  // kpis (server limits HODs to their own departments)
   const { data: kpiData, isLoading: kpiLoading } = useQuery({
-    queryKey: ["hodKpi"],
-    queryFn: () => api.get<any>("/api/v1/reports/dashboard"),
+    queryKey: ["hodKpi", departmentId],
+    queryFn: () => api.get<any>(departmentId ? `/api/v1/reports/dashboard?departmentId=${departmentId}` : "/api/v1/reports/dashboard"),
+    enabled: assignments !== undefined,
   });
+
+  // rates already come as 0-100, show "No data" when nothing is recorded yet
+  const passRateText = kpiData?.averageExamPassRate == null || !kpiData?.examResultCount
+    ? "No data"
+    : `${Math.round(kpiData.averageExamPassRate)}%`;
+  const attendanceText = kpiData?.averageAttendanceRate == null || !kpiData?.attendanceRecordCount
+    ? "No data"
+    : `${Math.round(kpiData.averageAttendanceRate)}%`;
 
   // course offerings
   const { data: allOfferings, isLoading: offeringsLoading } = useQuery({
@@ -104,7 +113,7 @@ export default function HodDashboard() {
             <div>
               <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-0.5">Average Department Pass Rate</p>
               <p className="font-display font-extrabold text-2xl text-[var(--on-surface)]">
-                {kpiData?.averageExamPassRate != null ? Math.round(kpiData.averageExamPassRate * 100) : 94}%
+                {passRateText}
               </p>
             </div>
           </div>
@@ -116,7 +125,7 @@ export default function HodDashboard() {
             <div>
               <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-0.5">Overall Attendance Rate</p>
               <p className="font-display font-extrabold text-2xl text-emerald-600">
-                {kpiData?.averageAttendanceRate != null ? Math.round(kpiData.averageAttendanceRate * 100) : 88.5}%
+                {attendanceText}
               </p>
             </div>
           </div>

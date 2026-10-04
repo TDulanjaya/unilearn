@@ -19,6 +19,6 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
 
     List<Exam> findByCourseOffering_OfferingIdAndExamType(Long offeringId, String examType);
 
-    @Query("SELECT e FROM Exam e WHERE e.courseOffering.batch.batchId = :batchId AND e.examType = 'in_class' AND e.linkedSlot IS NOT NULL AND e.examDate >= :currentDate ORDER BY e.examDate ASC, e.startTime ASC")
+    @Query("SELECT e FROM Exam e WHERE e.courseOffering.batch.batchId = :batchId AND e.examType = 'midterm_inclass' AND e.linkedSlot IS NOT NULL AND e.examDate >= :currentDate ORDER BY e.examDate ASC, e.startTime ASC")
     List<Exam> findUpcomingInClassExamsForBatch(@Param("batchId") Long batchId, @Param("currentDate") LocalDate currentDate);
 }

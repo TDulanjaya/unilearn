@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { useAuth } from "@/context/AuthContext";
 import LecturerNavbar from "@/components/LecturerNavbar";
 import FileDropzone from "@/components/FileDropzone";
@@ -105,29 +106,34 @@ export default function LecturerCoursesPage() {
     },
   });
 
+  // DB only accepts: pdf, video, slides, link, other
+  const toResourceType = (category: string, fileName: string) => {
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    if (["mp4", "mov", "webm", "mkv", "avi"].includes(ext)) return "video";
+    if (category === "Slide") return "slides";
+    if (ext === "pdf") return "pdf";
+    return "other";
+  };
+
   const handleConfirmUpload = async () => {
     if (uploadedFiles.length === 0 || !activeOfferingId || isUploading) return;
     setIsUploading(true);
     try {
       for (const file of uploadedFiles) {
-        let fileUrl = `/uploads/${file.name}`;
-        try {
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("folder", "materials");
-          const uploadRes = await api.post<{ url: string }>("/api/v1/files/upload", formData);
-          if (uploadRes?.url) {
-            fileUrl = uploadRes.url;
-          }
-        } catch (uploadErr) {
-          console.warn("Direct file upload endpoint failed, falling back to local path:", uploadErr);
+        // if the upload fails we stop, so no broken material is saved
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("folder", "materials");
+        const uploadRes = await api.post<{ url: string }>("/api/v1/files/upload", formData);
+        if (!uploadRes?.url) {
+          throw new Error(`Could not upload ${file.name}`);
         }
 
         await uploadMaterialMutation.mutateAsync({
           offeringId: activeOfferingId,
           title: file.name.replace(/\.[^/.]+$/, ""),
-          resourceType: materialCategory,
-          fileUrl: fileUrl,
+          resourceType: toResourceType(materialCategory, file.name),
+          fileUrl: uploadRes.url,
           uploadedById: user?.userId,
         });
       }
@@ -316,7 +322,7 @@ export default function LecturerCoursesPage() {
                   <span className="text-[10px] text-[var(--outline)]">
                     Published: {new Date(ann.postedAt).toLocaleDateString()}
                   </span>
-                  <div dangerouslySetInnerHTML={{ __html: ann.content }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(ann.content) }} />
                 </div>
               ))
             )}

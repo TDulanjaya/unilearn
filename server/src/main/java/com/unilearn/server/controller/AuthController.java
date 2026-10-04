@@ -106,19 +106,25 @@ public class AuthController {
 
     @PostMapping("/change-password")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<java.util.Map<String, String>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        authService.changePassword(request);
-        return ResponseEntity.ok(java.util.Map.of("message", "Password changed successfully."));
+    public ResponseEntity<java.util.Map<String, String>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        RefreshTokenResponse tokens = authService.changePassword(request);
+        // new refresh cookie, so the client's next refresh gets a working access token
+        addRefreshTokenCookie(httpResponse, httpRequest, tokens.getRefreshToken(), 7 * 24 * 60 * 60);
+        return ResponseEntity.ok(java.util.Map.of(
+                "message", "Password changed successfully.",
+                "accessToken", tokens.getAccessToken()));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @CookieValue(name = "refreshToken", required = false) String cookieRefreshToken,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        if (authHeader != null && !authHeader.isBlank()) {
-            authService.logout(authHeader);
-        }
+        authService.logout(authHeader, cookieRefreshToken);
         addRefreshTokenCookie(httpResponse, httpRequest, "", 0);
         return ResponseEntity.noContent().build();
     }

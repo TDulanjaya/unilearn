@@ -14,4 +14,7 @@ public interface ExamAnswerRepository extends JpaRepository<ExamAnswer, Long> {
     List<ExamAnswer> findByAttempt_AttemptId(Long attemptId);
 
     Optional<ExamAnswer> findByAttempt_AttemptIdAndQuestion_QuestionId(Long attemptId, Long questionId);
+
+    // can return more than one row if old duplicates exist
+    List<ExamAnswer> findAllByAttempt_AttemptIdAndQuestion_QuestionIdOrderByAnswerIdAsc(Long attemptId, Long questionId);
 }

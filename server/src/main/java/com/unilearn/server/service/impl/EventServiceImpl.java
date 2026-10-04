@@ -82,6 +82,8 @@ public class EventServiceImpl implements EventService {
         event.setDescription(request.getDescription());
         event.setVenue(request.getVenue());
         event.setEventDate(request.getEventDate());
+        // empty capacity means no limit
+        event.setCapacity(request.getCapacity());
         if (request.getPosterUrl() != null) {
             event.setPosterUrl(request.getPosterUrl());
         }

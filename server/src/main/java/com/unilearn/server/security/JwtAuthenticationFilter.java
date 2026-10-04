@@ -39,10 +39,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
-                if (jwtService.validateToken(token)) {
+                // only access tokens can log a request in
+                if (jwtService.validateToken(token) && jwtService.isAccessToken(token)) {
                     String email = jwtService.getEmailFromToken(token);
                     if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                        // deactivated users lose access right away
+                        if (!userDetails.isEnabled()) {
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
+                        // token from before a logout or password change, don't log in
+                        if (userDetails instanceof com.unilearn.server.model.User tv
+                                && !jwtService.isTokenVersionValid(token, tv.getTokenVersion())) {
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
                         if (userDetails instanceof com.unilearn.server.model.User u && Boolean.TRUE.equals(u.getMustChangePassword())) {
                             String uri = request.getRequestURI();
                             if (!uri.startsWith("/api/v1/auth/change-password")

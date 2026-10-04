@@ -12,6 +12,8 @@ interface UserRecord {
   email: string;
   phone?: string;
   role: string;
+  // role exactly as the server has it
+  rawRole?: string;
   department?: string;
   facultyName?: string;
   batch?: string;
@@ -30,17 +32,64 @@ interface CsvValidationRow {
   role: string;
   department: string;
   batch?: string;
+  departmentId?: number;
+  batchId?: number;
   isValid: boolean;
   errorMessage?: string;
 }
 
+interface ImportResult {
+  success: number;
+  failed: number;
+  failures: { rowNumber: number; email: string; message: string }[];
+}
+
+const PAGE_SIZE = 20;
+
+// split one csv line, commas inside "quotes" are kept
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
+
 const INITIAL_USERS: UserRecord[] = [];
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 const VALID_ROLES = ["Student", "Lecturer", "Guest Lecturer", "HOD/Dean", "Staff/Admin"];
 const FILTER_ROLES = ["Super Admin", "Staff/Admin", "Student", "Lecturer", "Guest Lecturer", "HOD/Dean"];
+
+function roleToBackend(r: string): string {
+  if (!r) return "STUDENT";
+  const normalized = r.trim().toUpperCase().replace(/[\s\/-]+/g, "_");
+  switch (normalized) {
+    case "HOD":
+    case "DEAN": return "HOD_DEAN";
+    case "ADMIN":
+    case "STAFF": return "STAFF_ADMIN";
+    default: return normalized;
+  }
+}
 
 function formatRoleFromBackend(r: string): string {
   if (!r) return "Student";
@@ -72,10 +121,48 @@ export default function UserManagementPage() {
   const { user: currentUser } = useAuth();
   const isSuperAdmin = currentUser?.role?.toLowerCase() === "super_admin";
 
+  const [page, setPage] = useState(0);
+  const [roleFilter, setRoleFilter] = useState("All roles");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+
+  // wait a bit after typing before asking the server
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = searchInput.trim();
+      if (next !== search) {
+        setSearch(next);
+        setPage(0);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput, search]);
+
+  const usersQueryString = (() => {
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("size", String(PAGE_SIZE));
+    params.set("sort", "fullName,asc");
+    if (search) params.set("search", search);
+    if (roleFilter !== "All roles") params.set("role", roleToBackend(roleFilter));
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    return params.toString();
+  })();
+
   const { data: usersResponse, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => api.get<any>("/api/v1/users"),
+    queryKey: ["users", "list", usersQueryString],
+    queryFn: () => api.get<any>(`/api/v1/users?${usersQueryString}`),
+    placeholderData: keepPreviousData,
   });
+
+  const totalUsers: number = usersResponse?.dataCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE));
+
+  // go back a page if the last user on this page was removed
+  useEffect(() => {
+    if (usersResponse && page > totalPages - 1) setPage(totalPages - 1);
+  }, [usersResponse, page, totalPages]);
 
   const { data: deptsResponse } = useQuery({
     queryKey: ["departments"],
@@ -103,6 +190,7 @@ export default function UserManagementPage() {
         email: u.email || "",
         phone: u.phone || "N/A",
         role: formatRoleFromBackend(u.role),
+        rawRole: u.role,
         department: u.departmentName || (u.facultyName ? u.facultyName : (u.role?.toLowerCase() === "super_admin" ? "Institution Wide" : "—")),
         facultyName: u.facultyName,
         scopeLevel: u.scopeLevel,
@@ -116,7 +204,6 @@ export default function UserManagementPage() {
     if (apiUsers) setUsers(apiUsers);
   }, [usersResponse]);
 
-  const [roleFilter, setRoleFilter] = useState("All roles");
   const [toastMessage, setToastMessage] = useState("");
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -159,6 +246,9 @@ export default function UserManagementPage() {
   }, [facultiesResponse]);
 
   const [parsedRows, setParsedRows] = useState<CsvValidationRow[] | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState("");
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -198,6 +288,14 @@ export default function UserManagementPage() {
     },
   });
 
+  const reactivateMutation = useMutation({
+    mutationFn: (userId: number) =>
+      api.patch(`/api/v1/users/${userId}/active?active=true`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: any) =>
       api.post("/api/v1/users", data),
@@ -207,13 +305,12 @@ export default function UserManagementPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: number; fullName: string; email: string; role: string; phone?: string; active: boolean; password?: string }) =>
+    mutationFn: (data: { id: number; fullName: string; email: string; role: string; phone?: string; password?: string }) =>
       api.put(`/api/v1/users/${data.id}`, {
         fullName: data.fullName,
         email: data.email,
         role: data.role,
         phone: data.phone,
-        active: data.active,
         password: data.password || undefined,
       }),
     onSuccess: () => {
@@ -303,29 +400,77 @@ export default function UserManagementPage() {
     }
   };
 
+  const findDepartment = (value: string): any | null => {
+    const v = value.trim().toLowerCase();
+    if (!v) return null;
+    return (
+      departmentsList.find(
+        (d: any) =>
+          String(d.departmentId) === v ||
+          (d.name || "").toLowerCase() === v ||
+          (d.code || "").toLowerCase() === v
+      ) || null
+    );
+  };
+
+  const findBatch = (value: string, departmentId?: number): any | null => {
+    const v = value.trim().toLowerCase();
+    if (!v) return null;
+    const matches = batchesList.filter(
+      (b: any) => String(b.batchId) === v || (b.name || "").toLowerCase() === v
+    );
+    // same batch name can be in many departments, prefer the row's department
+    return matches.find((b: any) => departmentId && b.departmentId === departmentId) || matches[0] || null;
+  };
+
   const handleCsvFilesSelected = (files: File[]) => {
     if (files.length === 0) return;
     const file = files[0];
     const reader = new FileReader();
+    setImportResult(null);
 
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (!text) return;
 
       const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length === 0) return;
       const rows: CsvValidationRow[] = [];
       const seenEmails = new Set<string>(users.map((u) => u.email.toLowerCase()));
 
-      const startIdx = lines[0].toLowerCase().includes("email") ? 1 : 0;
+      // read columns by header name when there is a header row
+      let col = { name: 0, email: 1, role: 2, department: 3, batch: 4 };
+      const hasHeader = lines[0].toLowerCase().includes("email");
+      if (hasHeader) {
+        const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/[\s_]+/g, ""));
+        const idx = (names: string[], fallback: number) => {
+          const i = headers.findIndex((h) => names.includes(h));
+          return i >= 0 ? i : fallback;
+        };
+        col = {
+          name: idx(["fullname", "name"], 0),
+          email: idx(["email", "emailaddress"], 1),
+          role: idx(["role"], 2),
+          department: idx(["department", "departmentcode", "dept"], -1),
+          batch: idx(["batch", "batchname"], -1),
+        };
+      }
+
+      const startIdx = hasHeader ? 1 : 0;
       for (let i = startIdx; i < lines.length; i++) {
-        const parts = lines[i].split(",").map((p) => p.trim().replace(/^["']|["']$/g, ""));
-        const fullName = parts[0] || "";
-        const email = parts[1] || "";
-        const role = parts[2] || "Student";
-        const department = parts[3] || "Software Eng.";
+        const parts = splitCsvLine(lines[i]).map((p) => p.replace(/^["']|["']$/g, ""));
+        const get = (c: number) => (c >= 0 ? parts[c] || "" : "");
+        const fullName = get(col.name);
+        const email = get(col.email);
+        const role = get(col.role) || "Student";
+        const department = get(col.department);
+        const batch = get(col.batch);
+        const backendRole = roleToBackend(role);
 
         let isValid = true;
         let errorMessage = "";
+        const dept = findDepartment(department);
+        const batchObj = findBatch(batch, dept?.departmentId);
 
         if (!fullName) {
           isValid = false;
@@ -336,11 +481,37 @@ export default function UserManagementPage() {
         } else if (seenEmails.has(email.toLowerCase())) {
           isValid = false;
           errorMessage = "Duplicate Email";
+        } else if (!["STUDENT", "LECTURER", "GUEST_LECTURER", "HOD_DEAN", "STAFF_ADMIN"].includes(backendRole)) {
+          isValid = false;
+          errorMessage = "Unknown Role";
+        } else if (department && !dept) {
+          isValid = false;
+          errorMessage = `Unknown Department "${department}"`;
+        } else if ((backendRole === "STUDENT" || backendRole === "HOD_DEAN") && !dept) {
+          isValid = false;
+          errorMessage = "Department is required";
+        } else if (backendRole === "STUDENT" && !batch) {
+          isValid = false;
+          errorMessage = "Batch is required";
+        } else if (batch && !batchObj) {
+          isValid = false;
+          errorMessage = `Unknown Batch "${batch}"`;
         }
 
         if (isValid) seenEmails.add(email.toLowerCase());
 
-        rows.push({ rowNumber: i + 1, fullName, email, role, department, isValid, errorMessage });
+        rows.push({
+          rowNumber: i + 1,
+          fullName,
+          email,
+          role,
+          department,
+          batch,
+          departmentId: dept ? Number(dept.departmentId) : undefined,
+          batchId: batchObj ? Number(batchObj.batchId) : undefined,
+          isValid,
+          errorMessage,
+        });
       }
 
       setParsedRows(rows);
@@ -349,27 +520,70 @@ export default function UserManagementPage() {
     reader.readAsText(file);
   };
 
+  const handleDownloadCsvTemplate = () => {
+    const sample =
+      "fullName,email,role,department,batch\n" +
+      "Nimal Perera,nimal@example.com,Student,SE,2024 Batch A\n" +
+      "Kamala Silva,kamala@example.com,Lecturer,SE,\n";
+    const blob = new Blob([sample], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "users-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleConfirmBulkImport = async () => {
     if (!parsedRows) return;
     const validRows = parsedRows.filter((r) => r.isValid);
     let successCount = 0;
+    const failures: ImportResult["failures"] = [];
+    const created: { email: string; password: string }[] = [];
+    setIsImporting(true);
     for (const r of validRows) {
+      const backendRole = roleToBackend(r.role);
+      const payload: any = {
+        fullName: r.fullName,
+        email: r.email,
+        role: backendRole,
+      };
+      if (r.departmentId) payload.departmentId = r.departmentId;
+      if (backendRole === "STUDENT" && r.batchId) payload.batchId = r.batchId;
+      if (backendRole === "STAFF_ADMIN") payload.scopeType = "INSTITUTION";
+      if (backendRole === "HOD_DEAN") payload.scopeType = "department";
       try {
-        await createMutation.mutateAsync({
-          fullName: r.fullName,
-          email: r.email,
-          role: mapRoleToBackend(r.role),
-        });
+        const res: any = await createMutation.mutateAsync(payload);
+        if (res?.temporaryPassword) created.push({ email: r.email, password: res.temporaryPassword });
         successCount++;
-      } catch (err) {
-        console.error("Failed to import user:", r.email, err);
+      } catch (err: any) {
+        failures.push({ rowNumber: r.rowNumber, email: r.email, message: err?.message || "Server error" });
       }
     }
+    setIsImporting(false);
+
+    // download the new users' temporary passwords so the admin can share them
+    if (created.length > 0) {
+      const csv = "email,temporaryPassword\n" + created.map((c) => `${c.email},${c.password}`).join("\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "imported-users-passwords.csv";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // rows that failed the preview check count as failed too
+    const invalidRows = parsedRows.filter((r) => !r.isValid);
+    const allFailures = [
+      ...invalidRows.map((r) => ({ rowNumber: r.rowNumber, email: r.email, message: r.errorMessage || "Invalid row" })),
+      ...failures,
+    ].sort((a, b) => a.rowNumber - b.rowNumber);
 
     setParsedRows(null);
-    setShowAddModal(false);
+    setImportResult({ success: successCount, failed: allFailures.length, failures: allFailures });
     queryClient.invalidateQueries({ queryKey: ["users"] });
-    showToast(`Bulk imported ${successCount} users to database.`);
+    showToast(`${successCount} imported, ${allFailures.length} failed.`);
   };
 
   const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
@@ -384,9 +598,9 @@ export default function UserManagementPage() {
           id: numericId,
           fullName: editingUser.fullName,
           email: editingUser.email,
-          role: mapRoleToBackend(editingUser.role),
-          phone: editingUser.phone,
-          active: editingUser.status === "Active",
+          // role can't change, send the one the server already has
+          role: editingUser.rawRole || mapRoleToBackend(editingUser.role),
+          phone: editingUser.phone && editingUser.phone !== "N/A" ? editingUser.phone : undefined,
           password: editPassword.trim() || undefined,
         });
         if (editPassword.trim()) {
@@ -423,6 +637,7 @@ export default function UserManagementPage() {
         );
         if (isReferenced) {
           setDeletingUser(null);
+          setConflictMessage(err.message || "");
           setConflictUser(user);
         } else {
           showToast(`Error: ${err.message || "Failed to delete user."}`);
@@ -447,15 +662,28 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleReactivateUser = async (user: UserRecord) => {
+    const numericId = Number(user.id);
+    if (!isNaN(numericId)) {
+      try {
+        await reactivateMutation.mutateAsync(numericId);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === user.id ? { ...u, status: "Active" } : u))
+        );
+        showToast(`User ${user.fullName} reactivated.`);
+      } catch (err: any) {
+        showToast(`Error: ${err.message || "Failed to reactivate user."}`);
+      }
+    }
+  };
+
   const handleTriggerPasswordReset = () => {
     if (!editingUser) return;
     showToast(`Password reset link dispatched to ${editingUser.email}.`);
   };
 
-  const filteredUsers = users.filter((u) => {
-    if (roleFilter === "All roles" || roleFilter === "ALL") return true;
-    return formatRoleFromBackend(u.role) === roleFilter;
-  });
+  // role, status and search are done by the server
+  const filteredUsers = users;
 
   const columns = [
     {
@@ -476,7 +704,7 @@ export default function UserManagementPage() {
         const displayRole = formatRoleFromBackend(row.role);
         if (displayRole === "Super Admin") {
           return (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/30">
               <i className="ti ti-crown text-xs"></i>
               Super Admin
             </span>
@@ -489,7 +717,7 @@ export default function UserManagementPage() {
             ? "Faculty Admin"
             : "Institution Admin";
           return (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-500/30">
               <i className="ti ti-shield text-xs"></i>
               {facultyTag}
             </span>
@@ -537,7 +765,7 @@ export default function UserManagementPage() {
         const isRowSuperAdmin = row.role === "Super Admin" || row.role?.toLowerCase() === "super_admin";
         if (isRowSuperAdmin) {
           return (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-400 px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/25">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 dark:text-purple-400 px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/25">
               <i className="ti ti-lock"></i> Protected Account
             </span>
           );
@@ -548,15 +776,24 @@ export default function UserManagementPage() {
               onClick={() => setEditingUser({ ...row, role: formatRoleFromBackend(row.role) })}
               className="btn-secondary text-xs !py-1 flex items-center gap-1"
             >
-              <i className="ti ti-edit"></i> Edit Profile & Role
+              <i className="ti ti-edit"></i> Edit Profile
             </button>
-            {row.status === "Active" && (
+            {row.status === "Active" ? (
               <button
                 onClick={() => handleDeactivateUser(row)}
                 className="px-2.5 py-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-xs font-bold transition-colors flex items-center gap-1"
                 title="Deactivate Account (Recommended)"
               >
                 <i className="ti ti-power"></i> Deactivate
+              </button>
+            ) : (
+              <button
+                onClick={() => handleReactivateUser(row)}
+                disabled={reactivateMutation.isPending}
+                className="px-2.5 py-1 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs font-bold transition-colors flex items-center gap-1 disabled:opacity-50"
+                title="Reactivate Account"
+              >
+                <i className="ti ti-player-play"></i> Reactivate
               </button>
             )}
             <button
@@ -593,16 +830,38 @@ export default function UserManagementPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search name or email..."
+              className="text-xs px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+            />
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(0);
+              }}
               className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
             >
               <option value="All roles">Filter: All Roles</option>
               {FILTER_ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
+              className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
             <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs shadow-md shrink-0 whitespace-nowrap">
               <i className="ti ti-user-plus mr-1"></i> Add / Bulk Import
@@ -611,7 +870,60 @@ export default function UserManagementPage() {
         </div>
 
         <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
-          <DataTable data={filteredUsers} columns={columns} searchPlaceholder="Search users by name, email or department..." pageSize={10} />
+          {isError ? (
+            <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 text-xs flex items-center justify-between gap-2">
+              <span>Could not load users: {(error as any)?.message || "Server error"}</span>
+              <button onClick={() => refetch()} className="btn-secondary text-xs">Retry</button>
+            </div>
+          ) : (
+            <DataTable
+              data={filteredUsers}
+              columns={columns}
+              searchPlaceholder="Filter this page..."
+              pageSize={PAGE_SIZE}
+              pageSizeOptions={[PAGE_SIZE]}
+            />
+          )}
+
+          {/* server pages */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 text-xs text-[var(--on-surface-variant)]">
+            <span>
+              {isLoading
+                ? "Loading users..."
+                : totalUsers === 0
+                ? "No users found"
+                : `Showing ${page * PAGE_SIZE + 1}-${Math.min((page + 1) * PAGE_SIZE, totalUsers)} of ${totalUsers} users`}
+            </span>
+            <div className="flex items-center gap-1 flex-wrap">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="btn-secondary text-xs !py-1 disabled:opacity-40"
+              >
+                <i className="ti ti-chevron-left"></i> Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i)
+                .filter((i) => i === 0 || i === totalPages - 1 || Math.abs(i - page) <= 2)
+                .map((i, idx, arr) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {idx > 0 && i - arr[idx - 1] > 1 && <span className="px-1">...</span>}
+                    <button
+                      onClick={() => setPage(i)}
+                      className={`text-xs !py-1 px-2.5 rounded-lg ${i === page ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      {i + 1}
+                    </button>
+                  </span>
+                ))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="btn-secondary text-xs !py-1 disabled:opacity-40"
+              >
+                Next <i className="ti ti-chevron-right"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </main>
 
@@ -709,10 +1021,10 @@ export default function UserManagementPage() {
               {newRole === "Staff/Admin" && isSuperAdmin && (
                 <div className="p-3.5 rounded-xl border border-blue-500/30 bg-blue-500/5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-bold text-blue-400 flex items-center gap-1.5">
+                    <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
                       <i className="ti ti-shield-lock text-sm"></i> Staff Administrator Scope & Faculty Assignment
                     </p>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
                       Super Admin Authorized
                     </span>
                   </div>
@@ -883,7 +1195,35 @@ export default function UserManagementPage() {
 
             <div className="space-y-3 pt-1">
               <p className="text-xs font-bold text-[var(--on-surface)]">CSV Bulk Importer:</p>
+              <div className="text-[11px] text-[var(--on-surface-variant)] space-y-1">
+                <p>
+                  Columns: <span className="font-mono">fullName, email, role, department, batch</span>
+                </p>
+                <p>
+                  Role is Student, Lecturer, Guest Lecturer, HOD/Dean or Staff/Admin. Department can be the name or the code.
+                  Students need a department and a batch (batch name as shown in Academic Structure).
+                </p>
+                <button type="button" onClick={handleDownloadCsvTemplate} className="text-[var(--tertiary)] font-semibold hover:underline">
+                  <i className="ti ti-download"></i> Download CSV template
+                </button>
+              </div>
               <FileDropzone accept=".csv" maxSizeMB={5} multiple={false} onFilesSelected={handleCsvFilesSelected} />
+
+              {importResult && (
+                <div className={`p-3 rounded-xl border text-xs space-y-1 ${importResult.failed > 0 ? "border-amber-500/30 bg-amber-500/10" : "border-emerald-500/30 bg-emerald-500/10"}`}>
+                  <p className="font-bold text-[var(--on-surface)]">
+                    {importResult.success} imported, {importResult.failed} failed
+                  </p>
+                  {importResult.failures.slice(0, 5).map((f) => (
+                    <p key={f.rowNumber} className="text-[11px] text-[var(--on-surface-variant)]">
+                      Row {f.rowNumber} ({f.email || "no email"}): {f.message}
+                    </p>
+                  ))}
+                  {importResult.failures.length > 5 && (
+                    <p className="text-[11px] text-[var(--on-surface-variant)]">...and {importResult.failures.length - 5} more</p>
+                  )}
+                </div>
+              )}
 
               {parsedRows && (
                 <div className="space-y-2 border-t border-[var(--outline-variant)] pt-3">
@@ -906,7 +1246,14 @@ export default function UserManagementPage() {
                               <p className="font-bold">{r.fullName || "—"}</p>
                               <p className="text-[10px] text-[var(--on-surface-variant)]">{r.email}</p>
                             </td>
-                            <td className="p-2">{r.role}</td>
+                            <td className="p-2">
+                              <p>{r.role}</p>
+                              {(r.department || r.batch) && (
+                                <p className="text-[10px] text-[var(--on-surface-variant)]">
+                                  {[r.department, r.batch].filter(Boolean).join(" / ")}
+                                </p>
+                              )}
+                            </td>
                             <td className="p-2">
                               {r.isValid ? (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600">Valid</span>
@@ -919,8 +1266,8 @@ export default function UserManagementPage() {
                       </tbody>
                     </table>
                   </div>
-                  <button onClick={handleConfirmBulkImport} disabled={parsedRows.filter((r) => r.isValid).length === 0} className="btn-primary text-xs w-full justify-center disabled:opacity-40">
-                    Confirm Import ({parsedRows.filter((r) => r.isValid).length} Valid Users)
+                  <button onClick={handleConfirmBulkImport} disabled={isImporting || parsedRows.filter((r) => r.isValid).length === 0} className="btn-primary text-xs w-full justify-center disabled:opacity-40">
+                    {isImporting ? "Importing..." : `Confirm Import (${parsedRows.filter((r) => r.isValid).length} Valid Users)`}
                   </button>
                 </div>
               )}
@@ -976,11 +1323,13 @@ export default function UserManagementPage() {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1 text-[var(--on-surface)]">Department</label>
+                  {/* department is not saved from here */}
                   <input
                     type="text"
                     value={editingUser.department || ""}
-                    onChange={(e) => setEditingUser({ ...editingUser, department: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]"
+                    readOnly
+                    disabled
+                    className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] opacity-70 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -988,19 +1337,22 @@ export default function UserManagementPage() {
               <div>
                 <label className="block font-semibold mb-1 text-[var(--on-surface)]">System Role</label>
                 {editingUser.role === "Super Admin" ? (
-                  <div className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 font-bold text-xs flex items-center gap-1.5">
+                  <div className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-400 font-bold text-xs flex items-center gap-1.5">
                     <i className="ti ti-crown"></i> Super Administrator (Fixed Role)
                   </div>
                 ) : (
-                  <select
-                    value={editingUser.role}
-                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] font-semibold"
-                  >
-                    {(isSuperAdmin ? VALID_ROLES : VALID_ROLES.filter((r) => r !== "Staff/Admin")).map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
+                  <>
+                    <input
+                      type="text"
+                      value={editingUser.role}
+                      readOnly
+                      disabled
+                      className="w-full p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] font-semibold opacity-70 cursor-not-allowed"
+                    />
+                    <p className="text-[10px] text-[var(--on-surface-variant)] mt-1">
+                      Role can't be changed. Create a new account for a different role.
+                    </p>
+                  </>
                 )}
               </div>
 
@@ -1091,6 +1443,9 @@ export default function UserManagementPage() {
               <p>
                 <b>{conflictUser.fullName}</b> cannot be permanently deleted because active or historical academic records in the database still reference this account.
               </p>
+              {conflictMessage && (
+                <p className="text-[11px]">{conflictMessage}</p>
+              )}
               <p className="text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 p-2.5 rounded-lg border border-amber-500/20">
                 To protect relational integrity and keep academic records intact, you can <b>Deactivate</b> this account instead. This immediately revokes system login privileges and locks the account.
               </p>

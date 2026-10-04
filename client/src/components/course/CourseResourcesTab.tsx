@@ -39,18 +39,15 @@ export default function CourseResourcesTab({
     }
     setIsUploading(true);
     try {
-      let fileUrl = `/uploads/${file.name}`;
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("folder", "resources");
-        const uploadRes = await api.post<{ url: string }>("/api/v1/files/upload", formData);
-        if (uploadRes?.url) {
-          fileUrl = uploadRes.url;
-        }
-      } catch (uploadErr) {
-        console.warn("Direct upload endpoint failed, using local path:", uploadErr);
+      // stop if the upload fails, so we don't save a file that isn't there
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "resources");
+      const uploadRes = await api.post<{ url: string }>("/api/v1/files/upload", formData);
+      if (!uploadRes?.url) {
+        throw new Error("Upload failed. Please try again.");
       }
+      const fileUrl = uploadRes.url;
 
       if (offeringId) {
         const created = await api.post<any>("/api/v1/personal-resources", {

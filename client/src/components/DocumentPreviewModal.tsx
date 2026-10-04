@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useFileUrl, openFile, downloadFile } from "@/lib/files";
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -19,6 +20,9 @@ export default function DocumentPreviewModal({
   type,
   fileSize,
 }: DocumentPreviewModalProps) {
+  // load the file with the login token
+  const { src, error } = useFileUrl(isOpen ? url : null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -56,21 +60,20 @@ export default function DocumentPreviewModal({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => openFile(url)}
               className="btn-outline text-xs min-h-[44px] px-3 hidden sm:flex items-center gap-1"
             >
               <i className="ti ti-external-link"></i> Open Tab
-            </a>
-            <a
-              href={url}
-              download
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadFile(url, url?.split("?")[0].split("/").pop() || title)}
               className="btn-primary text-xs min-h-[44px] px-3.5 flex items-center gap-1"
             >
               <i className="ti ti-download"></i> <span className="hidden sm:inline">Download</span>
-            </a>
+            </button>
             <button
               onClick={onClose}
               className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] transition-colors"
@@ -83,12 +86,18 @@ export default function DocumentPreviewModal({
 
         {/* Content iframe */}
         <div className="flex-1 bg-black/5 dark:bg-black/40 relative">
-          <iframe
-            src={url}
-            title={title}
-            className="w-full h-full border-0"
-            loading="lazy"
-          />
+          {error ? (
+            <p className="p-6 text-center text-xs font-semibold text-red-500">{error}</p>
+          ) : !src ? (
+            <p className="p-6 text-center text-xs font-semibold text-[var(--on-surface-variant)]">Loading file...</p>
+          ) : (
+            <iframe
+              src={src}
+              title={title}
+              className="w-full h-full border-0"
+              loading="lazy"
+            />
+          )}
         </div>
       </div>
     </div>

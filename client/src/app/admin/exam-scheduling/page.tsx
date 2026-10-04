@@ -10,19 +10,21 @@ interface ScheduledExam {
   id: string;
   courseCode: string;
   courseTitle: string;
+  batchId: number | null;
   batch: string;
   date: string;
   startTime: string;
   endTime: string;
   venue: string;
-  supervisor: string;
+  scheduledBy: string;
+  status: string;
 }
 
 export default function AdminExamSchedulingPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: rawExams, isLoading: examsLoading } = useQuery({
+  const { data: rawExams, isLoading: examsLoading, isError: examsError, error: examsErrorObj } = useQuery({
     queryKey: ["exams"],
     queryFn: () => api.get<any[]>("/api/v1/exams"),
   });
@@ -34,18 +36,24 @@ export default function AdminExamSchedulingPage() {
 
   const offerings = Array.isArray(rawOfferings) ? rawOfferings : [];
 
+  // the exam response has no batch, so take it from the exam's offering
   const exams: ScheduledExam[] = Array.isArray(rawExams)
-    ? rawExams.map((e: any) => ({
-        id: String(e.examId),
-        courseCode: e.courseCode || "—",
-        courseTitle: e.title || (e.courseCode ? `${e.courseCode} Exam` : "Scheduled Exam"),
-        batch: e.batchName || e.batch || "All Batches",
-        date: e.examDate ? String(e.examDate) : (e.date ? String(e.date) : "—"),
-        startTime: e.startTime ? String(e.startTime).substring(0, 5) : "—",
-        endTime: e.endTime ? String(e.endTime).substring(0, 5) : "—",
-        venue: e.venue || "TBD",
-        supervisor: e.scheduledByName || "—",
-      }))
+    ? rawExams.map((e: any) => {
+        const off = offerings.find((o: any) => o.offeringId === e.offeringId);
+        return {
+          id: String(e.examId),
+          courseCode: e.courseCode || "—",
+          courseTitle: off?.courseName || (e.courseCode ? `${e.courseCode} Exam` : "Scheduled Exam"),
+          batchId: off?.batchId ?? null,
+          batch: off?.batchName || "—",
+          date: e.examDate ? String(e.examDate) : "—",
+          startTime: e.startTime ? String(e.startTime).substring(0, 5) : "—",
+          endTime: e.endTime ? String(e.endTime).substring(0, 5) : "—",
+          venue: e.venue || "TBD",
+          scheduledBy: e.scheduledByName || "—",
+          status: e.status || "",
+        };
+      })
     : [];
 
   const [selectedOfferingId, setSelectedOfferingId] = useState<string>("");
@@ -53,7 +61,6 @@ export default function AdminExamSchedulingPage() {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("11:00");
   const [venue, setVenue] = useState("");
-  const [supervisor, setSupervisor] = useState("");
 
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -66,7 +73,6 @@ export default function AdminExamSchedulingPage() {
       setSelectedOfferingId("");
       setDate("");
       setVenue("");
-      setSupervisor("");
     },
     onError: (err: any) => {
       setConflictError(err?.message || "Failed to schedule exam. Check parameters.");
@@ -83,12 +89,17 @@ export default function AdminExamSchedulingPage() {
       return;
     }
 
-    const selectedOffering = offerings.find((o) => String(o.offeringId) === selectedOfferingId);
-    const targetBatch = selectedOffering?.batchName || "";
+    if (endTime <= startTime) {
+      setConflictError("End time must be after the start time.");
+      return;
+    }
 
-    // Check for time conflicts
+    const selectedOffering = offerings.find((o) => String(o.offeringId) === selectedOfferingId);
+    const targetBatchId = selectedOffering?.batchId ?? null;
+
+    // quick check here, the server checks again
     const conflict = exams.find((exam) => {
-      if (targetBatch && exam.batch === targetBatch && exam.date === date) {
+      if (targetBatchId != null && exam.batchId === targetBatchId && exam.date === date && exam.status !== "cancelled") {
         return startTime < exam.endTime && exam.startTime < endTime;
       }
       return false;
@@ -96,7 +107,7 @@ export default function AdminExamSchedulingPage() {
 
     if (conflict) {
       setConflictError(
-        `FR-EXAM-03 Violation: Batch ${targetBatch} already has a conflicting final exam (${conflict.courseCode} at ${conflict.startTime}-${conflict.endTime}) scheduled on ${date}.`
+        `FR-EXAM-03 Violation: Batch ${selectedOffering?.batchName || ""} already has a conflicting exam (${conflict.courseCode} at ${conflict.startTime}-${conflict.endTime}) scheduled on ${date}.`
       );
       return;
     }
@@ -147,6 +158,10 @@ export default function AdminExamSchedulingPage() {
                 <p className="py-8 text-center text-xs text-[var(--on-surface-variant)] animate-pulse">
                   Loading scheduled exams...
                 </p>
+              ) : examsError ? (
+                <p className="py-8 text-center text-xs text-red-500 font-semibold">
+                  Failed to load exams: {(examsErrorObj as Error)?.message || "unknown error"}
+                </p>
               ) : exams.length === 0 ? (
                 <p className="py-8 text-center text-xs text-[var(--on-surface-variant)]">
                   No final exams scheduled yet.
@@ -165,7 +180,7 @@ export default function AdminExamSchedulingPage() {
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-[var(--on-surface-variant)]">
                       <span>Venue: <b>{ex.venue}</b></span>
-                      <span>Supervisor: <b>{ex.supervisor}</b></span>
+                      <span>Scheduled by: <b>{ex.scheduledBy}</b></span>
                     </div>
                   </div>
                 ))
@@ -181,7 +196,7 @@ export default function AdminExamSchedulingPage() {
                     <th className="pb-3 px-3">Batch</th>
                     <th className="pb-3 px-3">Date & Time</th>
                     <th className="pb-3 px-3">Venue</th>
-                    <th className="pb-3 px-3">Supervisor</th>
+                    <th className="pb-3 px-3">Scheduled By</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--outline-variant)]">
@@ -189,6 +204,12 @@ export default function AdminExamSchedulingPage() {
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-[var(--on-surface-variant)] animate-pulse">
                         Loading scheduled exams...
+                      </td>
+                    </tr>
+                  ) : examsError ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-red-500 font-semibold">
+                        Failed to load exams: {(examsErrorObj as Error)?.message || "unknown error"}
                       </td>
                     </tr>
                   ) : exams.length === 0 ? (
@@ -212,7 +233,7 @@ export default function AdminExamSchedulingPage() {
                           <p className="text-[10px] text-[var(--tertiary)]">{ex.startTime} - {ex.endTime}</p>
                         </td>
                         <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.venue}</td>
-                        <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.supervisor}</td>
+                        <td className="py-3 px-3 text-[var(--on-surface-variant)]">{ex.scheduledBy}</td>
                       </tr>
                     ))
                   )}
@@ -278,11 +299,6 @@ export default function AdminExamSchedulingPage() {
               <div>
                 <label className="block text-xs font-semibold mb-1">Exam Hall / Venue</label>
                 <input type="text" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="e.g. Hall A" className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" required />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">Supervisor / Chief Invigilator</label>
-                <input type="text" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} placeholder="Supervisor name" className="w-full text-xs min-h-[44px] p-2.5 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]" />
               </div>
 
               <button type="submit" disabled={scheduleMutation.isPending} className="btn-primary w-full justify-center text-xs min-h-[44px] shadow-md mt-2">

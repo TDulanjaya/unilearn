@@ -45,8 +45,8 @@ public class MaterialServiceImpl implements MaterialService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        Lecturer lecturer = lecturerRepository.findById(request.getUploadedById())
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getUploadedById()));
+        Lecturer lecturer = currentLecturer();
+        request.setUploadedById(lecturer.getLecturerId());
 
         Material material = materialMapper.toMaterial(request, offering, lecturer);
         Material saved = materialRepository.save(material);
@@ -75,8 +75,8 @@ public class MaterialServiceImpl implements MaterialService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        Lecturer lecturer = lecturerRepository.findById(request.getUploadedById())
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getUploadedById()));
+        // keep the original uploader
+        Lecturer lecturer = material.getUploadedBy() != null ? material.getUploadedBy() : currentLecturer();
 
         material.setCourseOffering(offering);
         material.setTitle(request.getTitle());
@@ -161,5 +161,13 @@ public class MaterialServiceImpl implements MaterialService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    // the logged in lecturer, not the id sent by the browser
+    private Lecturer currentLecturer() {
+        com.unilearn.server.model.User user = ownershipValidator.getCurrentUser()
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("User not authenticated"));
+        return lecturerRepository.findById(user.getUserId())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Only lecturers can do this"));
     }
 }

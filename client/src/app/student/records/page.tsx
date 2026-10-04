@@ -18,6 +18,7 @@ interface SemesterData {
 }
 
 const GRADE_POINTS: Record<string, number> = {
+  "A+": 4.0,
   A: 4.0,
   "A-": 3.7,
   "B+": 3.3,
@@ -25,8 +26,14 @@ const GRADE_POINTS: Record<string, number> = {
   "B-": 2.7,
   "C+": 2.3,
   C: 2.0,
+  "C-": 1.7,
+  "D+": 1.3,
+  D: 1.0,
   F: 0.0,
 };
+
+// shown when there is no published final grade yet
+const PENDING = "Pending";
 
 const INITIAL_SEMESTERS: SemesterData[] = [];
 
@@ -34,6 +41,15 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect } from "react";
+
+interface EnrollmentRecord {
+  semesterId: number | null;
+  semesterName: string;
+  course: CourseRecord;
+}
+
+const toList = (data: any): any[] =>
+  Array.isArray(data) ? data : data?.content || data?.dataList || [];
 
 export default function StudentRecordsPage() {
   const { user } = useAuth();
@@ -49,26 +65,89 @@ export default function StudentRecordsPage() {
     queryFn: () => api.get<any[]>("/api/v1/semesters"),
   });
 
-  const semesters: SemesterData[] = Array.isArray(rawSemesters) && rawSemesters.length > 0
-    ? rawSemesters.map((s: any) => {
-        const matchingEnrollments = Array.isArray(enrollmentsData)
-          ? enrollmentsData.filter((e: any) => e.status === "ACTIVE" || e.status === "ENROLLED" || e.status === "COMPLETED")
-          : [];
-        const courses: CourseRecord[] = matchingEnrollments.map((e: any) => ({
-          code: e.courseCode || "CRS",
-          name: e.courseName || "Course",
-          credits: 3,
-          grade: "A",
-          points: 4.0,
-        }));
+  // server keeps status in lowercase, so compare without case
+  const recordEnrollments = toList(enrollmentsData).filter((e: any) =>
+    ["active", "enrolled", "completed"].includes(String(e.status || "").toLowerCase())
+  );
+
+  // load credits and final grade for each enrolled course
+  const { data: records, error: recordsError } = useQuery({
+    queryKey: ["student-records-details", user?.userId, recordEnrollments.map((e: any) => e.offeringId).join(",")],
+    enabled: !!user?.userId && recordEnrollments.length > 0,
+    queryFn: async (): Promise<EnrollmentRecord[]> => {
+      return Promise.all(
+        recordEnrollments.map(async (e: any) => {
+          const offering = await api.get<any>(`/api/v1/course-offerings/${e.offeringId}`);
+          const course = offering?.courseId ? await api.get<any>(`/api/v1/courses/${offering.courseId}`) : null;
+          const credits = Number(course?.credits ?? course?.creditHours ?? 0);
+
+          // grade comes from the published final exam result
+          let grade = PENDING;
+          const exams = toList(await api.get<any>(`/api/v1/exams/offering/${e.offeringId}`));
+          const finalExam = exams.find((x: any) => String(x.examType || "").toLowerCase() === "final");
+          if (finalExam) {
+            try {
+              const result = await api.get<any>(`/api/v1/exam-results/student/${user?.userId}?examId=${finalExam.examId}`);
+              const letter = String(result?.grade || "").trim().toUpperCase();
+              if (result?.publishedAt && letter in GRADE_POINTS) grade = letter;
+            } catch {
+              // no result yet or not published, so it stays pending
+            }
+          }
+
+          return {
+            semesterId: offering?.semesterId ?? null,
+            semesterName: offering?.semesterName || offering?.semesterLabel || "",
+            course: {
+              code: e.courseCode || offering?.courseCode || "CRS",
+              name: e.courseName || offering?.courseName || "Course",
+              credits,
+              grade,
+              points: grade === PENDING ? 0 : GRADE_POINTS[grade],
+            },
+          };
+        })
+      );
+    },
+  });
+
+  useEffect(() => {
+    if (recordsError) alert((recordsError as Error).message || "Failed to load academic records");
+  }, [recordsError]);
+
+  const semesterList = toList(rawSemesters);
+
+  // group the courses by semester, in the same order as the semester list
+  const semesters: SemesterData[] = (() => {
+    const groups = new Map<string, { order: number; name: string; courses: CourseRecord[] }>();
+    (records || []).forEach((r) => {
+      const key = r.semesterId != null ? String(r.semesterId) : "none";
+      const idx = semesterList.findIndex((s: any) => s.semesterId === r.semesterId);
+      if (!groups.has(key)) {
+        groups.set(key, {
+          order: idx >= 0 ? idx : semesterList.length,
+          name: r.semesterName || (idx >= 0 ? semesterList[idx].name : "") || "Semester",
+          courses: [],
+        });
+      }
+      groups.get(key)!.courses.push(r.course);
+    });
+
+    return Array.from(groups.values())
+      .sort((a, b) => a.order - b.order)
+      .map((g) => {
+        // pending courses are not part of the GPA
+        const graded = g.courses.filter((c) => c.grade !== PENDING);
+        const credits = graded.reduce((sum, c) => sum + c.credits, 0);
+        const quality = graded.reduce((sum, c) => sum + c.points * c.credits, 0);
         return {
-          semester: s.name || "Semester",
-          gpa: courses.length > 0 ? 4.0 : 0.0,
-          credits: courses.length * 3,
-          courses,
+          semester: g.name,
+          gpa: credits > 0 ? Number((quality / credits).toFixed(2)) : 0,
+          credits,
+          courses: g.courses,
         };
-      }).filter((s) => s.courses.length > 0)
-    : [];
+      });
+  })();
 
   const [selectedSemIdx, setSelectedSemIdx] = useState(0);
 
@@ -90,7 +169,9 @@ export default function StudentRecordsPage() {
     semesters.forEach((sem) => {
       sem.courses.forEach((course) => {
         const gradeKey = hypotheticalGrades[course.code] || course.grade;
-        const pts = GRADE_POINTS[gradeKey] ?? course.points;
+        const pts = GRADE_POINTS[gradeKey];
+        // skip courses that still have no grade
+        if (pts === undefined) return;
         totalQualityPoints += pts * course.credits;
         totalCreds += course.credits;
       });
@@ -121,19 +202,18 @@ export default function StudentRecordsPage() {
 ============================================================
 Student Name: ${studentName}
 Student ID  : ${studentId}
-Degree      : Bachelor of Science (Hons) in Software Engineering
 Overall CGPA: ${actualCgpa}
-Total Credits: ${totalCredits}
+Total Credits: ${totalCredits} (pending courses are not counted)
 
 ------------------------------------------------------------
 `;
 
     semesters.forEach((sem) => {
       transcriptText += `\n${sem.semester.toUpperCase()} (Semester GPA: ${sem.gpa.toFixed(2)})\n`;
-      transcriptText += `Code     | Course Name                         | Cr | Grade | Points\n`;
+      transcriptText += `Code     | Course Name                         | Cr | Grade   | Points\n`;
       transcriptText += `------------------------------------------------------------\n`;
       sem.courses.forEach((c) => {
-        transcriptText += `${c.code.padEnd(8)} | ${c.name.padEnd(35)} | ${c.credits}  | ${c.grade.padEnd(5)} | ${c.points.toFixed(2)}\n`;
+        transcriptText += `${c.code.padEnd(8)} | ${c.name.padEnd(35)} | ${String(c.credits).padEnd(2)} | ${c.grade.padEnd(7)} | ${c.grade === PENDING ? "-" : c.points.toFixed(2)}\n`;
       });
     });
 
@@ -180,7 +260,7 @@ Total Credits: ${totalCredits}
         <div className="card p-6 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
           <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Total Credits Earned</p>
           <p className="font-display font-extrabold text-3xl text-[var(--on-surface)]">{totalCredits}</p>
-          <p className="text-[11px] text-[var(--outline)] mt-1">First Class Honors Track</p>
+          <p className="text-[11px] text-[var(--outline)] mt-1">Pending courses are not counted</p>
         </div>
 
         
@@ -242,6 +322,7 @@ Total Credits: ${totalCredits}
                       onChange={(e) => handleGradeChange(course.code, e.target.value)}
                       className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--tertiary)] focus:outline-none focus:border-[var(--tertiary)]"
                     >
+                      {course.grade === PENDING && <option value={PENDING}>{PENDING}</option>}
                       {Object.keys(GRADE_POINTS).map((g) => (
                         <option key={g} value={g}>
                           {g} ({GRADE_POINTS[g].toFixed(1)})
@@ -281,7 +362,7 @@ Total Credits: ${totalCredits}
                 <p className="text-xs font-semibold text-[var(--on-surface)]">{course.name}</p>
                 <div className="flex items-center justify-between text-[11px] text-[var(--on-surface-variant)] pt-1">
                   <span>Credits: <b className="text-[var(--on-surface)]">{course.credits}</b></span>
-                  <span>Grade Points: <b className="font-mono text-[var(--on-surface)]">{course.points.toFixed(2)}</b></span>
+                  <span>Grade Points: <b className="font-mono text-[var(--on-surface)]">{course.grade === PENDING ? "-" : course.points.toFixed(2)}</b></span>
                 </div>
               </div>
             ))}
@@ -308,7 +389,7 @@ Total Credits: ${totalCredits}
                     <td className="p-3">
                       <span className="badge badge-accent font-bold">{course.grade}</span>
                     </td>
-                    <td className="p-3 font-mono font-bold">{course.points.toFixed(2)}</td>
+                    <td className="p-3 font-mono font-bold">{course.grade === PENDING ? "-" : course.points.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

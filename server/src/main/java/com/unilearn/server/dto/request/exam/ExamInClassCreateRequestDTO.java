@@ -11,6 +11,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -22,7 +25,21 @@ public class ExamInClassCreateRequestDTO {
     @Positive(message = "Offering ID must be positive")
     private Long offeringId;
 
+    @NotNull(message = "Linked class slot is required for an in-class exam")
+    @Positive(message = "Linked slot ID must be positive")
     private Long linkedSlotId;
+
+    // the slot only has a weekday, so the client sends the real date
+    @NotNull(message = "Exam date is required")
+    private LocalDate examDate;
+
+    // optional, the slot times are used when these are empty
+    private LocalTime startTime;
+
+    private LocalTime endTime;
+
+    @Size(max = 100, message = "Venue must not exceed 100 characters")
+    private String venue;
 
     @Size(max = 100, message = "Title must not exceed 100 characters")
     private String title;

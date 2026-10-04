@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DocumentPreviewModal from "@/components/DocumentPreviewModal";
+import { useFileUrl } from "@/lib/files";
 
 export interface RubricCriterion {
   criterion: string;
@@ -46,6 +47,8 @@ export default function SubmissionReviewer({
   const [rubric, setRubric] = useState<RubricCriterion[]>(submission.rubric);
   const [feedback, setFeedback] = useState(submission.feedback);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  // load the file with the login token
+  const { src: fileSrc, error: fileError } = useFileUrl(submission.fileUrl);
 
   const handlePointChange = (index: number, val: number) => {
     const max = rubric[index].maxPoints;
@@ -119,11 +122,17 @@ export default function SubmissionReviewer({
             <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 sm:space-y-4 bg-[var(--surface-container-lowest)]">
               {submission.fileUrl ? (
                 <div className="w-full h-[320px] lg:h-full min-h-[250px] flex flex-col rounded-xl overflow-hidden border border-[var(--outline-variant)] bg-white">
-                  <iframe
-                    src={submission.fileUrl}
-                    title={submission.fileName}
-                    className="w-full flex-1 border-0"
-                  />
+                  {fileError ? (
+                    <p className="p-4 text-center text-xs font-semibold text-red-500">{fileError}</p>
+                  ) : !fileSrc ? (
+                    <p className="p-4 text-center text-xs font-semibold text-slate-500">Loading file...</p>
+                  ) : (
+                    <iframe
+                      src={fileSrc}
+                      title={submission.fileName}
+                      className="w-full flex-1 border-0"
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="p-8 text-center space-y-2 border border-dashed border-[var(--outline-variant)] rounded-xl my-auto">

@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
+// present and late both count as attended (status can be any case)
+const isAttended = (status: any) => ["present", "late"].includes(String(status || "").toLowerCase());
+
 interface AttendanceCourse {
   offeringId: number;
   code: string;
@@ -50,7 +53,7 @@ export default function StudentAttendancePage() {
           r.session?.offeringId === e.offeringId ||
           r.courseCode === e.courseCode
       ) || [];
-    const presentRecords = courseRecords.filter((r: any) => r.status === "Present");
+    const presentRecords = courseRecords.filter((r: any) => isAttended(r.status));
     const attended = presentRecords.length;
     const total = courseRecords.length > 0 ? courseRecords.length : 1;
     const percentage = courseRecords.length > 0 ? Math.round((attended / total) * 100) : 0;
@@ -214,7 +217,7 @@ export default function StudentAttendancePage() {
                   <span className="font-bold text-xs text-[var(--on-surface)]">
                     {rec.courseCode || "Course"} · {rec.courseName || ""}
                   </span>
-                  <span className={`badge ${rec.status === "Present" ? "badge-success" : "badge-warning"} text-[10px]`}>
+                  <span className={`badge ${String(rec.status || "").toLowerCase() === "present" ? "badge-success" : "badge-warning"} text-[10px]`}>
                     {rec.status}
                   </span>
                 </div>
@@ -257,7 +260,7 @@ export default function StudentAttendancePage() {
                       #{rec.sessionId}
                     </td>
                     <td className="py-3 px-3">
-                      <span className={`badge ${rec.status === "Present" ? "badge-success" : "badge-warning"} text-[10px]`}>
+                      <span className={`badge ${String(rec.status || "").toLowerCase() === "present" ? "badge-success" : "badge-warning"} text-[10px]`}>
                         {rec.status}
                       </span>
                     </td>

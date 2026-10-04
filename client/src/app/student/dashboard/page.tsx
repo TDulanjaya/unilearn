@@ -37,7 +37,10 @@ export default function StudentDashboard() {
     enabled: !!user?.userId,
   });
 
-  const presentRecords = attendanceRecords?.filter((r: any) => r.status === "Present") || [];
+  // late also counts as attended
+  const presentRecords = attendanceRecords?.filter((r: any) =>
+    ["present", "late"].includes(String(r.status || "").toLowerCase())
+  ) || [];
   const attendanceRate = attendanceRecords && attendanceRecords.length > 0 
     ? Math.round((presentRecords.length / attendanceRecords.length) * 100) 
     : 0;

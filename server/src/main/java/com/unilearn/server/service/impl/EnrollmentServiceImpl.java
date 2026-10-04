@@ -67,6 +67,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             }
         }
 
+        // a dropped student coming back: reuse the old row (the table allows one row per course)
+        var oldRow = enrollmentRepository.findByStudent_StudentIdAndCourseOffering_OfferingId(request.getStudentId(), request.getOfferingId());
+        if (oldRow.isPresent()) {
+            Enrollment back = oldRow.get();
+            back.setStatus("active");
+            back.setEnrollmentDate(java.time.LocalDate.now());
+            return enrollmentMapper.toEnrollmentResponse(enrollmentRepository.save(back));
+        }
+
         Enrollment enrollment = enrollmentMapper.toEnrollment(request, student, offering);
         Enrollment saved = enrollmentRepository.save(enrollment);
         return enrollmentMapper.toEnrollmentResponse(saved);
@@ -249,12 +258,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 continue;
             }
 
-            Enrollment enrollment = Enrollment.builder()
-                    .student(student)
-                    .courseOffering(offering)
-                    .enrollmentDate(java.time.LocalDate.now())
-                    .status("active")
-                    .build();
+            // reuse a dropped row instead of adding a second one
+            Enrollment enrollment = enrollmentRepository
+                    .findByStudent_StudentIdAndCourseOffering_OfferingId(student.getStudentId(), offeringId)
+                    .orElseGet(() -> Enrollment.builder()
+                            .student(student)
+                            .courseOffering(offering)
+                            .build());
+            enrollment.setEnrollmentDate(java.time.LocalDate.now());
+            enrollment.setStatus("active");
             enrollmentRepository.save(enrollment);
             newlyEnrolled++;
             currentCount++;

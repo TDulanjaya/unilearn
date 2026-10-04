@@ -6,6 +6,7 @@ import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.AiQuizQuestion;
 import com.unilearn.server.repository.AiQuizQuestionRepository;
 import com.unilearn.server.repository.AiQuizSessionRepository;
+import com.unilearn.server.security.OwnershipValidator;
 import com.unilearn.server.service.AiQuizQuestionService;
 import com.unilearn.server.util.mapper.AiQuizQuestionMapper;
 import lombok.RequiredArgsConstructor;
@@ -22,15 +23,17 @@ public class AiQuizQuestionServiceImpl implements AiQuizQuestionService {
     private final AiQuizQuestionRepository aiQuizQuestionRepository;
     private final AiQuizSessionRepository aiQuizSessionRepository;
     private final AiQuizQuestionMapper aiQuizQuestionMapper;
+    private final OwnershipValidator ownershipValidator;
 
     @Override
     public List<AiQuizQuestionResponse> getQuestionsBySession(Long sessionId) {
         if (sessionId == null) {
             throw new ValidationException("Session ID cannot be null");
         }
-        if (!aiQuizSessionRepository.existsById(sessionId)) {
-            throw new EntryNotFoundException("AiQuizSession not found with ID: " + sessionId);
-        }
+        var session = aiQuizSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new EntryNotFoundException("AiQuizSession not found with ID: " + sessionId));
+        // students can only open their own quiz
+        ownershipValidator.checkStudentOwnership(session.getStudent().getStudentId());
 
         return aiQuizQuestionRepository.findByQuizSession_SessionIdOrderByOrderNoAsc(sessionId)
                 .stream()
@@ -50,6 +53,9 @@ public class AiQuizQuestionServiceImpl implements AiQuizQuestionService {
 
         AiQuizQuestion question = aiQuizQuestionRepository.findById(questionId)
                 .orElseThrow(() -> new EntryNotFoundException("AiQuizQuestion not found with ID: " + questionId));
+
+        // students can only answer their own quiz
+        ownershipValidator.checkStudentOwnership(question.getQuizSession().getStudent().getStudentId());
 
         question.setStudentAnswer(studentAnswer);
         question.setAnswerRevealed(true);

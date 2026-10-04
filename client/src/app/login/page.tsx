@@ -49,7 +49,7 @@ function LoginFormContent() {
       const role = res.role?.toUpperCase();
       if (role === "STUDENT") {
         router.push("/student/dashboard");
-      } else if (role === "LECTURER") {
+      } else if (role === "LECTURER" || role === "GUEST_LECTURER") {
         router.push("/lecturer/dashboard");
       } else if (role === "HOD_DEAN") {
         router.push("/hod/dashboard");
@@ -64,7 +64,7 @@ function LoginFormContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)] flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--on-background)] flex flex-col items-center justify-center p-4 sm:p-8 relative isolate overflow-hidden">
       <div className="absolute -top-20 -left-20 w-[500px] h-[500px] bg-gradient-to-tr from-[#0d1c2e] via-[#006a61] to-[#6bd8cb] opacity-25 blur-[100px] rounded-full pointer-events-none -z-10"></div>
       <div className="absolute -bottom-20 -right-20 w-[500px] h-[500px] bg-gradient-to-tr from-[#006a61] to-[#4cd7f6] opacity-20 blur-[100px] rounded-full pointer-events-none -z-10"></div>
 
@@ -158,14 +158,6 @@ function LoginFormContent() {
             Forgot your password? Contact your administrator.
           </p>
 
-          {process.env.NEXT_PUBLIC_REGISTRATION_ENABLED === "true" && (
-            <p className="text-center text-xs text-[var(--on-surface-variant)] mt-4">
-              Don't have an account?{" "}
-              <Link href="/register" className="text-[var(--tertiary)] font-semibold hover:underline">
-                Sign up
-              </Link>
-            </p>
-          )}
         </form>
       </div>
     </div>

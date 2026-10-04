@@ -86,6 +86,7 @@ CREATE TABLE `users` (
   `status` varchar(20) DEFAULT 'active',
   `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `token_version` int NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `email` (`email`),
   CONSTRAINT `users_chk_1` CHECK ((`role` in (_utf8mb4'student',_utf8mb4'lecturer',_utf8mb4'examiner',_utf8mb4'staff_admin',_utf8mb4'super_admin',_utf8mb4'hod_dean',_utf8mb4'guest_lecturer'))),
@@ -728,4 +729,4 @@ CREATE TABLE `password_reset_tokens` (
   CONSTRAINT `fk_password_reset_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-SET FOREIGN_KEY_CHECKS = 1;
+SET FOREIGN_KEY_CHECKS = 1;

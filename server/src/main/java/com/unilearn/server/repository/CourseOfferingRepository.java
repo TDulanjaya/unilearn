@@ -21,8 +21,13 @@ public interface CourseOfferingRepository extends JpaRepository<CourseOffering, 
 
     List<CourseOffering> findByPrimaryLecturer_LecturerId(Long lecturerId);
 
+    // is this lecturer the main lecturer of any offering of the course
+    boolean existsByCourse_CourseIdAndPrimaryLecturer_LecturerId(Long courseId, Long lecturerId);
+
     Optional<CourseOffering> findByCourse_CourseIdAndBatch_BatchIdAndSemester_SemesterId(Long courseId, Long batchId, Long semesterId);
 
-    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.courseOffering.offeringId = :offeringId")
+    // dropped students don't take a seat
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.courseOffering.offeringId = :offeringId "
+            + "AND (e.status IS NULL OR LOWER(e.status) <> 'dropped')")
     long countEnrollmentsByOfferingId(@Param("offeringId") Long offeringId);
 }

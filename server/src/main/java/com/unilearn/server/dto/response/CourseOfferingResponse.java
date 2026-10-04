@@ -32,6 +32,9 @@ public class CourseOfferingResponse {
     private String semesterName;
     private Integer capacity;
     private LocalDateTime createdAt;
+    // main lecturer first, then co-lecturers
+    private List<Long> lecturerIds;
+    private List<String> lecturerNames;
     private List<EnrollmentResponse> enrollments;
     private List<MaterialResponse> materials;
     private List<AssignmentResponse> assignments;

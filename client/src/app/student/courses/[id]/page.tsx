@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 import { CourseTab, Course, MaterialItem, Assignment, Resource } from "@/types/course";
 
@@ -36,6 +37,14 @@ function CourseHubContent() {
     queryKey: ["assignments", numericId],
     queryFn: () => api.get<any>(`/api/v1/assignments/offering/${numericId}`),
     enabled: !isNaN(numericId) && numericId > 0,
+  });
+
+  // this student's own submissions, used to show the status of each assignment
+  const { user } = useAuth();
+  const { data: mySubmissions } = useQuery({
+    queryKey: ["mySubmissions", user?.userId],
+    queryFn: () => api.get<any[]>(`/api/v1/submissions/student/${user?.userId}`),
+    enabled: !!user?.userId,
   });
 
   const { data: rawResourcesData } = useQuery({
@@ -93,39 +102,72 @@ function CourseHubContent() {
     progress: offeringResponse.progress ?? 0,
   };
 
-  const fetchedMaterials: MaterialItem[] = rawMaterialsData?.content || (Array.isArray(rawMaterialsData) ? rawMaterialsData : [])
-    ? (rawMaterialsData.content || (Array.isArray(rawMaterialsData) ? rawMaterialsData : [])).map((m: any) => ({
-        id: m.materialId,
-        title: m.title,
-        type: (m.resourceType as any) || "PDF",
-        module: "Module 1",
-        date: m.uploadedAt ? new Date(m.uploadedAt).toLocaleDateString() : "Recent",
-        size: m.fileSize ? `${Math.round(m.fileSize / 1024)} KB` : "Document",
-        summary: m.title,
-        linkUrl: m.fileUrl || m.linkUrl || m.externalLink,
-      }))
-    : [];
+  // Data may still be loading here, so never read .content on undefined
+  const materialList: any[] = rawMaterialsData?.content ?? (Array.isArray(rawMaterialsData) ? rawMaterialsData : []);
+  const fetchedMaterials: MaterialItem[] = materialList.map((m: any) => ({
+    id: m.materialId,
+    title: m.title,
+    // server sends "pdf", "video", "link"... the UI checks "PDF", "VIDEO", "LINK"
+    type: (String(m.resourceType || "pdf").toUpperCase() as any),
+    module: "Module 1",
+    date: m.uploadedAt ? new Date(m.uploadedAt).toLocaleDateString() : "Recent",
+    size: m.fileSize ? `${Math.round(m.fileSize / 1024)} KB` : "Document",
+    summary: m.title,
+    linkUrl: m.fileUrl || m.linkUrl || m.externalLink,
+  }));
 
+  const submissionList: any[] = Array.isArray(mySubmissions) ? mySubmissions : [];
   const fetchedAssignments: Assignment[] = Array.isArray(rawAssignmentsData) && rawAssignmentsData.length > 0
-    ? rawAssignmentsData.map((a: any) => ({
-        id: a.assignmentId,
-        title: a.title,
-        due: a.deadline ? new Date(a.deadline).toLocaleDateString() : "TBD",
-        status: "Draft",
-        grade: null,
-        description: a.description || "",
-        maxScore: Number(a.maxScore) || 100,
-        attempts: [],
-      }))
+    ? rawAssignmentsData.map((a: any): Assignment => {
+        const maxScore = Number(a.maxScore) || 100;
+        const sub = submissionList.find((s: any) => s.assignmentId === a.assignmentId);
+        if (!sub) {
+          return {
+            id: a.assignmentId,
+            title: a.title,
+            due: a.deadline ? new Date(a.deadline).toLocaleDateString() : "TBD",
+            status: "Draft",
+            grade: null,
+            description: a.description || "",
+            maxScore,
+            attempts: [],
+          };
+        }
+
+        const isGraded = sub.grade != null;
+        const status = isGraded ? "Graded" : sub.isLate ? "Late" : "Submitted";
+        const fileName = sub.fileUrl ? String(sub.fileUrl).split("/").pop() || "submission" : "submission";
+        const submittedAt = sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : "";
+        return {
+          id: a.assignmentId,
+          title: a.title,
+          due: a.deadline ? new Date(a.deadline).toLocaleDateString() : "TBD",
+          status,
+          grade: isGraded ? `${Number(sub.grade)} / ${maxScore}` : null,
+          description: a.description || "",
+          maxScore,
+          feedback: sub.feedback || "",
+          submittedFile: fileName,
+          submittedAt,
+          // server keeps only the latest file for each assignment
+          attempts: [
+            {
+              version: sub.isResubmission ? 2 : 1,
+              fileName,
+              timestamp: submittedAt,
+              status,
+            },
+          ],
+        };
+      })
     : [];
 
-  const fetchedResources: Resource[] = rawResourcesData?.content || (Array.isArray(rawResourcesData) ? rawResourcesData : [])
-    ? (rawResourcesData.content || (Array.isArray(rawResourcesData) ? rawResourcesData : [])).map((r: any) => ({
-        id: r.resourceId,
-        fileName: r.fileName || r.title || "Resource File",
-        uploadedAt: r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : "Today",
-      }))
-    : [];
+  const resourceList: any[] = rawResourcesData?.content ?? (Array.isArray(rawResourcesData) ? rawResourcesData : []);
+  const fetchedResources: Resource[] = resourceList.map((r: any) => ({
+    id: r.resourceId,
+    fileName: r.fileName || r.title || "Resource File",
+    uploadedAt: r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : "Today",
+  }));
 
   return (
     <CourseHubView

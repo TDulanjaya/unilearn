@@ -45,8 +45,12 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             throw new ValidationException("Announcement request cannot be null");
         }
 
-        User postedBy = userRepository.findById(request.getPostedByUserId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getPostedByUserId()));
+        // the poster is always the logged-in user, not what the browser sends
+        User postedBy = ownershipValidator.getCurrentUser()
+                .orElseThrow(() -> new ValidationException("You must be logged in to post an announcement"));
+        request.setPostedByUserId(postedBy.getUserId());
+        // DB only accepts lowercase scope values
+        request.setScope(request.getScope().trim().toLowerCase());
 
         CourseOffering offering = null;
         if (request.getOfferingId() != null) {
@@ -93,8 +97,9 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             ownershipValidator.checkHodDepartmentAccess(announcement.getDepartment().getDepartmentId());
         }
 
-        User postedBy = userRepository.findById(request.getPostedByUserId())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getPostedByUserId()));
+        // editing keeps the original poster
+        User postedBy = announcement.getPostedBy();
+        request.setScope(request.getScope().trim().toLowerCase());
 
         CourseOffering offering = null;
         if (request.getOfferingId() != null) {

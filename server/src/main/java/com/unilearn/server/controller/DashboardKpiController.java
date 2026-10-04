@@ -16,7 +16,8 @@ public class DashboardKpiController {
     private final DashboardKpiService dashboardKpiService;
 
     @GetMapping
-    public ResponseEntity<DashboardKpiResponse> getInstitutionKpis() {
-        return ResponseEntity.ok(dashboardKpiService.getDashboardKpis());
+    public ResponseEntity<DashboardKpiResponse> getInstitutionKpis(
+            @RequestParam(name = "departmentId", required = false) Long departmentId) {
+        return ResponseEntity.ok(dashboardKpiService.getDashboardKpis(departmentId));
     }
 }

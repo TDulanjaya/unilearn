@@ -30,6 +30,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final FacultyRepository facultyRepository;
     private final UserRepository userRepository;
     private final DepartmentMapper departmentMapper;
+    private final com.unilearn.server.security.AdminScopeValidator adminScopeValidator;
 
     @Override
     @Transactional
@@ -37,6 +38,8 @@ public class DepartmentServiceImpl implements DepartmentService {
         if (request == null) {
             throw new ValidationException("Department request cannot be null");
         }
+        // faculty-level admins can only add departments to their own faculty
+        adminScopeValidator.checkStaffFacultyScope(request.getFacultyId());
 
         if (departmentRepository.existsByCode(request.getCode())) {
             throw new com.unilearn.server.exception.DuplicateEntryException("Department code already exists: " + request.getCode());
@@ -68,6 +71,12 @@ public class DepartmentServiceImpl implements DepartmentService {
 
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + departmentId));
+        // check the admin's scope for this department and the faculty it moves to
+        adminScopeValidator.checkStaffDepartmentScope(departmentId);
+        Long oldFacultyId = department.getFaculty() != null ? department.getFaculty().getFacultyId() : null;
+        if (request.getFacultyId() != null && !request.getFacultyId().equals(oldFacultyId)) {
+            adminScopeValidator.checkStaffFacultyScope(request.getFacultyId());
+        }
 
         if (!department.getCode().equalsIgnoreCase(request.getCode())
                 && departmentRepository.existsByCode(request.getCode())) {
@@ -102,6 +111,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         if (!departmentRepository.existsById(departmentId)) {
             throw new EntryNotFoundException("Department not found with ID: " + departmentId);
         }
+        adminScopeValidator.checkStaffDepartmentScope(departmentId);
 
         departmentRepository.deleteById(departmentId);
     }

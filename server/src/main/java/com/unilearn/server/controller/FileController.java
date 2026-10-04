@@ -27,6 +27,7 @@ public class FileController {
     private final com.unilearn.server.repository.SubmissionRepository submissionRepository;
     private final com.unilearn.server.repository.MaterialRepository materialRepository;
     private final com.unilearn.server.repository.EnrollmentRepository enrollmentRepository;
+    private final com.unilearn.server.repository.PersonalResourceRepository personalResourceRepository;
     private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
     private final Path localUploadDir = Paths.get("uploads");
 
@@ -116,6 +117,46 @@ public class FileController {
         ));
     }
 
+    // who can open a submission file: the student who sent it, lecturers of the offering,
+    // the HOD of the course's department, and staff admins
+    private void checkSubmissionFileAccess(String fileName, com.unilearn.server.model.User principal) {
+        if (ownershipValidator.isStaffOrSuperAdmin()) {
+            return;
+        }
+        var submission = submissionRepository.findAllByFileUrlLike(fileName).stream()
+                .filter(sub -> sub.getFileUrl() != null && sub.getFileUrl().contains(fileName))
+                .findFirst()
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Access denied: Submission not found for this file"));
+
+        if (ownershipValidator.isStudent()) {
+            Long ownerStudentId = submission.getStudent() != null ? submission.getStudent().getStudentId() : null;
+            if (!principal.getUserId().equals(ownerStudentId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: You cannot download another student's submission");
+            }
+            return;
+        }
+
+        var offering = submission.getAssignment() != null ? submission.getAssignment().getCourseOffering() : null;
+        if (offering == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Course offering not found for this submission");
+        }
+        if (ownershipValidator.isLecturer()) {
+            ownershipValidator.checkLecturerOfferingAccess(offering.getOfferingId());
+            return;
+        }
+        if (ownershipValidator.isHodDean()) {
+            Long departmentId = offering.getCourse() != null && offering.getCourse().getDepartment() != null
+                    ? offering.getCourse().getDepartment().getDepartmentId()
+                    : null;
+            if (departmentId == null) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied: Department not found for this submission");
+            }
+            ownershipValidator.checkHodDepartmentAccess(departmentId);
+            return;
+        }
+        throw new org.springframework.security.access.AccessDeniedException("Access denied: You cannot download this submission");
+    }
+
     @GetMapping("/download/{fileName:.+}")
     @org.springframework.security.access.prepost.PreAuthorize("permitAll()")
     public ResponseEntity<Resource> downloadLocalFile(
@@ -132,13 +173,21 @@ public class FileController {
                 if (principal == null) {
                     throw new org.springframework.security.access.AccessDeniedException("Authentication required to download submission files");
                 }
-                if ("student".equalsIgnoreCase(principal.getRole())) {
-                    var submissionOpt = submissionRepository.findFirstByFileUrlContaining(fileName);
-                    if (submissionOpt.isPresent()) {
-                        Long ownerStudentId = submissionOpt.get().getStudent().getStudentId();
-                        if (!ownerStudentId.equals(principal.getUserId())) {
-                            throw new org.springframework.security.access.AccessDeniedException("Access denied: You cannot download another student's submission");
-                        }
+                checkSubmissionFileAccess(fileName, principal);
+            } else if (fileName.startsWith("resources_")) {
+                if (principal == null) {
+                    throw new org.springframework.security.access.AccessDeniedException("Authentication required to download this file");
+                }
+                // personal resources are private to the student who uploaded them
+                if (!ownershipValidator.isStaffOrSuperAdmin()) {
+                    var personalRes = personalResourceRepository.findAllByFileUrlLike(fileName).stream()
+                            .filter(r -> r.getFileUrl() != null && r.getFileUrl().contains(fileName))
+                            .findFirst();
+                    boolean owner = personalRes.isPresent()
+                            && personalRes.get().getStudent() != null
+                            && principal.getUserId().equals(personalRes.get().getStudent().getStudentId());
+                    if (!owner) {
+                        throw new org.springframework.security.access.AccessDeniedException("Access denied: This file belongs to another student");
                     }
                 }
             } else if (fileName.startsWith("materials_")) {

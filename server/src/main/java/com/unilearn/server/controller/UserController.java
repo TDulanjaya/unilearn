@@ -7,6 +7,7 @@ import com.unilearn.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,7 +59,11 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<PageResponseDTO<UserResponse>> getAllUsers(
-            @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(userService.getAllUsers(pageable));
+            @PageableDefault(size = 20, sort = "fullName", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status) {
+        // role can be a comma list, e.g. LECTURER,GUEST_LECTURER
+        return ResponseEntity.ok(userService.getAllUsers(pageable, search, role, status));
     }
 }

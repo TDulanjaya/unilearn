@@ -359,7 +359,8 @@ export default function EventsEnrollmentPage() {
       title: eventTitle.trim(),
       description: eventDesc.trim(),
       venue: eventVenue.trim() || "Main Auditorium",
-      eventDate: new Date(eventDate).toISOString(),
+      // send the local time as typed (no UTC shift)
+      eventDate: eventDate.length === 16 ? `${eventDate}:00` : eventDate,
       capacity: eventCapacity ? parseInt(eventCapacity, 10) : undefined,
       posterUrl: uploadedPosterUrl || existingPosterUrl || undefined,
       createdByStaffId: currentUser?.userId || 1,
@@ -412,8 +413,8 @@ export default function EventsEnrollmentPage() {
     publishAnnMutation.mutate({
       title: annTitle.trim(),
       content: annContent.trim(),
-      scope: "INSTITUTION",
-      scopeId: 1,
+      scope: "institution",
+      postedByUserId: currentUser?.userId,
     });
   };
 
@@ -513,7 +514,7 @@ export default function EventsEnrollmentPage() {
                     enrollStep === 1
                       ? "bg-[var(--tertiary-container)] border border-[var(--tertiary)] text-[var(--tertiary)] ring-2 ring-[var(--tertiary)]"
                       : selectedBatchId
-                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 cursor-pointer"
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 cursor-pointer"
                       : "opacity-60 text-[var(--on-surface-variant)]"
                   }`}
                 >
@@ -544,7 +545,7 @@ export default function EventsEnrollmentPage() {
                     enrollStep === 2
                       ? "bg-[var(--tertiary-container)] border border-[var(--tertiary)] text-[var(--tertiary)] ring-2 ring-[var(--tertiary)]"
                       : selectedOfferingIds.length > 0
-                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 cursor-pointer"
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 cursor-pointer"
                       : "opacity-60 text-[var(--on-surface-variant)] disabled:cursor-not-allowed"
                   }`}
                 >
@@ -672,7 +673,7 @@ export default function EventsEnrollmentPage() {
                           </div>
 
                           <div className="mt-4 pt-3 border-t border-[var(--outline-variant)] flex items-center justify-between text-xs text-[var(--on-surface-variant)]">
-                            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                            <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
                               <i className="ti ti-user-check" /> Active Batch
                             </span>
                             <span className="text-[11px] text-[var(--ink-faint)]">ID #{b.batchId}</span>
@@ -687,7 +688,7 @@ export default function EventsEnrollmentPage() {
                 <div className="flex items-center justify-between pt-4 border-t border-[var(--outline-variant)]">
                   <div className="text-xs text-[var(--on-surface-variant)]">
                     {selectedBatch ? (
-                      <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
                         <i className="ti ti-check" /> Selected: <b>{selectedBatch.name}</b> ({selectedBatch.departmentName})
                       </span>
                     ) : (
@@ -720,7 +721,7 @@ export default function EventsEnrollmentPage() {
                     <p className="text-xs text-[var(--on-surface-variant)] mt-0.5">
                       Target Batch: <span className="text-[var(--tertiary)] font-bold">{selectedBatch?.name}</span> ({selectedBatch?.departmentName})
                       {" · "}
-                      <span className="text-emerald-400 font-bold">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">
                         {selectedOfferingIds.length} offering{selectedOfferingIds.length === 1 ? "" : "s"} selected
                       </span>
                     </p>
@@ -869,26 +870,26 @@ export default function EventsEnrollmentPage() {
 
                 {/* Result Message Banner */}
                 {enrollResult && (
-                  <div className="p-5 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 space-y-2">
+                  <div className="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/40 text-emerald-800 dark:text-emerald-300 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-sm">
-                      <i className="ti ti-circle-check text-lg text-emerald-400" />
+                      <i className="ti ti-circle-check text-lg text-emerald-600 dark:text-emerald-400" />
                       <span>{enrollResult.message}</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs border-t border-emerald-500/20">
                       <div>
-                        <span className="text-emerald-500 block font-semibold">Offerings:</span>
+                        <span className="text-emerald-700 dark:text-emerald-500 block font-semibold">Offerings:</span>
                         <span className="font-bold text-[var(--on-surface)] text-sm">{enrollResult.totalOfferings ?? selectedOfferingIds.length}</span>
                       </div>
                       <div>
-                        <span className="text-emerald-500 block font-semibold">Total Students:</span>
+                        <span className="text-emerald-700 dark:text-emerald-500 block font-semibold">Total Students:</span>
                         <span className="font-bold text-[var(--on-surface)] text-sm">{enrollResult.totalStudents}</span>
                       </div>
                       <div>
-                        <span className="text-emerald-500 block font-semibold">Newly Enrolled:</span>
-                        <span className="font-bold text-emerald-400 text-sm">+{enrollResult.newlyEnrolled}</span>
+                        <span className="text-emerald-700 dark:text-emerald-500 block font-semibold">Newly Enrolled:</span>
+                        <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">+{enrollResult.newlyEnrolled}</span>
                       </div>
                       <div>
-                        <span className="text-emerald-500 block font-semibold">Already Enrolled:</span>
+                        <span className="text-emerald-700 dark:text-emerald-500 block font-semibold">Already Enrolled:</span>
                         <span className="font-bold text-[var(--on-surface-variant)] text-sm">{enrollResult.alreadyEnrolled}</span>
                       </div>
                     </div>
@@ -897,9 +898,9 @@ export default function EventsEnrollmentPage() {
                     {enrollResult.perOffering && enrollResult.perOffering.length > 1 && (
                       <div className="pt-3 border-t border-emerald-500/20 space-y-1.5">
                         {enrollResult.perOffering.map((po) => (
-                          <div key={po.offeringId} className="flex items-center justify-between text-[11px] bg-emerald-950/30 rounded-lg px-3 py-1.5">
-                            <span className="font-semibold text-emerald-200">{po.courseLabel || `Offering #${po.offeringId}`}</span>
-                            <span className="text-emerald-400">
+                          <div key={po.offeringId} className="flex items-center justify-between text-[11px] bg-emerald-100 dark:bg-emerald-950/30 rounded-lg px-3 py-1.5">
+                            <span className="font-semibold text-emerald-900 dark:text-emerald-200">{po.courseLabel || `Offering #${po.offeringId}`}</span>
+                            <span className="text-emerald-700 dark:text-emerald-400">
                               +{po.newlyEnrolled} new · {po.alreadyEnrolled} already{po.skippedCapacity ? ` · ${po.skippedCapacity} skipped (capacity)` : ""}
                             </span>
                           </div>
@@ -1040,7 +1041,7 @@ export default function EventsEnrollmentPage() {
                 <h3 className="font-display font-bold text-lg text-[var(--on-surface)] flex items-center gap-2">
                   {editingEventId ? (
                     <>
-                      <i className="ti ti-edit text-amber-400" /> Edit Campus Event
+                      <i className="ti ti-edit text-amber-600 dark:text-amber-400" /> Edit Campus Event
                     </>
                   ) : (
                     <>
@@ -1098,7 +1099,7 @@ export default function EventsEnrollmentPage() {
                   ) : (
                     <label className="border-2 border-dashed border-[var(--border)] hover:border-[var(--tertiary)] rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer bg-[var(--surface-container-low)] hover:bg-[var(--surface-container-low)] transition-all text-center group">
                       <i className="ti ti-cloud-upload text-3xl text-[var(--tertiary)] mb-1.5 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-bold text-slate-200">Click to upload poster image</span>
+                      <span className="text-xs font-bold text-[var(--on-surface)]">Click to upload poster image</span>
                       <span className="text-[11px] text-[var(--ink-faint)] mt-0.5">PNG, JPG, WEBP up to 10MB</span>
                       <input
                         type="file"
@@ -1142,6 +1143,19 @@ export default function EventsEnrollmentPage() {
                       className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--on-surface-variant)] mb-1">Capacity</label>
+                  {/* leave empty for no limit */}
+                  <input
+                    type="number"
+                    min={1}
+                    value={eventCapacity}
+                    onChange={(e) => setEventCapacity(e.target.value)}
+                    placeholder="No limit"
+                    className="w-full bg-[var(--surface-container-lowest)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--on-surface)] placeholder-[var(--ink-faint)] focus:outline-none focus:border-[var(--tertiary)]"
+                  />
                 </div>
 
                 <div className="flex items-center gap-3 pt-2">
@@ -1244,7 +1258,7 @@ export default function EventsEnrollmentPage() {
                           <button
                             onClick={() => deleteEventMutation.mutate(ev.id)}
                             title="Delete Event"
-                            className="text-[var(--on-surface-variant)] hover:text-rose-400 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 transition-colors"
+                            className="text-slate-300 hover:text-rose-400 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 transition-colors"
                           >
                             <i className="ti ti-trash text-sm" />
                           </button>
@@ -1253,17 +1267,22 @@ export default function EventsEnrollmentPage() {
 
                       {/* Details */}
                       <div className="relative z-10 space-y-1.5 mt-auto pt-4">
-                        <h4 className="font-bold text-base text-[var(--on-surface)] group-hover:text-[var(--tertiary)] transition-colors">
+                        <h4 className="font-bold text-base text-white group-hover:text-cyan-300 transition-colors">
                           {ev.title}
                         </h4>
-                        {ev.description && <p className="text-xs text-[var(--on-surface-variant)] line-clamp-2">{ev.description}</p>}
-                        <div className="flex items-center justify-between text-[11px] text-[var(--on-surface-variant)] pt-2 border-t border-white/10">
+                        {ev.description && <p className="text-xs text-slate-300 line-clamp-2">{ev.description}</p>}
+                        <div className="flex items-center justify-between text-[11px] text-slate-300 pt-2 border-t border-white/10">
                           <span className="text-[var(--tertiary)] font-semibold flex items-center gap-1">
                             <i className="ti ti-clock" /> {ev.eventDate}
                           </span>
                           <span className="flex items-center gap-1">
                             <i className="ti ti-map-pin text-[var(--tertiary)]" /> {ev.venue}
                           </span>
+                          {ev.capacity ? (
+                            <span className="flex items-center gap-1">
+                              <i className="ti ti-users text-[var(--tertiary)]" /> {ev.capacity}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>

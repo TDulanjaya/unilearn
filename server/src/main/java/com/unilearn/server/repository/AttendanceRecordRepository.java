@@ -19,8 +19,10 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
 
     Optional<AttendanceRecord> findBySession_SessionIdAndStudent_StudentId(Long sessionId, Long studentId);
 
+    // late also counts as attended
     @Query("SELECT COUNT(ar) * 100.0 / NULLIF(COUNT(s), 0) FROM AttendanceSession s " +
-           "LEFT JOIN AttendanceRecord ar ON ar.session = s AND ar.student.studentId = :studentId AND ar.status = 'present' " +
+           "LEFT JOIN AttendanceRecord ar ON ar.session = s AND ar.student.studentId = :studentId " +
+           "AND LOWER(ar.status) IN ('present', 'late') " +
            "WHERE s.courseOffering.offeringId = :offeringId")
     Double calculateAttendancePercentageByStudentAndOffering(@Param("studentId") Long studentId, @Param("offeringId") Long offeringId);
 }

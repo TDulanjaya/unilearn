@@ -25,6 +25,9 @@ public class DashboardKpiResponse {
     private Long totalEnrollments;
     private Double averageAttendanceRate;
     private Double averageExamPassRate;
+    // how many rows the two rates above came from (0 = no data yet)
+    private Long attendanceRecordCount;
+    private Long examResultCount;
     private LocalDateTime generatedAt;
 
     private List<LabeledCountDTO> usersByRole;

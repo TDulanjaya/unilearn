@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useFileUrl } from "@/lib/files";
 
 interface VideoPlayerModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export default function VideoPlayerModal({
   moduleName,
 }: VideoPlayerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // uploaded videos need the login token, so load them as a blob
+  const { src: videoSrc, error: videoError } = useFileUrl(isOpen ? url : null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,15 +68,21 @@ export default function VideoPlayerModal({
 
         {/* Video Player */}
         <div className="flex-1 sm:flex-none relative bg-black aspect-video flex items-center justify-center">
-          <video
-            ref={videoRef}
-            src={url}
-            controls
-            autoPlay
-            className="w-full h-full object-contain"
-          >
-            Your browser does not support the video tag.
-          </video>
+          {videoError ? (
+            <p className="text-xs text-red-400 p-4 text-center">{videoError}</p>
+          ) : !videoSrc ? (
+            <p className="text-xs text-slate-300 p-4 text-center">Loading video...</p>
+          ) : (
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              controls
+              autoPlay
+              className="w-full h-full object-contain"
+            >
+              Your browser does not support the video tag.
+            </video>
+          )}
         </div>
       </div>
     </div>

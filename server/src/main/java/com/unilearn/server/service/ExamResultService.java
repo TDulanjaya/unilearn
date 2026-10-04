@@ -12,6 +12,9 @@ public interface ExamResultService {
 
     ExamResultResponse publishResultForStudent(Long examId, Long studentId);
 
+    // works out the score but keeps it hidden until publish
+    ExamResultResponse computeResultForStudent(Long examId, Long studentId);
+
     List<ExamResultResponse> publishAllResultsForExam(Long examId);
 
     ExamResultResponse getResultForStudent(Long examId, Long studentId);

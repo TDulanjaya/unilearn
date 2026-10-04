@@ -17,6 +17,7 @@ export default function NotificationsPage() {
     queryKey: ["notifications", user?.userId],
     queryFn: () => api.get<any>("/api/v1/notifications/me?size=100"),
     enabled: !!user?.userId,
+    refetchInterval: 30000,
   });
 
   const readMutation = useMutation({
@@ -26,14 +27,15 @@ export default function NotificationsPage() {
     },
   });
 
-  const rawNotifications = notificationsData?.dataList || [];
+  const rawNotifications = notificationsData?.dataList || notificationsData?.content || [];
 
   const notifications = rawNotifications.map((n: any) => ({
     id: n.notificationId,
     title: n.title,
     detail: n.message,
-    time: new Date(n.createdAt).toLocaleString(),
-    read: n.read || false,
+    time: n.createdAt ? new Date(n.createdAt).toLocaleString() : "Just now",
+    // server sends "isRead", older data may use "read"
+    read: !!(n.isRead ?? n.read),
     icon: "ti-bell",
     iconBg: "bg-[var(--surface-container)]",
     iconColor: "text-[var(--tertiary)]",
@@ -51,7 +53,7 @@ export default function NotificationsPage() {
     try {
       await readMutation.mutateAsync(id);
     } catch (err: any) {
-      console.error("Failed to mark as read:", err);
+      alert(err?.message || "Failed to mark notification as read");
     }
   };
 

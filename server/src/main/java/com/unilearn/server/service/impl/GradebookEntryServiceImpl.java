@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -43,7 +44,21 @@ public class GradebookEntryServiceImpl implements GradebookEntryService {
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new EntryNotFoundException("Student not found with ID: " + request.getStudentId()));
 
-        GradebookEntry entry = gradebookEntryMapper.toGradebookEntry(request, offering, student);
+        // old rows are updated, not added again
+        Optional<GradebookEntry> existing = request.getComponentRefId() != null
+                ? gradebookEntryRepository.findFirstByCourseOffering_OfferingIdAndStudent_StudentIdAndComponentAndComponentRefId(
+                        request.getOfferingId(), request.getStudentId(), request.getComponent(), request.getComponentRefId())
+                : gradebookEntryRepository.findFirstByCourseOffering_OfferingIdAndStudent_StudentIdAndComponentAndComponentRefIdIsNull(
+                        request.getOfferingId(), request.getStudentId(), request.getComponent());
+
+        GradebookEntry entry;
+        if (existing.isPresent()) {
+            entry = existing.get();
+            entry.setWeightPct(request.getWeightPct());
+            entry.setScore(request.getScore());
+        } else {
+            entry = gradebookEntryMapper.toGradebookEntry(request, offering, student);
+        }
         GradebookEntry saved = gradebookEntryRepository.save(entry);
         return gradebookEntryMapper.toGradebookEntryResponse(saved);
     }

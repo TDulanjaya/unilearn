@@ -21,7 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthResponse>;
   logout: () => void;
-  markPasswordChanged: () => void;
+  markPasswordChanged: (newToken?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -119,9 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const markPasswordChanged = () => {
+  // after a password change the server sends a new token, keep it everywhere
+  const markPasswordChanged = (newToken?: string) => {
+    if (newToken) {
+      setToken(newToken);
+      setTokenState(newToken);
+    }
     if (user) {
-      const updated: AuthUser = { ...user, mustChangePassword: false };
+      const updated: AuthUser = { ...user, mustChangePassword: false, ...(newToken ? { token: newToken } : {}) };
       setUser(updated);
       setUserState(updated);
     }

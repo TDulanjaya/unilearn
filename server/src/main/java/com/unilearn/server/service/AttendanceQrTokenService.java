@@ -5,6 +5,7 @@ import com.unilearn.server.exception.EntryNotFoundException;
 import com.unilearn.server.exception.ValidationException;
 import com.unilearn.server.model.AttendanceSession;
 import com.unilearn.server.repository.AttendanceSessionRepository;
+import com.unilearn.server.security.OwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class AttendanceQrTokenService {
     private static final long EXPIRY_SECONDS = 90; // Valid for 90 seconds
 
     private final AttendanceSessionRepository attendanceSessionRepository;
+    private final OwnershipValidator ownershipValidator;
     private final SecureRandom secureRandom = new SecureRandom();
 
     // Cache active tokens
@@ -39,12 +41,12 @@ public class AttendanceQrTokenService {
                 .orElseThrow(() -> new EntryNotFoundException("Attendance session not found with ID: " + sessionId));
 
         Long offeringId = session.getCourseOffering().getOfferingId();
+        // only a lecturer of this course can show the QR code
+        ownershipValidator.checkLecturerOfferingAccess(offeringId);
 
-        // Remove old token
-        String oldToken = sessionTokenMap.remove(sessionId);
-        if (oldToken != null) {
-            tokenStore.remove(oldToken);
-        }
+        // keep the last code working until it expires (a student may be scanning it now)
+        Instant now = Instant.now();
+        tokenStore.entrySet().removeIf(e -> now.isAfter(e.getValue().getExpiresAt()));
 
         // Generate random token
         byte[] randomBytes = new byte[TOKEN_BYTE_LENGTH];
@@ -82,7 +84,7 @@ public class AttendanceQrTokenService {
 
         if (Instant.now().isAfter(info.getExpiresAt())) {
             tokenStore.remove(cleanToken);
-            sessionTokenMap.remove(info.getSessionId());
+            sessionTokenMap.remove(info.getSessionId(), cleanToken);
             throw new ValidationException("QR attendance token has expired. Please ask your lecturer to refresh the code.");
         }
 

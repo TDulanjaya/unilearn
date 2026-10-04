@@ -34,6 +34,7 @@ public class AuditLogMapper {
                 .logId(log.getLogId())
                 .userId(log.getUser() != null ? log.getUser().getUserId() : null)
                 .userName(log.getUser() != null ? log.getUser().getFullName() : null)
+                .userEmail(log.getUser() != null ? log.getUser().getEmail() : null)
                 .action(log.getAction())
                 .entityType(log.getEntityType())
                 .entityId(log.getEntityId())

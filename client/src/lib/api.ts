@@ -1,85 +1,57 @@
 import { getToken, setToken, getUser, setUser, clearAuth } from "./auth";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-export async function apiFetch<T = any>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = getToken();
+// One refresh at a time, other requests wait for it
+let refreshPromise: Promise<string | null> | null = null;
 
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
-
-  if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
-
-  const response = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers,
-  });
-
-  if (response.status === 401) {
-    try {
-      const refreshUrl = `${BASE_URL}/api/v1/auth/refresh`;
-      const refreshRes = await fetch(refreshUrl, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (refreshRes.ok) {
-        const refreshData = await refreshRes.json();
-        setToken(refreshData.accessToken);
+export async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        setToken(data.accessToken);
         const currentUser = getUser();
         if (currentUser) {
-          currentUser.token = refreshData.accessToken;
+          currentUser.token = data.accessToken;
           setUser(currentUser);
         }
-        // Retry original request with new token
-        headers["Authorization"] = `Bearer ${refreshData.accessToken}`;
-        const retryResponse = await fetch(url, {
-          ...options,
-          credentials: "include",
-          headers,
-        });
-        if (retryResponse.status === 204) {
-          return null as T;
-        }
-        if (retryResponse.ok) {
-          const contentType = retryResponse.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            return (await retryResponse.json()) as T;
-          } else {
-            return (await retryResponse.text()) as unknown as T;
-          }
-        }
+        return data.accessToken as string;
+      } catch (err) {
+        console.error("Token refresh failed:", err);
+        return null;
+      } finally {
+        refreshPromise = null;
       }
-    } catch (err) {
-      console.error("Token refresh failed:", err);
-    }
-
-    clearAuth();
-    if (
-      typeof window !== "undefined" &&
-      window.location.pathname !== "/" &&
-      !window.location.pathname.startsWith("/login")
-    ) {
-      window.location.href = "/login";
-    }
-    throw new Error("Unauthorized access. Redirecting to login...");
+    })();
   }
+  return refreshPromise;
+}
 
+export function toApiUrl(endpoint: string): string {
+  return endpoint.startsWith("http")
+    ? endpoint
+    : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+}
+
+function sendToLogin() {
+  clearAuth();
+  if (
+    typeof window !== "undefined" &&
+    window.location.pathname !== "/" &&
+    !window.location.pathname.startsWith("/login")
+  ) {
+    window.location.href = "/login";
+  }
+}
+
+async function readResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) {
     return null as T;
   }
@@ -101,6 +73,62 @@ export async function apiFetch<T = any>(
   }
 
   return data as T;
+}
+
+export async function apiFetch<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getToken();
+
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const url = toApiUrl(endpoint);
+
+  const response = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
+
+  // Login/refresh errors (like a wrong password) should show the real message
+  const isAuthCall = url.includes("/api/v1/auth/login") || url.includes("/api/v1/auth/refresh");
+
+  if (response.status === 401 && !isAuthCall) {
+    const newToken = await refreshAccessToken();
+    if (!newToken) {
+      sendToLogin();
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+
+    // Try again with the new token
+    headers["Authorization"] = `Bearer ${newToken}`;
+    const retryResponse = await fetch(url, {
+      ...options,
+      credentials: "include",
+      headers,
+    });
+
+    if (retryResponse.status === 401) {
+      sendToLogin();
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+
+    // Other errors (400, 403, 409...) are shown normally, no logout
+    return readResponse<T>(retryResponse);
+  }
+
+  return readResponse<T>(response);
 }
 
 export const api = {

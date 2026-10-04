@@ -1,7 +1,6 @@
 package com.unilearn.server.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -35,7 +34,7 @@ public class AnnouncementRequest {
     @NotBlank(message = "Content is required")
     private String content;
 
-    @NotNull(message = "Posted by user ID is required")
+    // filled from the logged-in user on the server
     private Long postedByUserId;
 
     private java.util.List<String> targetPrograms;

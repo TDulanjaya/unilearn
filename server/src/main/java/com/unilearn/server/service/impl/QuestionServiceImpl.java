@@ -9,6 +9,7 @@ import com.unilearn.server.model.Question;
 import com.unilearn.server.model.QuestionBank;
 import com.unilearn.server.repository.QuestionBankRepository;
 import com.unilearn.server.repository.QuestionRepository;
+import com.unilearn.server.security.OwnershipValidator;
 import com.unilearn.server.service.QuestionService;
 import com.unilearn.server.util.mapper.QuestionMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final QuestionRepository questionRepository;
     private final QuestionBankRepository questionBankRepository;
     private final QuestionMapper questionMapper;
+    private final OwnershipValidator ownershipValidator;
 
     @Override
     @Transactional
@@ -37,6 +39,7 @@ public class QuestionServiceImpl implements QuestionService {
 
         QuestionBank bank = questionBankRepository.findById(request.getBankId())
                 .orElseThrow(() -> new EntryNotFoundException("QuestionBank not found with ID: " + request.getBankId()));
+        checkBankAccess(bank);
 
         Question question = questionMapper.toQuestion(request, bank);
         Question saved = questionRepository.save(question);
@@ -55,9 +58,14 @@ public class QuestionServiceImpl implements QuestionService {
 
         Question question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new EntryNotFoundException("Question not found with ID: " + questionId));
+        checkBankAccess(question.getQuestionBank());
 
         QuestionBank bank = questionBankRepository.findById(request.getBankId())
                 .orElseThrow(() -> new EntryNotFoundException("QuestionBank not found with ID: " + request.getBankId()));
+        // moving the question to another bank needs access to that bank too
+        if (question.getQuestionBank() == null || !bank.getBankId().equals(question.getQuestionBank().getBankId())) {
+            checkBankAccess(bank);
+        }
 
         question.setQuestionBank(bank);
         question.setQuestionText(request.getQuestionText());
@@ -78,10 +86,10 @@ public class QuestionServiceImpl implements QuestionService {
         if (questionId == null) {
             throw new ValidationException("Question ID cannot be null");
         }
-        if (!questionRepository.existsById(questionId)) {
-            throw new EntryNotFoundException("Question not found with ID: " + questionId);
-        }
-        questionRepository.deleteById(questionId);
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new EntryNotFoundException("Question not found with ID: " + questionId));
+        checkBankAccess(question.getQuestionBank());
+        questionRepository.delete(question);
     }
 
     @Override
@@ -91,6 +99,7 @@ public class QuestionServiceImpl implements QuestionService {
         }
         Question question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new EntryNotFoundException("Question not found with ID: " + questionId));
+        checkBankAccess(question.getQuestionBank());
         return questionMapper.toQuestionResponse(question);
     }
 
@@ -102,9 +111,9 @@ public class QuestionServiceImpl implements QuestionService {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
-        if (!questionBankRepository.existsById(bankId)) {
-            throw new EntryNotFoundException("QuestionBank not found with ID: " + bankId);
-        }
+        QuestionBank bank = questionBankRepository.findById(bankId)
+                .orElseThrow(() -> new EntryNotFoundException("QuestionBank not found with ID: " + bankId));
+        checkBankAccess(bank);
 
         Page<Question> page = questionRepository.findByQuestionBank_BankId(bankId, pageable);
         List<QuestionResponse> content = page.getContent()
@@ -116,5 +125,14 @@ public class QuestionServiceImpl implements QuestionService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    // only people allowed on the bank's course can see or change its questions
+    private void checkBankAccess(QuestionBank bank) {
+        if (bank == null) {
+            throw new EntryNotFoundException("QuestionBank not found for this question");
+        }
+        Long creatorId = bank.getCreatedBy() != null ? bank.getCreatedBy().getUserId() : null;
+        ownershipValidator.checkQuestionBankAccess(bank.getCourse(), creatorId);
     }
 }

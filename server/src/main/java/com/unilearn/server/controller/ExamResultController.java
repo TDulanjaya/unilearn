@@ -26,9 +26,9 @@ public class ExamResultController {
             @PathVariable Long attemptId,
             @RequestParam Long examId,
             @RequestParam Long studentId) {
-        // Uses publishResultForStudent which computes + publishes
+        // only works out the score, students see it after "Publish"
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(examResultService.publishResultForStudent(examId, studentId));
+                .body(examResultService.computeResultForStudent(examId, studentId));
     }
 
     @PatchMapping("/{id}/publish")

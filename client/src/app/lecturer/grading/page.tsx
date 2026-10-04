@@ -32,13 +32,39 @@ interface SubmissionItem {
 
 interface ExamSubmissionItem {
   id: string;
+  examId: number;
+  studentId: number;
   candidateCode: string;
   studentName: string;
   examTitle: string;
   score: number;
   maxScore: number;
-  status: "Ungraded" | "Graded" | "Published";
+  status: "In Progress" | "Ungraded" | "Graded" | "Published";
   questions: ExamQuestionAnswer[];
+  // questions the student actually answered (only these can be graded)
+  answeredQuestionIds: string[];
+}
+
+// split the assignment max score into the 50/30/20 rubric
+function buildRubric(maxScore: number, score: number): RubricCriterion[] {
+  const max1 = Math.round(maxScore * 0.5);
+  const max2 = Math.round(maxScore * 0.3);
+  const max3 = Math.max(0, maxScore - max1 - max2);
+  const got1 = Math.min(Math.round(score * 0.5), max1);
+  const got2 = Math.min(Math.round(score * 0.3), max2);
+  const got3 = Math.max(0, Math.min(score - got1 - got2, max3));
+  return [
+    { criterion: "Correctness", maxPoints: max1, awarded: got1 },
+    { criterion: "Documentation", maxPoints: max2, awarded: got2 },
+    { criterion: "Style & Best Practices", maxPoints: max3, awarded: got3 },
+  ];
+}
+
+function toQuestionType(type?: string): ExamQuestionAnswer["type"] {
+  const t = String(type || "").toLowerCase();
+  if (t === "mcq") return "MCQ";
+  if (t === "short_answer") return "Short answer";
+  return "Essay";
 }
 
 export default function LecturerGradingPage() {
@@ -56,6 +82,8 @@ export default function LecturerGradingPage() {
   // State for Exams Tab
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [reviewingExamSub, setReviewingExamSub] = useState<ExamSubmissionItem | null>(null);
+  const [loadingPaperId, setLoadingPaperId] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // lecturer offerings
   const { data: offerings, isLoading: offeringsLoading } = useQuery({
@@ -93,25 +121,25 @@ export default function LecturerGradingPage() {
     .flatMap((q: any) => q.data || [])
     .map((sub: any) => {
       const assignment = assignments?.find((a: any) => a.assignmentId === sub.assignmentId);
-      return {
+      const maxMarks = Number(assignment?.maxScore) || 100;
+      const gradeValue = sub.grade ?? sub.score;
+      const marks = gradeValue != null ? Number(gradeValue) : 0;
+      const item: SubmissionItem = {
         id: String(sub.submissionId),
         studentId: String(sub.studentId),
         studentName: sub.studentName || `Student #${sub.studentId}`,
         assignmentTitle: assignment?.title || "Assignment",
         submittedAt: new Date(sub.submittedAt).toLocaleString(),
-        marks: sub.score || 0,
-        maxMarks: assignment?.maxScore || 100,
-        status: sub.score != null ? "graded" : "pending",
+        marks,
+        maxMarks,
+        status: gradeValue != null ? "graded" : "pending",
         fileName: sub.fileUrl?.split("/").pop() || "submission.pdf",
         fileNote: sub.remarks || "No remarks",
         fileUrl: sub.fileUrl || "",
-        rubric: [
-          { criterion: "Correctness", maxPoints: 50, awarded: Math.round((sub.score || 0) * 0.5) },
-          { criterion: "Documentation", maxPoints: 30, awarded: Math.round((sub.score || 0) * 0.3) },
-          { criterion: "Style & Best Practices", maxPoints: 20, awarded: Math.round((sub.score || 0) * 0.2) }
-        ],
+        rubric: buildRubric(maxMarks, marks),
         feedback: sub.feedback || "",
       };
+      return item;
     });
 
   const distinctAssignments = Array.from(new Set(submissions.map((s) => s.assignmentTitle)));
@@ -141,19 +169,84 @@ export default function LecturerGradingPage() {
     enabled: !!selectedExamId,
   });
 
-  const examSubmissions: ExamSubmissionItem[] = (attempts || []).map((att: any) => ({
-    id: String(att.attemptId),
-    candidateCode: `STUD-${att.studentId}`,
-    studentName: att.studentName || `Candidate #${att.studentId}`,
-    examTitle: examsList?.find((e: any) => e.examId === att.examId)?.title || "Final Exam",
-    score: 0,
-    maxScore: 100,
-    status: att.status === "COMPLETED" ? "Published" : "Ungraded",
-    questions: [
-      { id: "q-1", text: "Explain the software development life cycle.", type: "Essay", studentAnswer: "The SDLC consists of planning, analysis, design, implementation, testing, and maintenance.", awardedMarks: 0, maxMarks: 50, autoScored: false },
-      { id: "q-2", text: "What is normalized form in database management systems?", type: "Essay", studentAnswer: "Normalization reduces data redundancy and improves data integrity by structuring fields.", awardedMarks: 0, maxMarks: 50, autoScored: false }
-    ],
-  }));
+  // questions of the selected exam
+  const { data: examQuestions } = useQuery({
+    queryKey: ["examQuestions", selectedExamId],
+    queryFn: () => api.get<any[]>(`/api/v1/exams/${selectedExamId}/questions`),
+    enabled: !!selectedExamId,
+  });
+
+  // saved results of the selected exam
+  const { data: examResults } = useQuery({
+    queryKey: ["examResults", selectedExamId],
+    queryFn: () => api.get<any[]>(`/api/v1/exam-results/exam/${selectedExamId}`),
+    enabled: !!selectedExamId,
+  });
+
+  const questionList: any[] = Array.isArray(examQuestions) ? examQuestions : [];
+  const examMaxScore = questionList.reduce(
+    (acc: number, q: any) => acc + Number(q.marksOverride ?? q.marks ?? 0),
+    0
+  );
+
+  const examSubmissions: ExamSubmissionItem[] = (attempts || []).map((att: any) => {
+    const result = (examResults || []).find((r: any) => r.studentId === att.studentId);
+    const attemptStatus = String(att.status || "").toLowerCase();
+    let status: ExamSubmissionItem["status"] = "In Progress";
+    if (result?.publishedAt) status = "Published";
+    else if (result) status = "Graded";
+    else if (attemptStatus === "submitted" || attemptStatus === "flagged") status = "Ungraded";
+
+    const exam = examsList?.find((e: any) => e.examId === att.examId);
+    return {
+      id: String(att.attemptId),
+      examId: att.examId,
+      studentId: att.studentId,
+      candidateCode: `STUD-${att.studentId}`,
+      studentName: att.studentName || `Candidate #${att.studentId}`,
+      examTitle: exam?.title || exam?.examType || "Final Exam",
+      score: result ? Number(result.score ?? result.totalScore ?? 0) : 0,
+      maxScore: examMaxScore,
+      status,
+      // answers are loaded when the paper is opened
+      questions: [],
+      answeredQuestionIds: [],
+    };
+  });
+
+  // load the real answers of one attempt and open the reviewer
+  const handleOpenPaper = async (sub: ExamSubmissionItem) => {
+    setLoadingPaperId(sub.id);
+    try {
+      const answers = await api.get<any[]>(`/api/v1/exam-answers/attempt/${sub.id}`);
+      const answerList: any[] = Array.isArray(answers) ? answers : [];
+      const sorted = [...questionList].sort(
+        (a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
+      const questions: ExamQuestionAnswer[] = sorted.map((q: any) => {
+        const ans = answerList.find((a: any) => a.questionId === q.questionId);
+        const type = toQuestionType(q.questionType);
+        return {
+          id: String(q.questionId),
+          text: q.questionText || "",
+          type,
+          maxMarks: Number(q.marksOverride ?? q.marks ?? 0),
+          studentAnswer: ans ? ans.answerText || ans.selectedOption || "" : "",
+          awardedMarks: ans?.marksAwarded != null ? Number(ans.marksAwarded) : 0,
+          autoScored: type === "MCQ",
+        };
+      });
+      setReviewingExamSub({
+        ...sub,
+        questions,
+        answeredQuestionIds: answerList.map((a: any) => String(a.questionId)),
+      });
+    } catch (err: any) {
+      alert("Failed to load exam answers: " + (err?.message || "Unknown error"));
+    } finally {
+      setLoadingPaperId(null);
+    }
+  };
 
   // Mutations
   const gradeMutation = useMutation({
@@ -208,33 +301,58 @@ export default function LecturerGradingPage() {
   };
 
   const handleSaveExamGradeNext = async (
-    candidateCode: string,
-    totalScore: number
+    _candidateCode: string,
+    _totalScore: number,
+    updatedQuestions: ExamQuestionAnswer[]
   ) => {
-    const studentId = Number(candidateCode.split("-")[1]);
-    const attempt = attempts?.find((att: any) => att.studentId === studentId);
-    if (!attempt) return;
+    const sub = reviewingExamSub;
+    if (!sub) return;
 
     try {
-      // Save exam score directly into gradebook
+      // save marks for each answer
+      for (const q of updatedQuestions) {
+        if (q.autoScored || !sub.answeredQuestionIds.includes(q.id)) continue;
+        await api.patch(
+          `/api/v1/exam-answers/${sub.id}/grade?questionId=${q.id}&marksAwarded=${q.awardedMarks}`
+        );
+      }
+
+      // work out the total from the saved marks
+      const result = await api.post<any>(
+        `/api/v1/exam-results/attempt/${sub.id}/compute?examId=${sub.examId}&studentId=${sub.studentId}`
+      );
+      const finalScore = Number(result?.score ?? result?.totalScore ?? 0);
+
       await gradebookMutation.mutateAsync({
         offeringId: Number(activeOfferingId),
-        studentId: Number(studentId),
+        studentId: Number(sub.studentId),
         component: "Exam",
-        componentRefId: Number(attempt.examId),
+        componentRefId: Number(sub.examId),
         weightPct: 50.0,
-        score: totalScore,
+        score: finalScore,
       });
 
+      queryClient.invalidateQueries({ queryKey: ["examResults", sub.examId] });
       setReviewingExamSub(null);
-      alert("Exam graded & persistent record saved!");
+      alert("Exam marks saved!");
     } catch (err: any) {
       alert("Failed to save exam grade: " + err.message);
     }
   };
 
-  const handlePublishAllExamResults = () => {
-    alert("Final exam results published successfully to student portal!");
+  const handlePublishAllExamResults = async () => {
+    if (!selectedExamId || isPublishing) return;
+    if (!confirm("Publish all results of this exam to students?")) return;
+    setIsPublishing(true);
+    try {
+      const published = await api.patch<any[]>(`/api/v1/exam-results/${selectedExamId}/publish`);
+      queryClient.invalidateQueries({ queryKey: ["examResults", selectedExamId] });
+      alert(`Published ${Array.isArray(published) ? published.length : 0} exam result(s).`);
+    } catch (err: any) {
+      alert("Failed to publish results: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   if (offeringsLoading || submissionsLoading) {
@@ -389,13 +507,17 @@ export default function LecturerGradingPage() {
                     className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
                   >
                     {examsList?.map((e: any) => (
-                      <option key={e.examId} value={e.examId}>{e.title}</option>
+                      <option key={e.examId} value={e.examId}>{e.title || e.examType || `Exam #${e.examId}`}</option>
                     ))}
                   </select>
                 </div>
 
-                <button onClick={handlePublishAllExamResults} className="btn-primary text-xs shadow-md">
-                  <i className="ti ti-send mr-1"></i> Publish All Results
+                <button
+                  onClick={handlePublishAllExamResults}
+                  disabled={isPublishing || !selectedExamId}
+                  className="btn-primary text-xs shadow-md disabled:opacity-60"
+                >
+                  <i className="ti ti-send mr-1"></i> {isPublishing ? "Publishing..." : "Publish All Results"}
                 </button>
               </div>
 
@@ -413,14 +535,18 @@ export default function LecturerGradingPage() {
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600">{sub.status}</span>
                         </div>
                         <p className="text-xs text-[var(--on-surface-variant)] truncate">
-                          {sub.questions.length} Exam Questions Submitted • Blind Review Masked
+                          {questionList.length} Exam Questions • Blind Review Masked
                         </p>
                       </div>
 
                       <div className="flex items-center gap-4 shrink-0">
                         <span className="font-extrabold text-sm text-[var(--tertiary)]">{sub.score} / {sub.maxScore}</span>
-                        <button onClick={() => setReviewingExamSub(sub)} className="btn-primary text-xs !py-1.5 flex items-center gap-1 shadow-sm">
-                          <i className="ti ti-file-text text-sm"></i> Grade Paper
+                        <button
+                          onClick={() => handleOpenPaper(sub)}
+                          disabled={loadingPaperId === sub.id || sub.status === "In Progress"}
+                          className="btn-primary text-xs !py-1.5 flex items-center gap-1 shadow-sm disabled:opacity-60"
+                        >
+                          <i className="ti ti-file-text text-sm"></i> {loadingPaperId === sub.id ? "Loading..." : "Grade Paper"}
                         </button>
                       </div>
                     </div>
@@ -442,6 +568,7 @@ export default function LecturerGradingPage() {
             submittedAt: reviewingSubmission.submittedAt,
             fileName: reviewingSubmission.fileName,
             fileNote: reviewingSubmission.fileNote,
+            fileUrl: reviewingSubmission.fileUrl,
             rubric: reviewingSubmission.rubric,
             feedback: reviewingSubmission.feedback,
             maxMarks: reviewingSubmission.maxMarks,
@@ -459,6 +586,7 @@ export default function LecturerGradingPage() {
           studentName={reviewingExamSub.studentName}
           courseCode={selectedOffering?.courseCode || "SE"}
           batch={selectedOffering?.batchName || "Batch A"}
+          key={reviewingExamSub.id}
           examTitle={reviewingExamSub.examTitle}
           questions={reviewingExamSub.questions}
           onClose={() => setReviewingExamSub(null)}

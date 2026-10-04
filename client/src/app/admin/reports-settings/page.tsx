@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 interface AuditLogRecord {
   id: string;
   timestamp: string;
+  createdAt: string | null;
   userEmail: string;
   actionType: string;
   entity: string;
@@ -30,9 +31,10 @@ export default function Page() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const { data: auditLogsData } = useQuery({
-    queryKey: ["auditLogs"],
-    queryFn: () => api.get<any>("/api/v1/audit-logs"),
+  // newest first (server default)
+  const { data: auditLogsData, isError: auditError, error: auditErrorObj } = useQuery({
+    queryKey: ["auditLogs", "reports"],
+    queryFn: () => api.get<any>("/api/v1/audit-logs?size=200"),
   });
 
   const { data: kpiData, isLoading: kpiLoading } = useQuery({
@@ -48,14 +50,17 @@ export default function Page() {
   const facultiesList: Array<{ facultyId: number; name: string }> =
     facultiesData?.dataList || facultiesData?.content || (Array.isArray(facultiesData) ? facultiesData : []);
 
-  const auditLogs: AuditLogRecord[] = auditLogsData?.dataList || auditLogsData?.content
-    ? (auditLogsData.dataList || auditLogsData.content).map((log: any) => ({
-        id: String(log.logId || log.id),
-        timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString() : "Recent",
-        userEmail: log.userEmail || log.performedByName || (log.user?.email) || "System",
-        actionType: String(log.action || log.actionType || "System Action"),
-        entity: log.entityName || log.entityType || log.details || "System Entity",
-        ipAddress: log.ipAddress || "127.0.0.1",
+  // fields from AuditLogResponse on the server
+  const auditLogs: AuditLogRecord[] = auditLogsData?.dataList
+    ? auditLogsData.dataList.map((log: any) => ({
+        id: String(log.logId),
+        timestamp: log.createdAt ? new Date(log.createdAt).toLocaleString() : "—",
+        createdAt: log.createdAt || null,
+        userEmail: log.userEmail || log.userName || (log.userId ? `User #${log.userId}` : "System"),
+        actionType: String(log.action || "—"),
+        entity: log.entityType ? `${log.entityType}${log.entityId != null ? ` #${log.entityId}` : ""}` : "—",
+        // the server does not store IP addresses
+        ipAddress: "—",
       }))
     : INITIAL_AUDIT_LOGS;
 
@@ -65,8 +70,13 @@ export default function Page() {
   ];
 
   const totalStudents = kpiData?.totalStudents ?? 0;
-  const avgAttendance = kpiData?.averageAttendanceRate != null ? Math.round(kpiData.averageAttendanceRate) : 0;
-  const avgPassRate = kpiData?.averageExamPassRate != null ? Math.round(kpiData.averageExamPassRate) : 0;
+  // rates come as 0-100, "No data" when nothing is recorded yet
+  const avgAttendance = kpiData?.averageAttendanceRate != null && kpiData?.attendanceRecordCount
+    ? `${Math.round(kpiData.averageAttendanceRate)}%`
+    : "No data";
+  const avgPassRate = kpiData?.averageExamPassRate != null && kpiData?.examResultCount
+    ? `${Math.round(kpiData.averageExamPassRate)}%`
+    : "No data";
   const totalCourses = kpiData?.totalCourses ?? 0;
 
   const filteredLogs = auditLogs.filter((log) => {
@@ -75,7 +85,11 @@ export default function Page() {
       log.userEmail.toLowerCase().includes(auditSearch.toLowerCase()) ||
       log.entity.toLowerCase().includes(auditSearch.toLowerCase()) ||
       log.actionType.toLowerCase().includes(auditSearch.toLowerCase());
-    return matchesAction && matchesSearch;
+    // compare only the date part (yyyy-mm-dd)
+    const day = log.createdAt ? log.createdAt.slice(0, 10) : "";
+    const matchesStart = !startDate || (day !== "" && day >= startDate);
+    const matchesEnd = !endDate || (day !== "" && day <= endDate);
+    return matchesAction && matchesSearch && matchesStart && matchesEnd;
   });
 
   const auditColumns = [
@@ -155,13 +169,13 @@ export default function Page() {
             <div className="card p-4 text-center">
               <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Avg Attendance</p>
               <p className="font-display font-extrabold text-2xl text-[var(--tertiary)]">
-                {kpiLoading ? "..." : `${avgAttendance}%`}
+                {kpiLoading ? "..." : avgAttendance}
               </p>
             </div>
             <div className="card p-4 text-center">
               <p className="text-xs text-[var(--on-surface-variant)] font-semibold mb-1">Pass Rate</p>
               <p className="font-display font-extrabold text-2xl text-[var(--secondary)]">
-                {kpiLoading ? "..." : `${avgPassRate}%`}
+                {kpiLoading ? "..." : avgPassRate}
               </p>
             </div>
             <div className="card p-4 text-center">
@@ -237,6 +251,12 @@ export default function Page() {
                 />
               </div>
             </div>
+
+            {auditError && (
+              <p className="text-xs font-semibold text-red-500">
+                Failed to load audit logs: {(auditErrorObj as Error)?.message || "unknown error"}
+              </p>
+            )}
 
             <DataTable data={filteredLogs} columns={auditColumns} searchPlaceholder="Search audit logs..." pageSize={10} />
           </div>

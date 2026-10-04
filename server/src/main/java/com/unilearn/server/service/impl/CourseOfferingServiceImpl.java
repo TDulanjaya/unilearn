@@ -33,6 +33,8 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
     private final SemesterRepository semesterRepository;
     private final LecturerRepository lecturerRepository;
     private final CourseOfferingMapper courseOfferingMapper;
+    private final com.unilearn.server.repository.CourseOfferingLecturerRepository courseOfferingLecturerRepository;
+    private final com.unilearn.server.security.AdminScopeValidator adminScopeValidator;
 
     @Override
     @Transactional
@@ -43,6 +45,7 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
 
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
+        adminScopeValidator.checkCourseWriteAccess(course);
 
         Batch batch = batchRepository.findById(request.getBatchId())
                 .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
@@ -77,9 +80,12 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
 
         CourseOffering offering = courseOfferingRepository.findById(offeringId)
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + offeringId));
+        // check the current course too, not only the new one
+        adminScopeValidator.checkOfferingWriteAccess(offering);
 
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + request.getCourseId()));
+        adminScopeValidator.checkCourseWriteAccess(course);
 
         Batch batch = batchRepository.findById(request.getBatchId())
                 .orElseThrow(() -> new EntryNotFoundException("Batch not found with ID: " + request.getBatchId()));
@@ -108,9 +114,9 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
         if (offeringId == null) {
             throw new ValidationException("Offering ID cannot be null");
         }
-        if (!courseOfferingRepository.existsById(offeringId)) {
-            throw new EntryNotFoundException("CourseOffering not found with ID: " + offeringId);
-        }
+        CourseOffering offering = courseOfferingRepository.findById(offeringId)
+                .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + offeringId));
+        adminScopeValidator.checkOfferingWriteAccess(offering);
         courseOfferingRepository.deleteById(offeringId);
     }
 
@@ -174,7 +180,16 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
         if (!lecturerRepository.existsById(lecturerId)) {
             throw new EntryNotFoundException("Lecturer not found with ID: " + lecturerId);
         }
-        return courseOfferingRepository.findByPrimaryLecturer_LecturerId(lecturerId)
+        // courses where they are the main lecturer, plus courses they co-teach
+        java.util.Map<Long, com.unilearn.server.model.CourseOffering> offerings = new java.util.LinkedHashMap<>();
+        courseOfferingRepository.findByPrimaryLecturer_LecturerId(lecturerId)
+                .forEach(o -> offerings.put(o.getOfferingId(), o));
+        courseOfferingLecturerRepository.findByLecturer_LecturerId(lecturerId).forEach(col -> {
+            if (col.getCourseOffering() != null) {
+                offerings.putIfAbsent(col.getCourseOffering().getOfferingId(), col.getCourseOffering());
+            }
+        });
+        return offerings.values()
                 .stream()
                 .map(courseOfferingMapper::toCourseOfferingResponse)
                 .toList();

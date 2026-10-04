@@ -33,7 +33,7 @@ public class AttendanceSessionRequest {
 
     private LocalTime endTime;
 
-    @NotNull(message = "Lecturer ID is required")
+    // set by the server from the logged in lecturer
     @Positive(message = "Lecturer ID must be positive")
     private Long markedByLecturerId;
 }

@@ -7,6 +7,7 @@ import { z } from "zod";
 import Sidebar from "@/components/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { useAuth } from "@/context/AuthContext";
 
 const announcementSchema = z.object({
@@ -463,7 +464,10 @@ export default function HodAnnouncement() {
                         </div>
                       </div>
                       <p className="font-bold text-xs text-[var(--on-surface)]">{ann.title}</p>
-                      <p className="text-xs text-[var(--on-surface-variant)] leading-relaxed">{ann.content}</p>
+                      <div
+                        className="text-xs text-[var(--on-surface-variant)] leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(ann.content) }}
+                      />
                     </div>
                   );
                 })

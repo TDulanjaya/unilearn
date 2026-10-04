@@ -31,7 +31,7 @@ export default function StudentCoursesPage() {
   const { user } = useAuth();
 
   // enrollments
-  const { data: enrollmentsData } = useQuery({
+  const { data: enrollmentsData, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["studentEnrollments", user?.userId],
     queryFn: () => api.get<any[]>(`/api/v1/enrollments/student/${user?.userId}`),
     enabled: !!user?.userId,
@@ -51,31 +51,35 @@ export default function StudentCoursesPage() {
     ? offeringsData
     : offeringsData?.content || offeringsData?.dataList || [];
 
-  // Show enrolled courses or all courses
-  const activeList = enrolledList.length > 0 ? enrolledList : allOfferingsList;
+  // only show the courses the student is enrolled in (dropped ones are hidden)
+  const activeList = enrolledList.filter(
+    (e: any) => String(e.status || "active").toLowerCase() !== "dropped"
+  );
 
-  const apiCourses: CourseItem[] = activeList.map((o: any, idx: number) => ({
-    id: String(o.offeringId || idx + 1),
-    code: o.courseCode || "—",
-    title: o.courseName || o.courseTitle || "Untitled Course",
-    lecturer: o.primaryLecturerName
-      ? `${o.primaryLecturerName}${o.departmentName ? " · " + o.departmentName : ""}`
-      : (o.lecturerName || "Lecturer"),
-    progress: o.progress ?? 0,
-    assignmentsPending: 0,
-    status: "In progress",
-    isStarred: false,
-    isRemovedFromView: false,
-  }));
+  const apiCourses: CourseItem[] = activeList.map((e: any, idx: number) => {
+    // offering list has the lecturer name
+    const o = allOfferingsList.find((x: any) => x.offeringId === e.offeringId) || {};
+    return {
+      id: String(e.offeringId || idx + 1),
+      code: e.courseCode || o.courseCode || "—",
+      title: e.courseName || o.courseName || o.courseTitle || "Untitled Course",
+      lecturer: o.primaryLecturerName
+        ? `${o.primaryLecturerName}${o.departmentName ? " · " + o.departmentName : ""}`
+        : (o.lecturerName || "Lecturer"),
+      progress: o.progress ?? 0,
+      assignmentsPending: 0,
+      status: (String(e.status || "").toLowerCase() === "completed" ? "Past" : "In progress") as CourseItem["status"],
+      isStarred: false,
+      isRemovedFromView: false,
+    };
+  });
 
   const [courses, setCourses] = useState<CourseItem[]>(apiCourses);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("All (except removed from view)");
 
   useEffect(() => {
-    if (activeList.length > 0) {
-      setCourses(apiCourses);
-    }
+    setCourses(apiCourses);
   }, [enrollmentsData, offeringsData]);
 
   const toggleRemoveFromView = (id: string, e: React.MouseEvent) => {
@@ -163,7 +167,13 @@ export default function StudentCoursesPage() {
       </div>
 
       
-      {filteredCourses.length === 0 ? (
+      {!enrollmentsLoading && activeList.length === 0 ? (
+        <div className="card p-12 text-center space-y-3 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+          <i className="ti ti-books-off text-4xl text-[var(--on-surface-variant)] opacity-40"></i>
+          <p className="font-bold text-sm text-[var(--on-surface)]">You are not enrolled in any courses yet</p>
+          <p className="text-xs text-[var(--on-surface-variant)]">Your courses will show here once you are enrolled.</p>
+        </div>
+      ) : filteredCourses.length === 0 ? (
         <div className="card p-12 text-center space-y-3 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
           <i className="ti ti-books-off text-4xl text-[var(--on-surface-variant)] opacity-40"></i>
           <p className="font-bold text-sm text-[var(--on-surface)]">No matching courses found</p>

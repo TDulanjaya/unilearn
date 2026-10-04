@@ -13,7 +13,9 @@ import com.unilearn.server.service.AuditLogService;
 import com.unilearn.server.util.mapper.AuditLogMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +51,7 @@ public class AuditLogServiceImpl implements AuditLogService {
             throw new ValidationException("Pageable parameter cannot be null");
         }
 
-        Page<AuditLog> page = auditLogRepository.findAll(pageable);
+        Page<AuditLog> page = auditLogRepository.findAll(newestFirst(pageable));
         List<AuditLogResponse> content = page.getContent()
                 .stream()
                 .map(auditLogMapper::toAuditLogResponse)
@@ -73,7 +75,7 @@ public class AuditLogServiceImpl implements AuditLogService {
             throw new EntryNotFoundException("User not found with ID: " + userId);
         }
 
-        Page<AuditLog> page = auditLogRepository.findByUser_UserId(userId, pageable);
+        Page<AuditLog> page = auditLogRepository.findByUser_UserId(userId, newestFirst(pageable));
         List<AuditLogResponse> content = page.getContent()
                 .stream()
                 .map(auditLogMapper::toAuditLogResponse)
@@ -83,5 +85,14 @@ public class AuditLogServiceImpl implements AuditLogService {
                 .dataCount((int) page.getTotalElements())
                 .dataList(content)
                 .build();
+    }
+
+    // newest logs first when the caller did not ask for a sort
+    private Pageable newestFirst(Pageable pageable) {
+        if (pageable.isUnpaged() || pageable.getSort().isSorted()) {
+            return pageable;
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 }

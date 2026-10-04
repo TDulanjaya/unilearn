@@ -46,8 +46,8 @@ public class AssignmentServiceImpl implements AssignmentService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        Lecturer lecturer = lecturerRepository.findById(request.getCreatedById())
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getCreatedById()));
+        Lecturer lecturer = currentLecturer();
+        request.setCreatedById(lecturer.getLecturerId());
 
         Assignment assignment = assignmentMapper.toAssignment(request, offering, lecturer);
         Assignment saved = assignmentRepository.save(assignment);
@@ -79,8 +79,8 @@ public class AssignmentServiceImpl implements AssignmentService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        Lecturer lecturer = lecturerRepository.findById(request.getCreatedById())
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getCreatedById()));
+        // keep the original creator
+        Lecturer lecturer = assignment.getCreatedBy() != null ? assignment.getCreatedBy() : currentLecturer();
 
         assignment.setCourseOffering(offering);
         assignment.setTitle(request.getTitle());
@@ -157,5 +157,13 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .stream()
                 .map(assignmentMapper::toAssignmentResponse)
                 .toList();
+    }
+
+    // the logged in lecturer, not the id sent by the browser
+    private Lecturer currentLecturer() {
+        com.unilearn.server.model.User user = ownershipValidator.getCurrentUser()
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("User not authenticated"));
+        return lecturerRepository.findById(user.getUserId())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Only lecturers can do this"));
     }
 }

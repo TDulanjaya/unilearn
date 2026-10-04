@@ -66,11 +66,29 @@ public class ExamMapper {
         if (request == null) {
             throw new ValidationException("Exam request cannot be null");
         }
+        if (slot == null) {
+            throw new ValidationException("A linked class slot is required for an in-class exam");
+        }
+        if (request.getExamDate() == null) {
+            throw new ValidationException("Exam date is required for an in-class exam");
+        }
+        // use the class slot times when the request has none
+        LocalTime start = request.getStartTime() != null ? request.getStartTime() : slot.getStartTime();
+        LocalTime end = request.getEndTime() != null ? request.getEndTime() : slot.getEndTime();
+        if (end == null && start != null && request.getDurationMinutes() != null) {
+            end = start.plusMinutes(request.getDurationMinutes());
+        }
+        String venue = request.getVenue() != null && !request.getVenue().isBlank() ? request.getVenue() : slot.getVenue();
+
         return Exam.builder()
                 .courseOffering(offering)
-                .examType("in_class")
+                .examType("midterm_inclass")
                 .scheduledBy(scheduledBy)
                 .linkedSlot(slot)
+                .examDate(request.getExamDate())
+                .startTime(start)
+                .endTime(end)
+                .venue(venue)
                 .durationMinutes(request.getDurationMinutes())
                 .status("published")
                 .build();

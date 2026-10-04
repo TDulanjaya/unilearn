@@ -38,6 +38,10 @@ public class GradebookEntryController {
         if ("student".equalsIgnoreCase(principal.getRole()) && !studentId.equals(principal.getUserId())) {
             throw new AccessDeniedException("Access denied: Students can only access their own gradebook entries");
         }
-        return ResponseEntity.ok(gradebookEntryService.getEntriesByStudent(studentId));
+        // only keep the entries for this offering
+        List<GradebookEntryResponse> entries = gradebookEntryService.getEntriesByStudent(studentId).stream()
+                .filter(e -> offeringId.equals(e.getOfferingId()))
+                .toList();
+        return ResponseEntity.ok(entries);
     }
 }

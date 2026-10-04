@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MaterialItem, Course, getFileTypeMeta } from "@/types/course";
 import VideoPlayerModal from "@/components/VideoPlayerModal";
+import { downloadFile } from "@/lib/files";
 
 interface CourseMaterialsTabProps {
   course: Course;
@@ -20,19 +21,14 @@ export default function CourseMaterialsTab({
     moduleName?: string;
   } | null>(null);
 
+  // download the real uploaded file
   const handleDownloadMaterial = (m: MaterialItem) => {
-    const blob = new Blob(
-      [
-        `[UniLearn Course Material]\nTitle: ${m.title}\nCourse: ${course.code} - ${course.title}\nReleased: ${m.date}\nSummary: ${m.summary}`,
-      ],
-      { type: "text/plain" }
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${m.title.replace(/[^a-zA-Z0-9]/g, "_")}.${m.type.toLowerCase()}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!m.linkUrl) {
+      alert("No file is attached to this material.");
+      return;
+    }
+    const ext = m.linkUrl.split("?")[0].split(".").pop() || "file";
+    downloadFile(m.linkUrl, `${m.title.replace(/[^a-zA-Z0-9]/g, "_")}.${ext}`);
   };
 
   return (
@@ -200,6 +196,7 @@ export default function CourseMaterialsTab({
                                     date: m.date,
                                     size: att.size,
                                     summary: att.summary || m.summary,
+                                    linkUrl: att.linkUrl,
                                   })
                                 }
                                 className="btn-primary text-[11px] !py-1 !px-2.5"

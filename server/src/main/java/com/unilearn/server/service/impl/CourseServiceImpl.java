@@ -27,6 +27,7 @@ public class CourseServiceImpl implements CourseService {
     private final CourseRepository courseRepository;
     private final DepartmentRepository departmentRepository;
     private final CourseMapper courseMapper;
+    private final com.unilearn.server.security.AdminScopeValidator adminScopeValidator;
 
     @Override
     @Transactional
@@ -34,6 +35,7 @@ public class CourseServiceImpl implements CourseService {
         if (request == null) {
             throw new ValidationException("Course request cannot be null");
         }
+        adminScopeValidator.checkDepartmentWriteAccess(request.getDepartmentId());
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
@@ -59,6 +61,12 @@ public class CourseServiceImpl implements CourseService {
 
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + courseId));
+
+        // check both the old and the new department
+        if (course.getDepartment() != null) {
+            adminScopeValidator.checkDepartmentWriteAccess(course.getDepartment().getDepartmentId());
+        }
+        adminScopeValidator.checkDepartmentWriteAccess(request.getDepartmentId());
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new EntryNotFoundException("Department not found with ID: " + request.getDepartmentId()));
@@ -86,8 +94,10 @@ public class CourseServiceImpl implements CourseService {
         if (courseId == null) {
             throw new ValidationException("Course ID cannot be null");
         }
-        if (!courseRepository.existsById(courseId)) {
-            throw new EntryNotFoundException("Course not found with ID: " + courseId);
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new EntryNotFoundException("Course not found with ID: " + courseId));
+        if (course.getDepartment() != null) {
+            adminScopeValidator.checkDepartmentWriteAccess(course.getDepartment().getDepartmentId());
         }
         courseRepository.deleteById(courseId);
     }

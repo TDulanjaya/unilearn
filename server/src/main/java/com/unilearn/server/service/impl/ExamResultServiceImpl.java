@@ -37,6 +37,7 @@ public class ExamResultServiceImpl implements ExamResultService {
     private final ExamAnswerRepository examAnswerRepository;
     private final ExamResultMapper examResultMapper;
     private final com.unilearn.server.security.OwnershipValidator ownershipValidator;
+    private final com.unilearn.server.repository.ExamQuestionRepository examQuestionRepository;
 
     @Override
     @Transactional
@@ -69,6 +70,40 @@ public class ExamResultServiceImpl implements ExamResultService {
     @Override
     @Transactional
     public ExamResultResponse publishResultForStudent(Long examId, Long studentId) {
+        return saveResult(examId, studentId, true);
+    }
+
+    @Override
+    @Transactional
+    public ExamResultResponse computeResultForStudent(Long examId, Long studentId) {
+        return saveResult(examId, studentId, false);
+    }
+
+    // letter grade from the % of the exam's total marks (null if the exam has no questions)
+    private String letterGrade(Long examId, BigDecimal score) {
+        BigDecimal total = examQuestionRepository.findByExam_ExamId(examId).stream()
+                .map(eq -> examQuestionRepository.maxMarksFor(examId, eq.getQuestion()))
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (score == null || total.signum() <= 0) {
+            return null;
+        }
+        double pct = score.doubleValue() * 100.0 / total.doubleValue();
+        if (pct >= 85) return "A+";
+        if (pct >= 75) return "A";
+        if (pct >= 70) return "A-";
+        if (pct >= 65) return "B+";
+        if (pct >= 60) return "B";
+        if (pct >= 55) return "B-";
+        if (pct >= 50) return "C+";
+        if (pct >= 45) return "C";
+        if (pct >= 40) return "C-";
+        if (pct >= 35) return "D+";
+        if (pct >= 30) return "D";
+        return "F";
+    }
+
+    private ExamResultResponse saveResult(Long examId, Long studentId, boolean publish) {
         if (examId == null || studentId == null) {
             throw new ValidationException("Exam ID and Student ID cannot be null");
         }
@@ -86,7 +121,9 @@ public class ExamResultServiceImpl implements ExamResultService {
         ExamAttempt attempt = examAttemptRepository.findByExam_ExamIdAndStudent_StudentId(examId, studentId)
                 .orElseThrow(() -> new EntryNotFoundException("ExamAttempt not found for exam ID: " + examId + " and student ID: " + studentId));
 
-        List<ExamAnswer> answers = examAnswerRepository.findByAttempt_AttemptId(attempt.getAttemptId());
+        // count each question once, even if it was saved twice
+        List<ExamAnswer> answers = ExamAttemptServiceImpl.latestPerQuestion(
+                examAnswerRepository.findByAttempt_AttemptId(attempt.getAttemptId()));
         BigDecimal totalScore = answers.stream()
                 .map(a -> a.getMarksAwarded() != null ? a.getMarksAwarded() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -95,7 +132,10 @@ public class ExamResultServiceImpl implements ExamResultService {
                 .orElseGet(() -> ExamResult.builder().exam(exam).student(student).build());
 
         result.setScore(totalScore);
-        result.setPublishedAt(LocalDateTime.now());
+        result.setGrade(letterGrade(examId, totalScore));
+        if (publish) {
+            result.setPublishedAt(LocalDateTime.now());
+        }
 
         ExamResult saved = examResultRepository.save(result);
         return examResultMapper.toExamResultResponse(saved);

@@ -16,7 +16,7 @@ public interface UserService {
 
     UserResponse getUserById(Long userId);
 
-    PageResponseDTO<UserResponse> getAllUsers(Pageable pageable);
+    PageResponseDTO<UserResponse> getAllUsers(Pageable pageable, String search, String roles, String status);
 
     UserResponse setUserActive(Long userId, boolean active);
 

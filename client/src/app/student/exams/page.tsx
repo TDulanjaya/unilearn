@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -39,7 +39,16 @@ interface ExamListEntry {
   grade?: string;
   durationMinutes?: number;
   isOnlineAvailable?: boolean;
+  examDate?: string;
+  startTime?: string;
+  endTime?: string;
 }
+
+// "09:30:00" -> "09:30"
+const shortTime = (t?: string) => (t ? String(t).slice(0, 5) : "");
+
+const examTypeLabel = (examType?: string): ExamListEntry["type"] =>
+  (examType || "").toLowerCase() === "final" ? "Final Exam" : "In-Class Assessment";
 
 export default function StudentExamsPage() {
   const { user } = useAuth();
@@ -56,6 +65,12 @@ export default function StudentExamsPage() {
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState<boolean>(false);
+
+  // typed answers waiting to be saved (debounce)
+  const saveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const pendingAnswers = useRef<Record<number, string>>({});
 
   // enrollments
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
@@ -83,31 +98,74 @@ export default function StudentExamsPage() {
 
   const rawExams = examQueries.flatMap((q: any) => q.data || []);
 
-  const upcomingExams: ExamListEntry[] = rawExams.map((ex: any, idx: number) => ({
-    id: ex.examId,
-    courseCode: ex.courseCode || "—",
-    courseTitle: ex.title || "Examination",
-    dateTime: ex.startDateTime ? new Date(ex.startDateTime).toLocaleString() : "Date & Time TBD",
-    venue: ex.location || "Online Exam Portal",
-    seatNo: `SEAT-${idx + 10}`,
-    type: "In-Class Assessment",
-    status: "Upcoming",
-    durationMinutes: ex.durationMinutes || 45,
-    isOnlineAvailable: true,
-  }));
+  const courseNameFor = (offeringId: number) =>
+    enrollmentList.find((e: any) => e.offeringId === offeringId)?.courseName;
 
-  const completedExams: ExamListEntry[] = (studentAttempts || []).map((att: any) => {
+  const isAttemptSubmitted = (att: any) =>
+    (att.status || "").toLowerCase() === "submitted" || !!att.endTime;
+
+  const submittedAttempts = (studentAttempts || []).filter(isAttemptSubmitted);
+  const submittedExamIds = new Set(submittedAttempts.map((att: any) => att.examId));
+
+  // published results for submitted exams (404/403 just means not published yet)
+  const resultQueries = useQueries({
+    queries: submittedAttempts.map((att: any) => ({
+      queryKey: ["studentExamResult", user?.userId, att.examId],
+      queryFn: () =>
+        api.get<any>(`/api/v1/exam-results/student/${user?.userId}?examId=${att.examId}`),
+      enabled: !!user?.userId && !!att.examId,
+      retry: false,
+    })),
+  });
+
+  const formatExamDateTime = (ex: any) => {
+    if (!ex?.examDate) return "Date & Time TBD";
+    const datePart = new Date(`${ex.examDate}T00:00:00`).toLocaleDateString();
+    const timePart = ex.startTime
+      ? ` · ${shortTime(ex.startTime)}${ex.endTime ? ` - ${shortTime(ex.endTime)}` : ""}`
+      : "";
+    return `${datePart}${timePart}`;
+  };
+
+  const upcomingExams: ExamListEntry[] = rawExams
+    // only published exams the student has not submitted yet
+    .filter((ex: any) => !ex.status || ex.status.toLowerCase() === "published")
+    .filter((ex: any) => !submittedExamIds.has(ex.examId))
+    .map((ex: any, idx: number) => ({
+      id: ex.examId,
+      courseCode: ex.courseCode || "—",
+      courseTitle: courseNameFor(ex.offeringId) || examTypeLabel(ex.examType),
+      dateTime: formatExamDateTime(ex),
+      venue: ex.venue || "Online Exam Portal",
+      seatNo: `SEAT-${idx + 10}`,
+      type: examTypeLabel(ex.examType),
+      status: "Upcoming",
+      durationMinutes: ex.durationMinutes || 45,
+      isOnlineAvailable: true,
+      examDate: ex.examDate,
+      startTime: ex.startTime,
+      endTime: ex.endTime,
+    }));
+
+  const completedExams: ExamListEntry[] = submittedAttempts.map((att: any, idx: number) => {
     const matchedExam = rawExams.find((e: any) => e.examId === att.examId);
+    const result: any = resultQueries[idx]?.data;
+    let grade = "Pending Grading";
+    if (result && result.publishedAt && result.score != null) {
+      grade = `${Number(result.score)} marks${result.grade ? ` (${result.grade})` : ""}`;
+    }
     return {
       id: att.examId || att.attemptId,
       courseCode: matchedExam?.courseCode || "Exam",
-      courseTitle: matchedExam?.title || `Exam Attempt #${att.attemptId}`,
+      courseTitle: matchedExam
+        ? courseNameFor(matchedExam.offeringId) || examTypeLabel(matchedExam.examType)
+        : `Exam Attempt #${att.attemptId}`,
       dateTime: att.endTime ? new Date(att.endTime).toLocaleString() : (att.startTime ? new Date(att.startTime).toLocaleString() : "Submitted"),
-      venue: "Online Exam Portal",
+      venue: matchedExam?.venue || "Online Exam Portal",
       seatNo: `ATT-${att.attemptId}`,
-      type: "Final Exam",
+      type: matchedExam ? examTypeLabel(matchedExam.examType) : "Final Exam",
       status: "Completed",
-      grade: att.score != null ? `${att.score}%` : "Pending Grading",
+      grade,
       durationMinutes: matchedExam?.durationMinutes || 45,
       isOnlineAvailable: false,
     };
@@ -132,6 +190,10 @@ export default function StudentExamsPage() {
         selectedOption: data.answer,
         answerText: data.answer,
       }),
+    onSuccess: () => setSaveError(null),
+    onError: (err: any) => {
+      setSaveError(err?.message || "Your answer could not be saved. Please try again.");
+    },
   });
 
   const completeAttemptMutation = useMutation({
@@ -140,17 +202,40 @@ export default function StudentExamsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["studentExamAttempts", user?.userId] });
     },
+    onError: (err: any) => {
+      setSaveError("Submission failed: " + (err?.message || "please try again."));
+    },
   });
 
-  const startExam = async (exam: ExamListEntry) => {
-    setExamError(null);
+  // save one answer now and drop its waiting timer
+  const flushAnswer = async (questionId: number) => {
+    const timer = saveTimers.current[questionId];
+    if (timer) {
+      clearTimeout(timer);
+      delete saveTimers.current[questionId];
+    }
+    if (!(questionId in pendingAnswers.current) || !currentAttemptId) return;
+    const value = pendingAnswers.current[questionId];
+    delete pendingAnswers.current[questionId];
     try {
-      // create attempt
-      const attemptRes = await startAttemptMutation.mutateAsync(exam.id);
-      const attemptId = attemptRes.attemptId;
-      setCurrentAttemptId(attemptId);
+      await saveAnswerMutation.mutateAsync({ attemptId: currentAttemptId, questionId, answer: value });
+    } catch {
+      // error is already shown by onError
+    }
+  };
 
-      // fetch exam questions
+  const flushAllAnswers = async () => {
+    const ids = Object.keys(pendingAnswers.current).map(Number);
+    await Promise.all(ids.map((id) => flushAnswer(id)));
+  };
+
+  const startExam = async (exam: ExamListEntry) => {
+    if (isStarting) return;
+    setExamError(null);
+    setSaveError(null);
+    setIsStarting(true);
+    try {
+      // load questions first, so a "not started yet" error doesn't create an attempt
       const questionsRes = await api.get<any[]>(`/api/v1/exams/${exam.id}/questions`);
 
       const loadedQuestions: QuestionData[] = (questionsRes || []).map((q: any) => {
@@ -174,11 +259,33 @@ export default function StudentExamsPage() {
           text: q.questionText || "Question",
           type: qType,
           points: Number(q.marksOverride ?? q.marks ?? 5),
-          options: parsedOptions,
+          options: Array.isArray(parsedOptions) ? parsedOptions : [],
         };
       });
 
+      // create attempt (or get the one already in progress)
+      const attemptRes = await startAttemptMutation.mutateAsync(exam.id);
+      const attemptId = attemptRes.attemptId;
+      setCurrentAttemptId(attemptId);
+
       const examDuration = exam.durationMinutes || 45;
+
+      // time left is counted from when the attempt started
+      let remaining = examDuration * 60;
+      if (attemptRes.startTime) {
+        let deadline = new Date(attemptRes.startTime).getTime() + examDuration * 60 * 1000;
+        if (exam.examDate && exam.endTime && exam.startTime && exam.endTime > exam.startTime) {
+          const examEnd = new Date(`${exam.examDate}T${exam.endTime}`).getTime();
+          if (!isNaN(examEnd)) deadline = Math.min(deadline, examEnd);
+        }
+        const left = Math.floor((deadline - Date.now()) / 1000);
+        // if the clocks don't match, don't end the exam at once
+        if (!isNaN(left) && left > 0) remaining = Math.min(remaining, left);
+      }
+
+      pendingAnswers.current = {};
+      Object.values(saveTimers.current).forEach((t) => clearTimeout(t));
+      saveTimers.current = {};
 
       setActiveExam({
         id: exam.id,
@@ -188,7 +295,7 @@ export default function StudentExamsPage() {
         questions: loadedQuestions,
       });
 
-      setSecondsRemaining(examDuration * 60);
+      setSecondsRemaining(remaining);
       setCurrentQIndex(0);
       setAnswers({});
       setFlagged({});
@@ -196,6 +303,8 @@ export default function StudentExamsPage() {
       setIsSubmitted(false);
     } catch (err: any) {
       setExamError(err.message || "Failed to start exam attempt. Please try again.");
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -203,9 +312,11 @@ export default function StudentExamsPage() {
     if (confirm("Are you sure you want to submit your exam now?")) {
       try {
         if (currentAttemptId) {
+          await flushAllAnswers();
           await completeAttemptMutation.mutateAsync(currentAttemptId);
         }
         setIsSubmitted(true);
+        setSaveError(null);
       } catch (err: any) {
         alert("Submission failed: " + err.message);
       }
@@ -238,21 +349,21 @@ export default function StudentExamsPage() {
     if (!activeExam || isSubmitted) return;
 
     const timer = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          if (currentAttemptId) {
-            completeAttemptMutation.mutate(currentAttemptId);
-          }
-          setIsSubmitted(true);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activeExam, isSubmitted, currentAttemptId]);
+  }, [activeExam, isSubmitted]);
+
+  // time is up: save what we have and submit once
+  useEffect(() => {
+    if (activeExam && !isSubmitted && secondsRemaining === 0 && currentAttemptId) {
+      const attemptId = currentAttemptId;
+      setIsSubmitted(true);
+      flushAllAnswers().finally(() => completeAttemptMutation.mutate(attemptId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsRemaining, activeExam, isSubmitted, currentAttemptId]);
 
   useEffect(() => {
     if (!activeExam || isSubmitted) return;
@@ -271,14 +382,20 @@ export default function StudentExamsPage() {
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  const handleAnswerChange = (questionId: number, value: string) => {
+  // typed answers wait 800ms before saving, clicked answers save at once
+  const handleAnswerChange = (questionId: number, value: string, typed = false) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
-    if (currentAttemptId) {
-      saveAnswerMutation.mutate({
-        attemptId: currentAttemptId,
-        questionId,
-        answer: value,
-      });
+    if (!currentAttemptId) return;
+    pendingAnswers.current[questionId] = value;
+    if (saveTimers.current[questionId]) {
+      clearTimeout(saveTimers.current[questionId]);
+    }
+    if (typed) {
+      saveTimers.current[questionId] = setTimeout(() => {
+        flushAnswer(questionId);
+      }, 800);
+    } else {
+      flushAnswer(questionId);
     }
   };
 
@@ -359,6 +476,18 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
             </div>
           </div>
         </div>
+
+        {saveError && (
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <i className="ti ti-alert-triangle text-base"></i>
+              <span>{saveError}</span>
+            </div>
+            <button onClick={() => setSaveError(null)} className="hover:opacity-80">
+              <i className="ti ti-x"></i>
+            </button>
+          </div>
+        )}
 
         {isSubmitted ? (
           <div className="card p-6 sm:p-12 text-center space-y-4 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] max-w-2xl mx-auto shadow-2xl animate-scaleIn">
@@ -448,14 +577,16 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                   <ShortTextQuestion
                     questionId={currentQ.id}
                     selectedAnswer={answers[currentQ.id]}
-                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val)}
+                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val, true)}
+                    onBlur={() => flushAnswer(currentQ.id)}
                   />
                 )}
                 {currentQ.type === "ESSAY" && (
                   <EssayQuestion
                     questionId={currentQ.id}
                     selectedAnswer={answers[currentQ.id]}
-                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val)}
+                    onAnswerChange={(val) => handleAnswerChange(currentQ.id, val, true)}
+                    onBlur={() => flushAnswer(currentQ.id)}
                   />
                 )}
               </div>
@@ -642,9 +773,10 @@ Generated on: ${new Date().toLocaleDateString("en-US")}
                 {exam.isOnlineAvailable && exam.status === "Upcoming" && (
                   <button
                     onClick={() => startExam(exam)}
-                    className="btn-primary text-xs !py-2 !px-4"
+                    disabled={isStarting}
+                    className="btn-primary text-xs !py-2 !px-4 disabled:opacity-60"
                   >
-                    Start Exam
+                    {isStarting ? "Starting..." : "Start Exam"}
                   </button>
                 )}
               </div>

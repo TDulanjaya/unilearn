@@ -36,6 +36,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     queryKey: ["notifications", user?.userId],
     queryFn: () => api.get<any>("/api/v1/notifications/me?size=50"),
     enabled: !!user?.userId,
+    // check for new notifications every 30 seconds
+    refetchInterval: 30000,
   });
 
   const markReadMutation = useMutation({
@@ -52,7 +54,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     title: n.title,
     detail: n.message,
     time: n.createdAt ? new Date(n.createdAt).toLocaleString() : "Just now",
-    read: n.read || false,
+    // server sends "isRead", older data may use "read"
+    read: !!(n.isRead ?? n.read),
     icon: "ti-bell",
     iconBg: "bg-[var(--surface-container)]",
     iconColor: "text-[var(--tertiary)]",
@@ -72,8 +75,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     );
     try {
       await markReadMutation.mutateAsync(id);
-    } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+    } catch (err: any) {
+      // put it back to unread if the server call failed
+      setLocalNotifications((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, read: false } : item))
+      );
+      alert(err?.message || "Failed to mark notification as read");
     }
   };
 

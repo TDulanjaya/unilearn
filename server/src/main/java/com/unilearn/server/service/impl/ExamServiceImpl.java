@@ -53,8 +53,7 @@ public class ExamServiceImpl implements ExamService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        User scheduledBy = userRepository.findById(request.getScheduledById())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getScheduledById()));
+        User scheduledBy = resolveScheduledBy(request.getScheduledById());
 
         TimetableSlot slot = null;
         if (request.getLinkedSlotId() != null) {
@@ -62,7 +61,16 @@ public class ExamServiceImpl implements ExamService {
                     .orElseThrow(() -> new EntryNotFoundException("TimetableSlot not found with ID: " + request.getLinkedSlotId()));
         }
 
+        request.setExamType(normalizeExamType(request.getExamType()));
+        if ("midterm_inclass".equals(request.getExamType()) && slot == null) {
+            throw new ValidationException("A linked class slot is required for an in-class exam");
+        }
+        if ("final".equals(request.getExamType()) && date == null) {
+            throw new ValidationException("Exam date is required for a final exam");
+        }
+
         Exam exam = examMapper.toExam(request, offering, scheduledBy, slot);
+        checkBatchClash(exam);
         Exam saved = examRepository.save(exam);
         return examMapper.toExamResponse(saved);
     }
@@ -75,17 +83,20 @@ public class ExamServiceImpl implements ExamService {
         }
         ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
 
-        if (request.getExamDate() != null && request.getExamDate().isBefore(LocalDate.now())) {
+        if (request.getExamDate() == null) {
+            throw new ValidationException("Exam date is required for a final exam");
+        }
+        if (request.getExamDate().isBefore(LocalDate.now())) {
             throw new com.unilearn.server.exception.IllegalStateException("Exam date cannot be in the past");
         }
 
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        User scheduledBy = userRepository.findById(request.getScheduledById())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getScheduledById()));
+        User scheduledBy = resolveScheduledBy(request.getScheduledById());
 
         Exam exam = examMapper.toFinalExam(request, offering, scheduledBy);
+        checkBatchClash(exam);
         Exam saved = examRepository.save(exam);
         return examMapper.toExamResponse(saved);
     }
@@ -101,16 +112,37 @@ public class ExamServiceImpl implements ExamService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        User scheduledBy = userRepository.findById(request.getScheduledById())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getScheduledById()));
+        User scheduledBy = resolveScheduledBy(request.getScheduledById());
 
-        TimetableSlot slot = null;
-        if (request.getLinkedSlotId() != null) {
-            slot = timetableSlotRepository.findById(request.getLinkedSlotId())
-                    .orElseThrow(() -> new EntryNotFoundException("TimetableSlot not found with ID: " + request.getLinkedSlotId()));
+        if (request.getLinkedSlotId() == null) {
+            throw new ValidationException("A linked class slot is required for an in-class exam");
+        }
+        TimetableSlot slot = timetableSlotRepository.findById(request.getLinkedSlotId())
+                .orElseThrow(() -> new EntryNotFoundException("TimetableSlot not found with ID: " + request.getLinkedSlotId()));
+
+        // the slot must be a class of this offering
+        if (slot.getCourseOffering() == null || !offering.getOfferingId().equals(slot.getCourseOffering().getOfferingId())) {
+            throw new ValidationException("The selected class slot does not belong to this course offering");
+        }
+
+        if (request.getExamDate() == null) {
+            throw new ValidationException("Exam date is required for an in-class exam");
+        }
+        if (request.getExamDate().isBefore(LocalDate.now())) {
+            throw new com.unilearn.server.exception.IllegalStateException("Exam date cannot be in the past");
+        }
+
+        // the date should fall on the same weekday as the slot (slot days are Mon, Tue ...)
+        String slotDay = slot.getDayOfWeek();
+        if (slotDay != null && slotDay.length() >= 3) {
+            String dateDay = request.getExamDate().getDayOfWeek().name().substring(0, 3);
+            if (!dateDay.equalsIgnoreCase(slotDay.substring(0, 3))) {
+                throw new ValidationException("Exam date must be on a " + slotDay + " to match the selected class slot");
+            }
         }
 
         Exam exam = examMapper.toInClassExam(request, offering, scheduledBy, slot);
+        checkBatchClash(exam);
         Exam saved = examRepository.save(exam);
         return examMapper.toExamResponse(saved);
     }
@@ -141,8 +173,8 @@ public class ExamServiceImpl implements ExamService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        User scheduledBy = userRepository.findById(request.getScheduledById())
-                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + request.getScheduledById()));
+        // keep who first scheduled it, the request can't change that
+        User scheduledBy = exam.getScheduledBy() != null ? exam.getScheduledBy() : resolveScheduledBy(request.getScheduledById());
 
         TimetableSlot slot = null;
         if (request.getLinkedSlotId() != null) {
@@ -153,8 +185,17 @@ public class ExamServiceImpl implements ExamService {
         LocalTime start = request.getStartTime() != null ? request.getStartTime() : (request.getScheduledAt() != null ? request.getScheduledAt().toLocalTime() : exam.getStartTime());
         LocalTime end = request.getEndTime() != null ? request.getEndTime() : start.plusMinutes(request.getDurationMinutes() != null ? request.getDurationMinutes() : exam.getDurationMinutes());
 
+        String examType = normalizeExamType(request.getExamType());
+        // keep the old slot if the update doesn't send one
+        if (slot == null && "midterm_inclass".equals(examType)) {
+            slot = exam.getLinkedSlot();
+            if (slot == null) {
+                throw new ValidationException("A linked class slot is required for an in-class exam");
+            }
+        }
+
         exam.setCourseOffering(offering);
-        exam.setExamType(request.getExamType());
+        exam.setExamType(examType);
         exam.setScheduledBy(scheduledBy);
         exam.setLinkedSlot(slot);
         exam.setExamDate(date != null ? date : exam.getExamDate());
@@ -165,6 +206,10 @@ public class ExamServiceImpl implements ExamService {
         if (request.getStatus() != null) {
             exam.setStatus(request.getStatus());
         }
+        if ("final".equals(examType) && exam.getExamDate() == null) {
+            throw new ValidationException("Exam date is required for a final exam");
+        }
+        checkBatchClash(exam);
 
         Exam updated = examRepository.save(exam);
         return examMapper.toExamResponse(updated);
@@ -255,6 +300,75 @@ public class ExamServiceImpl implements ExamService {
                 .stream()
                 .map(examMapper::toExamListItemDTO)
                 .toList();
+    }
+
+    // use the logged in user, fall back to the id in the request
+    private User resolveScheduledBy(Long requestedId) {
+        User current = ownershipValidator.getCurrentUser().orElse(null);
+        if (current != null) {
+            return current;
+        }
+        if (requestedId == null) {
+            throw new ValidationException("Scheduled by user is required");
+        }
+        return userRepository.findById(requestedId)
+                .orElseThrow(() -> new EntryNotFoundException("User not found with ID: " + requestedId));
+    }
+
+    // a batch can't sit two exams at the same time on the same day
+    private void checkBatchClash(Exam exam) {
+        if (exam.getExamDate() == null || exam.getStartTime() == null || exam.getEndTime() == null) {
+            return;
+        }
+        if ("cancelled".equalsIgnoreCase(exam.getStatus())) {
+            return;
+        }
+        CourseOffering offering = exam.getCourseOffering();
+        if (offering == null || offering.getBatch() == null || offering.getBatch().getBatchId() == null) {
+            return;
+        }
+        Long batchId = offering.getBatch().getBatchId();
+
+        for (Exam other : examRepository.findByExamDate(exam.getExamDate())) {
+            // skip the exam we are editing
+            if (exam.getExamId() != null && exam.getExamId().equals(other.getExamId())) {
+                continue;
+            }
+            if ("cancelled".equalsIgnoreCase(other.getStatus())) {
+                continue;
+            }
+            CourseOffering otherOffering = other.getCourseOffering();
+            if (otherOffering == null || otherOffering.getBatch() == null
+                    || !batchId.equals(otherOffering.getBatch().getBatchId())) {
+                continue;
+            }
+            if (other.getStartTime() == null || other.getEndTime() == null) {
+                continue;
+            }
+            boolean overlaps = exam.getStartTime().isBefore(other.getEndTime())
+                    && exam.getEndTime().isAfter(other.getStartTime());
+            if (overlaps) {
+                String code = otherOffering.getCourse() != null ? otherOffering.getCourse().getCode() : "another course";
+                throw new ValidationException("Exam clash: this batch already has the " + code + " exam (#"
+                        + other.getExamId() + ") on " + other.getExamDate() + " from "
+                        + other.getStartTime() + " to " + other.getEndTime());
+            }
+        }
+    }
+
+    // only 'final' and 'midterm_inclass' are allowed in the database
+    private String normalizeExamType(String examType) {
+        if (examType == null || examType.isBlank()) {
+            throw new ValidationException("Exam type is required");
+        }
+        String type = examType.trim().toLowerCase().replace('-', '_').replace(' ', '_');
+        if (type.equals("final")) {
+            return "final";
+        }
+        if (type.equals("midterm_inclass") || type.equals("in_class") || type.equals("inclass") || type.equals("midterm")) {
+            return "midterm_inclass";
+        }
+        throw new ValidationException("Exam type must be 'final' or 'midterm_inclass'");
     }
 
     @Override

@@ -185,7 +185,8 @@ export default function Page() {
     mutationFn: (body: { name: string; code: string; facultyId: number }) =>
       api.post("/api/v1/departments", body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["departments", selectedFacultyId] });
+      // prefix match, refreshes every departments list
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["allDepartments"] });
       setShowAddDeptForm(false);
       setNewDeptName("");
@@ -199,7 +200,8 @@ export default function Page() {
     mutationFn: ({ id, body }: { id: number; body: { name: string; code: string; facultyId: number; hodUserId?: number | null } }) =>
       api.put(`/api/v1/departments/${id}`, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["departments", selectedFacultyId] });
+      // prefix match, refreshes every departments list
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["allDepartments"] });
       setEditingDept(null);
       showToast("Department updated successfully.");
@@ -210,7 +212,8 @@ export default function Page() {
   const deleteDeptMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/api/v1/departments/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["departments", selectedFacultyId] });
+      // prefix match, refreshes every departments list
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["allDepartments"] });
       setConfirmDeleteDeptId(null);
       showToast("Department deleted successfully.");
@@ -583,15 +586,22 @@ export default function Page() {
     deleteBatchMutation.mutate(id);
   };
 
-  // lecturers
+  // lecturers (the users list filtered by role, so we get all of them, not just one page)
   const { data: usersData } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => api.get<any>("/api/v1/users?size=100"),
+    queryKey: ["users", "lecturerOptions"],
+    queryFn: () => api.get<any>("/api/v1/users?role=LECTURER,GUEST_LECTURER&size=1000&sort=fullName,asc"),
   });
   const allUsers: any[] =
     usersData?.content ||
     usersData?.dataList ||
     (Array.isArray(usersData) ? usersData : []);
+
+  // people who can be picked as HOD
+  const { data: hodUsersData } = useQuery({
+    queryKey: ["users", "hodOptions"],
+    queryFn: () => api.get<any>("/api/v1/users?role=HOD_DEAN,LECTURER,STAFF_ADMIN&size=1000&sort=fullName,asc"),
+  });
+  const hodCandidates: any[] = hodUsersData?.dataList || hodUsersData?.content || [];
 
   const lecturers: LecturerOption[] = allUsers
     .filter(
@@ -628,10 +638,11 @@ export default function Page() {
   // Sync default form dropdown values
   useEffect(() => {
     if (courses.length > 0 && !newOffCourseCode) setNewOffCourseCode(courses[0].code);
-    if (batches.length > 0 && !newOffBatch) setNewOffBatch(batches[0].name);
-    if (semesters.length > 0 && !newOffSemester) setNewOffSemester(semesters[0].name);
-    if (lecturers.length > 0 && !newOffLecturer) setNewOffLecturer(lecturers[0].fullName);
-    if (lecturers.length > 0 && !selectedLecturerToAdd) setSelectedLecturerToAdd(lecturers[0].fullName);
+    // dropdowns keep ids, names can repeat
+    if (batches.length > 0 && !newOffBatch) setNewOffBatch(batches[0].id);
+    if (semesters.length > 0 && !newOffSemester) setNewOffSemester(semesters[0].id);
+    if (lecturers.length > 0 && !newOffLecturer) setNewOffLecturer(String(lecturers[0].lecturerId));
+    if (lecturers.length > 0 && !selectedLecturerToAdd) setSelectedLecturerToAdd(String(lecturers[0].lecturerId));
     if (offerings.length > 0 && newSlotOfferingId === 0) setNewSlotOfferingId(offerings[0].offeringId);
   }, [courses, batches, semesters, lecturers, offerings, newOffCourseCode, newOffBatch, newOffSemester, newOffLecturer, selectedLecturerToAdd, newSlotOfferingId]);
 
@@ -642,8 +653,8 @@ export default function Page() {
 
   useEffect(() => {
     if (filteredBatchesForOffering.length > 0) {
-      if (!filteredBatchesForOffering.some((b: any) => b.name === newOffBatch)) {
-        setNewOffBatch(filteredBatchesForOffering[0].name);
+      if (!filteredBatchesForOffering.some((b: any) => b.id === newOffBatch)) {
+        setNewOffBatch(filteredBatchesForOffering[0].id);
       }
     }
   }, [newOffCourseCode, showAllDeptsForOffering, batches]);
@@ -660,9 +671,9 @@ export default function Page() {
   const handleCreateOffering = (e: React.FormEvent) => {
     e.preventDefault();
     const course = courses.find((c) => c.code === newOffCourseCode);
-    const batch = batches.find((b) => b.name === newOffBatch);
-    const sem = semesters.find((s) => s.name === newOffSemester);
-    const lec = lecturers.find((l) => l.fullName === newOffLecturer) || lecturers[0];
+    const batch = batches.find((b) => b.id === newOffBatch);
+    const sem = semesters.find((s) => s.id === newOffSemester);
+    const lec = lecturers.find((l) => String(l.lecturerId) === newOffLecturer);
 
     if (!course || !course.courseId) {
       showToast("Please select a valid course module.", "error");
@@ -692,16 +703,22 @@ export default function Page() {
 
   const handleAddLecturerToOffering = (offeringId: number) => {
     if (!selectedLecturerToAdd) return;
-    const lecObj = lecturers.find((l) => l.fullName === selectedLecturerToAdd) || lecturers[0] || null;
+    const lecObj = lecturers.find((l) => String(l.lecturerId) === selectedLecturerToAdd) || null;
     if (lecObj) {
-      assignLecturer(offeringId, lecObj.lecturerId, lecObj.fullName);
-      showToast(`Assigned ${lecObj.fullName} to course offering.`);
+      assignLecturer(offeringId, lecObj.lecturerId, lecObj.fullName)
+        .then(() => showToast(`Assigned ${lecObj.fullName} to course offering.`))
+        .catch((err: any) => showToast(err?.message || "Could not assign the lecturer.", "error"));
     }
   };
 
-  const handleRemoveLecturerFromOffering = (offeringId: number, lecturerName: string) => {
-    removeLecturer(offeringId, lecturerName);
-    showToast(`Removed ${lecturerName} from course offering.`);
+  const handleRemoveLecturerFromOffering = (offeringId: number, lecturerId: number | undefined, lecturerName: string) => {
+    if (!lecturerId) {
+      showToast("Could not find this lecturer. Please refresh the page.", "error");
+      return;
+    }
+    removeLecturer(offeringId, lecturerId)
+      .then(() => showToast(`Removed ${lecturerName} from course offering.`))
+      .catch((err: any) => showToast(err?.message || "Could not remove the lecturer.", "error"));
   };
 
   const createSlotMutation = useMutation({
@@ -1098,7 +1115,7 @@ export default function Page() {
                             className="w-full text-xs !py-1.5"
                           >
                             <option value="">No HOD Assigned</option>
-                            {allUsers
+                            {hodCandidates
                               .filter((u: any) => u.role === "hod_dean" || u.role === "lecturer" || u.role === "staff_admin")
                               .map((u: any) => (
                                 <option key={u.userId || u.id} value={u.userId || u.id}>
@@ -1643,7 +1660,7 @@ export default function Page() {
                         </option>
                       ) : (
                         filteredBatchesForOffering.map((b: any) => (
-                          <option key={b.id} value={b.name}>
+                          <option key={b.id} value={b.id}>
                             {b.name} ({b.department})
                           </option>
                         ))
@@ -1666,8 +1683,8 @@ export default function Page() {
                       className="w-full text-xs"
                     >
                       {semesters.map((s: any) => (
-                        <option key={s.id} value={s.name}>
-                          {s.name}
+                        <option key={s.id} value={s.id}>
+                          {s.name}{s.academicYear ? ` (${s.academicYear})` : ""}
                         </option>
                       ))}
                     </select>
@@ -1684,7 +1701,7 @@ export default function Page() {
                     className="w-full text-xs"
                   >
                     {lecturers.map((l) => (
-                      <option key={l.lecturerId} value={l.fullName}>
+                      <option key={l.lecturerId} value={String(l.lecturerId)}>
                         {l.fullName}
                       </option>
                     ))}
@@ -1778,15 +1795,15 @@ export default function Page() {
                                       {off.lecturerNames[0]}
                                     </span>
                                   )}
-                                  {off.lecturerNames.slice(1).map((lec) => (
+                                  {off.lecturerNames.slice(1).map((lec, i) => (
                                     <span
-                                      key={lec}
+                                      key={off.lecturerIds[i + 1] ?? `${lec}-${i}`}
                                       className="badge bg-[var(--surface-container-high)] text-[var(--on-surface)] text-[10px] flex items-center gap-1"
                                     >
                                       {lec}
                                       {isManaging && (
                                         <button
-                                          onClick={() => handleRemoveLecturerFromOffering(off.offeringId, lec)}
+                                          onClick={() => handleRemoveLecturerFromOffering(off.offeringId, off.lecturerIds[i + 1], lec)}
                                           className="hover:text-[var(--error)] font-bold ml-0.5"
                                           title="Remove co-lecturer"
                                         >
@@ -1833,7 +1850,7 @@ export default function Page() {
                           className="text-xs flex-1"
                         >
                           {lecturers.map((l) => (
-                            <option key={l.lecturerId} value={l.fullName}>
+                            <option key={l.lecturerId} value={String(l.lecturerId)}>
                               {l.fullName}
                             </option>
                           ))}

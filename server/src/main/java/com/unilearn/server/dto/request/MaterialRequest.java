@@ -35,6 +35,6 @@ public class MaterialRequest {
     @Size(max = 500, message = "Link URL must not exceed 500 characters")
     private String linkUrl;
 
-    @NotNull(message = "Uploader lecturer ID is required")
+    // set by the server from the logged in lecturer
     private Long uploadedById;
 }

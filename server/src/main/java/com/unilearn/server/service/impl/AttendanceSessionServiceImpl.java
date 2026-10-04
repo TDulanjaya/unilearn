@@ -41,8 +41,8 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        Lecturer lecturer = lecturerRepository.findById(request.getMarkedByLecturerId())
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getMarkedByLecturerId()));
+        Lecturer lecturer = currentLecturer();
+        request.setMarkedByLecturerId(lecturer.getLecturerId());
 
         if (request.getSessionDate() != null && attendanceSessionRepository.existsByCourseOffering_OfferingIdAndSessionDate(request.getOfferingId(), request.getSessionDate())) {
             List<AttendanceSession> existing = attendanceSessionRepository.findByCourseOffering_OfferingIdAndSessionDate(request.getOfferingId(), request.getSessionDate());
@@ -69,11 +69,16 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
         AttendanceSession session = attendanceSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new EntryNotFoundException("AttendanceSession not found with ID: " + sessionId));
 
+        if (session.getCourseOffering() != null) {
+            ownershipValidator.checkLecturerOfferingAccess(session.getCourseOffering().getOfferingId());
+        }
+        ownershipValidator.checkLecturerOfferingAccess(request.getOfferingId());
+
         CourseOffering offering = courseOfferingRepository.findById(request.getOfferingId())
                 .orElseThrow(() -> new EntryNotFoundException("CourseOffering not found with ID: " + request.getOfferingId()));
 
-        Lecturer lecturer = lecturerRepository.findById(request.getMarkedByLecturerId())
-                .orElseThrow(() -> new EntryNotFoundException("Lecturer not found with ID: " + request.getMarkedByLecturerId()));
+        // keep the lecturer who opened the session
+        Lecturer lecturer = session.getMarkedBy() != null ? session.getMarkedBy() : currentLecturer();
 
         session.setCourseOffering(offering);
         session.setSessionDate(request.getSessionDate());
@@ -139,5 +144,13 @@ public class AttendanceSessionServiceImpl implements AttendanceSessionService {
                 .stream()
                 .map(attendanceSessionMapper::toAttendanceSessionResponse)
                 .toList();
+    }
+
+    // the logged in lecturer, not the id sent by the browser
+    private Lecturer currentLecturer() {
+        com.unilearn.server.model.User user = ownershipValidator.getCurrentUser()
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("User not authenticated"));
+        return lecturerRepository.findById(user.getUserId())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Only lecturers can do this"));
     }
 }

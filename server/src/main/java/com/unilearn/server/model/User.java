@@ -63,6 +63,11 @@ public class User implements UserDetails {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    // goes up on logout, password change or deactivation, so old tokens stop working
+    @Builder.Default
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
     // UserDetails methods
 
     @Override
@@ -72,6 +77,13 @@ public class User implements UserDetails {
             return List.of(
                     new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"),
                     new SimpleGrantedAuthority("ROLE_STAFF_ADMIN")
+            );
+        }
+        // guest lecturers use the same lecturer pages and APIs
+        if ("GUEST_LECTURER".equals(r)) {
+            return List.of(
+                    new SimpleGrantedAuthority("ROLE_GUEST_LECTURER"),
+                    new SimpleGrantedAuthority("ROLE_LECTURER")
             );
         }
         return List.of(new SimpleGrantedAuthority("ROLE_" + r));

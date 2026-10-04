@@ -139,11 +139,14 @@ public class StaffAdminServiceImpl implements StaffAdminService {
             return false;
         }
         StaffAdmin staffAdmin = staffAdminRepository.findById(staffId).orElse(null);
-        if (staffAdmin == null) {
-            return false;
-        }
-        if ("institution".equalsIgnoreCase(staffAdmin.getScopeLevel())) {
+        // no row means institution scope, same as AdminScopeValidator
+        if (staffAdmin == null || staffAdmin.getScopeLevel() == null
+                || "institution".equalsIgnoreCase(staffAdmin.getScopeLevel())) {
             return true;
+        }
+        // a faculty admin can also manage department level things
+        if ("faculty".equalsIgnoreCase(staffAdmin.getScopeLevel())) {
+            return !"institution".equalsIgnoreCase(requiredScopeLevel);
         }
         return staffAdmin.getScopeLevel().equalsIgnoreCase(requiredScopeLevel);
     }

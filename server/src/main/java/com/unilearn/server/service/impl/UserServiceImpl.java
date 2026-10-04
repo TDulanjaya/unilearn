@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -48,6 +49,8 @@ public class UserServiceImpl implements UserService {
     private final ExamAttemptRepository examAttemptRepository;
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final CourseOfferingLecturerRepository courseOfferingLecturerRepository;
+    private final CourseOfferingRepository courseOfferingRepository;
+    private final QuestionBankRepository questionBankRepository;
     private final AssignmentRepository assignmentRepository;
     private final MaterialRepository materialRepository;
     private final GradebookEntryRepository gradebookEntryRepository;
@@ -208,29 +211,30 @@ public class UserServiceImpl implements UserService {
             throw new com.unilearn.server.exception.DuplicateEntryException("Email already registered: " + request.getEmail());
         }
 
+        // the student/lecturer/admin rows are not moved, so a role change would leave the user half done
+        if (request.getRole() != null && !request.getRole().equalsIgnoreCase(user.getRole())) {
+            throw new ValidationException("Changing a user's role isn't supported. Create a new account instead.");
+        }
+
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setPhotoUrl(request.getPhotoUrl());
-        if (request.getRole() != null) {
-            String newRoleUpper = request.getRole().toUpperCase();
-            if (("STAFF_ADMIN".equals(newRoleUpper) || "SUPER_ADMIN".equals(newRoleUpper))
-                    && !newRoleUpper.equalsIgnoreCase(user.getRole())) {
-                var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-                boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
-                if (!isSuperAdmin) {
-                    throw new org.springframework.security.access.AccessDeniedException("Only Super Administrator is authorized to assign Administrator roles.");
-                }
-            }
-            user.setRole(request.getRole().toLowerCase());
-        }
         if (request.getStatus() != null) {
-            user.setStatus(request.getStatus().toLowerCase());
+            String newStatus = request.getStatus().toLowerCase();
+            // log the user out everywhere when the account is turned off
+            if (!"active".equals(newStatus) && "active".equalsIgnoreCase(user.getStatus())) {
+                if ("super_admin".equalsIgnoreCase(user.getRole())) {
+                    throw new ValidationException("Cannot deactivate the Super Administrator account.");
+                }
+                bumpTokenVersion(user);
+            }
+            user.setStatus(newStatus);
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
             user.setMustChangePassword(true);
+            bumpTokenVersion(user);
         }
 
         User updated = userRepository.save(user);
@@ -284,17 +288,12 @@ public class UserServiceImpl implements UserService {
                 jdbcTemplate.update("DELETE FROM ai_quiz_sessions WHERE student_id = ?", userId);
             } catch (Exception ignored) {}
             studentRepository.deleteById(userId);
-        } else if ("lecturer".equals(role)) {
-            List<com.unilearn.server.model.CourseOfferingLecturer> colList = courseOfferingLecturerRepository.findByLecturer_LecturerId(userId);
-            for (com.unilearn.server.model.CourseOfferingLecturer col : colList) {
-                gradebookEntryRepository.deleteAll(
-                    gradebookEntryRepository.findByCourseOffering_OfferingId(col.getCourseOffering().getOfferingId())
-                );
+        } else if ("lecturer".equals(role) || "guest_lecturer".equals(role)) {
+            // never delete other people's gradebook or submissions here
+            checkLecturerCanBeDeleted(userId);
+            if (lecturerRepository.existsById(userId)) {
+                lecturerRepository.deleteById(userId);
             }
-            courseOfferingLecturerRepository.deleteAll(colList);
-            assignmentRepository.deleteAll(assignmentRepository.findByCreatedBy_LecturerId(userId));
-            materialRepository.deleteAll(materialRepository.findByUploadedBy_LecturerId(userId));
-            lecturerRepository.deleteById(userId);
         } else if ("staff_admin".equals(role)) {
             staffAdminRepository.deleteById(userId);
         } else if ("hod_dean".equals(role)) {
@@ -364,11 +363,29 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public PageResponseDTO<UserResponse> getAllUsers(Pageable pageable) {
+    public PageResponseDTO<UserResponse> getAllUsers(Pageable pageable, String search, String roles, String status) {
         if (pageable == null) {
             throw new ValidationException("Pageable parameter cannot be null");
         }
-        Page<User> page = userRepository.findAll(pageable);
+        String searchText = (search == null || search.isBlank()) ? "" : "%" + search.trim().toLowerCase() + "%";
+        List<String> roleList = new ArrayList<>();
+        if (roles != null) {
+            for (String r : roles.split(",")) {
+                if (!r.isBlank()) {
+                    roleList.add(r.trim().toLowerCase());
+                }
+            }
+        }
+        boolean allRoles = roleList.isEmpty();
+        if (allRoles) {
+            // IN () with an empty list is not valid sql
+            roleList.add("-");
+        }
+        String statusText = status == null ? "" : status.trim().toLowerCase();
+        if (!statusText.isEmpty() && !"active".equals(statusText) && !"inactive".equals(statusText)) {
+            throw new ValidationException("Status filter must be active or inactive");
+        }
+        Page<User> page = userRepository.searchUsers(searchText, allRoles, roleList, statusText, pageable);
         List<UserResponse> content = page.getContent()
                 .stream()
                 .map(this::enrichUserResponse)
@@ -395,6 +412,10 @@ public class UserServiceImpl implements UserService {
             throw new ValidationException("Cannot deactivate the Super Administrator account.");
         }
 
+        if (!active) {
+            // old tokens stop working
+            bumpTokenVersion(user);
+        }
         user.setStatus(active ? "active" : "inactive");
         User updated = userRepository.save(user);
         return enrichUserResponse(updated);
@@ -419,8 +440,50 @@ public class UserServiceImpl implements UserService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword.trim()));
         user.setMustChangePassword(true);
+        // sign the user out of old sessions
+        bumpTokenVersion(user);
         User updated = userRepository.save(user);
         return enrichUserResponse(updated);
+    }
+
+    private void bumpTokenVersion(User user) {
+        int current = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+        user.setTokenVersion(current + 1);
+    }
+
+    // lecturers with teaching records are kept, the admin should deactivate them
+    private void checkLecturerCanBeDeleted(Long userId) {
+        List<String> reasons = new ArrayList<>();
+        int primaryCount = courseOfferingRepository.findByPrimaryLecturer_LecturerId(userId).size();
+        if (primaryCount > 0) {
+            reasons.add("main lecturer of " + primaryCount + " course offering(s)");
+        }
+        int coCount = courseOfferingLecturerRepository.findByLecturer_LecturerId(userId).size();
+        if (coCount > 0) {
+            reasons.add("assigned to " + coCount + " course offering(s)");
+        }
+        int assignmentCount = assignmentRepository.findByCreatedBy_LecturerId(userId).size();
+        if (assignmentCount > 0) {
+            reasons.add("owner of " + assignmentCount + " assignment(s)");
+        }
+        int materialCount = materialRepository.findByUploadedBy_LecturerId(userId).size();
+        if (materialCount > 0) {
+            reasons.add("uploader of " + materialCount + " material(s)");
+        }
+        Long examCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM exams WHERE scheduled_by_user_id = ?", Long.class, userId);
+        if (examCount != null && examCount > 0) {
+            reasons.add("owner of " + examCount + " exam(s)");
+        }
+        int bankCount = questionBankRepository.findByCreatedBy_UserId(userId).size();
+        if (bankCount > 0) {
+            reasons.add("owner of " + bankCount + " question bank(s)");
+        }
+        if (!reasons.isEmpty()) {
+            throw new com.unilearn.server.exception.IllegalStateException(
+                    "This lecturer can't be deleted because they are " + String.join(", ", reasons)
+                            + ". Deactivate the account instead to keep the academic records.");
+        }
     }
 
     private void checkSuperAdminModification(User targetUser) {

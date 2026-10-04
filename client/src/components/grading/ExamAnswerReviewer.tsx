@@ -122,6 +122,11 @@ export default function ExamAnswerReviewer({
         </div>
 
         {/* Question Answer & Grading */}
+        {!currentQ ? (
+          <div className="p-8 text-center text-xs font-semibold text-[var(--on-surface-variant)]">
+            No answers found for this exam paper.
+          </div>
+        ) : (
         <div className="flex flex-col space-y-4 overflow-y-auto">
           <div className="card p-4 sm:p-5 space-y-2 sm:space-y-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--outline-variant)]">
@@ -169,6 +174,7 @@ export default function ExamAnswerReviewer({
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Footer Navigation Bar */}
@@ -183,7 +189,7 @@ export default function ExamAnswerReviewer({
           </button>
           <button
             onClick={() => setActiveQIndex((i) => Math.min(questions.length - 1, i + 1))}
-            disabled={activeQIndex === questions.length - 1}
+            disabled={activeQIndex >= questions.length - 1}
             className="btn-secondary text-xs flex-1 sm:flex-none min-h-[44px] justify-center disabled:opacity-40"
           >
             Next Q

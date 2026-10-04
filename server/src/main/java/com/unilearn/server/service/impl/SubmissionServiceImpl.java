@@ -100,6 +100,10 @@ public class SubmissionServiceImpl implements SubmissionService {
         submission.setGrade(gradeRequest.getGrade());
         submission.setFeedback(gradeRequest.getFeedback());
         submission.setGradedAt(LocalDateTime.now());
+        // save which lecturer gave the grade
+        ownershipValidator.getCurrentUser()
+                .flatMap(u -> lecturerRepository.findById(u.getUserId()))
+                .ifPresent(submission::setGradedBy);
 
         Submission updated = submissionRepository.save(submission);
         return submissionMapper.toSubmissionResponse(updated);

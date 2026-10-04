@@ -47,7 +47,7 @@ public class AssignmentRequest {
 
     private Boolean allowResubmission;
 
-    @NotNull(message = "Creator lecturer ID is required")
+    // set by the server from the logged in lecturer
     @Positive(message = "Creator lecturer ID must be positive")
     private Long createdById;
 }
