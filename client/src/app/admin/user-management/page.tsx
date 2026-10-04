@@ -77,7 +77,6 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api } from "@/lib/api";
 
 const VALID_ROLES = ["Student", "Lecturer", "Guest Lecturer", "HOD/Dean", "Staff/Admin"];
-const FILTER_ROLES = ["Super Admin", "Staff/Admin", "Student", "Lecturer", "Guest Lecturer", "HOD/Dean"];
 
 function roleToBackend(r: string): string {
   if (!r) return "STUDENT";
@@ -122,12 +121,11 @@ export default function UserManagementPage() {
   const isSuperAdmin = currentUser?.role?.toLowerCase() === "super_admin";
 
   const [page, setPage] = useState(0);
-  const [roleFilter, setRoleFilter] = useState("All roles");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
-  // wait a bit after typing before asking the server
+  // wait a bit after typing, then search all users on the server
   useEffect(() => {
     const t = setTimeout(() => {
       const next = searchInput.trim();
@@ -138,15 +136,13 @@ export default function UserManagementPage() {
     }, 400);
     return () => clearTimeout(t);
   }, [searchInput, search]);
-
   const usersQueryString = (() => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("size", String(PAGE_SIZE));
     params.set("sort", "fullName,asc");
     if (search) params.set("search", search);
-    if (roleFilter !== "All roles") params.set("role", roleToBackend(roleFilter));
-    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (roleFilter) params.set("role", roleFilter);
     return params.toString();
   })();
 
@@ -682,7 +678,7 @@ export default function UserManagementPage() {
     showToast(`Password reset link dispatched to ${editingUser.email}.`);
   };
 
-  // role, status and search are done by the server
+  // search and role filter are done by the server
   const filteredUsers = users;
 
   const columns = [
@@ -831,38 +827,6 @@ export default function UserManagementPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search name or email..."
-              className="text-xs px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
-            />
-            <select
-              value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value);
-                setPage(0);
-              }}
-              className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
-            >
-              <option value="All roles">Filter: All Roles</option>
-              {FILTER_ROLES.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(0);
-              }}
-              className="text-xs font-bold px-3 py-2 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)]"
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
             <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs shadow-md shrink-0 whitespace-nowrap">
               <i className="ti ti-user-plus mr-1"></i> Add / Bulk Import
             </button>
@@ -879,9 +843,29 @@ export default function UserManagementPage() {
             <DataTable
               data={filteredUsers}
               columns={columns}
-              searchPlaceholder="Filter this page..."
+              searchPlaceholder="Search name or email..."
+              searchValue={searchInput}
+              onSearchChange={setSearchInput}
               pageSize={PAGE_SIZE}
               pageSizeOptions={[PAGE_SIZE]}
+              toolbarExtra={
+                <select
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className="flex-1 md:flex-none px-3 py-2 text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[var(--on-surface)] focus:outline-none focus:border-[var(--tertiary)] min-h-[44px]"
+                >
+                  <option value="">All roles</option>
+                  <option value="STUDENT">Student</option>
+                  <option value="LECTURER">Lecturer</option>
+                  <option value="GUEST_LECTURER">Guest Lecturer</option>
+                  <option value="HOD_DEAN">HOD/Dean</option>
+                  <option value="STAFF_ADMIN">Staff/Admin</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                </select>
+              }
             />
           )}
 

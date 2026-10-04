@@ -1,4 +1,4 @@
-# UniLearn 🎓
+# UniLearn
 
 UniLearn is a university learning management system for students, lecturers, heads of departments, and administrators. It includes course management, exams, attendance tracking, and an AI study assistant.
 
@@ -12,10 +12,10 @@ UniLearn is a university learning management system for students, lecturers, hea
 
 ## Tech Stack
 
-- **Frontend:** Next.js (TypeScript, Tailwind CSS)
-- **Backend:** Spring Boot (Java 17, Spring Security)
+- **Frontend:** Next.js
+- **Backend:** Spring Boot
 - **Database:** MySQL
-- **Storage:** Storj S3 (with local storage fallback)
+- **Storage:** Storj S3
 - **AI:** Google Gemini
 
 ---
@@ -23,12 +23,15 @@ UniLearn is a university learning management system for students, lecturers, hea
 ## Quick Start
 
 ### 1. Database
+
 Create your database and load the schema:
+
 ```bash
 mysql -u root -p unilearn_db < unilearn_db.sql
 ```
 
 ### 2. Backend
+
 1. Go to the `server` folder:
    ```bash
    cd server
@@ -45,6 +48,7 @@ mysql -u root -p unilearn_db < unilearn_db.sql
    The backend runs at `http://localhost:8080`.
 
 ### 3. Frontend
+
 1. Go to the `client` folder:
    ```bash
    cd client
@@ -78,6 +82,7 @@ docker compose up --build
 - **Database:** localhost:3306
 
 To stop all services:
+
 ```bash
 docker compose down
 ```
@@ -87,6 +92,7 @@ docker compose down
 ## Environment Variables
 
 ### Backend (`server/.env`)
+
 - `SPRING_DATASOURCE_URL`: Database connection URL
 - `SPRING_DATASOURCE_USERNAME`: Database username
 - `SPRING_DATASOURCE_PASSWORD`: Database password
@@ -96,4 +102,5 @@ docker compose down
 - `STORJ_*`: Cloud storage credentials (optional, defaults to local folder)
 
 ### Frontend (`client/.env.local`)
+
 - `NEXT_PUBLIC_API_URL`: Backend API URL (default: `http://localhost:8080`)

@@ -18,6 +18,11 @@ export interface DataTableProps<T> {
   pageSizeOptions?: number[];
   initialPageSize?: number;
   pageSize?: number;
+  // server search: the page does the search, the table only shows the box
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  // extra filters shown next to the search box
+  toolbarExtra?: ReactNode;
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -27,7 +32,11 @@ export default function DataTable<T extends Record<string, any>>({
   pageSizeOptions = [5, 10, 20, 50],
   initialPageSize = 10,
   pageSize: propPageSize,
+  searchValue,
+  onSearchChange,
+  toolbarExtra,
 }: DataTableProps<T>) {
+  const serverSearch = !!onSearchChange;
   const [searchTerm, setSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(propPageSize || initialPageSize);
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,7 +44,7 @@ export default function DataTable<T extends Record<string, any>>({
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      if (searchTerm.trim()) {
+      if (!serverSearch && searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchesSearch = Object.values(item).some((val) =>
           String(val ?? "").toLowerCase().includes(query)
@@ -54,7 +63,7 @@ export default function DataTable<T extends Record<string, any>>({
 
       return true;
     });
-  }, [data, searchTerm, columnFilters]);
+  }, [data, searchTerm, columnFilters, serverSearch]);
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const currentPageClamped = Math.min(currentPage, totalPages);
@@ -78,9 +87,13 @@ export default function DataTable<T extends Record<string, any>>({
           <input
             type="text"
             placeholder={searchPlaceholder}
-            value={searchTerm}
+            value={serverSearch ? searchValue ?? "" : searchTerm}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
+              if (serverSearch) {
+                onSearchChange?.(e.target.value);
+              } else {
+                setSearchTerm(e.target.value);
+              }
               setCurrentPage(1);
             }}
             className="w-full !pl-10 pr-4 py-2.5 text-xs sm:text-xs rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)]/60 focus:outline-none focus:border-[var(--tertiary)] transition-colors min-h-[44px]"
@@ -89,6 +102,7 @@ export default function DataTable<T extends Record<string, any>>({
 
         {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+          {toolbarExtra}
           {columns
             .filter((col) => col.filterable && col.accessorKey && col.filterOptions)
             .map((col) => {
