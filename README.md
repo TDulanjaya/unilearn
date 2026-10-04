@@ -6,7 +6,7 @@ UniLearn is a university learning management system for students, lecturers, hea
 
 - **Course Management:** Materials, announcements, and assignments.
 - **Attendance:** Secure QR code check-in with time-limited tokens.
-- **Exams & Quizzes:** Online exams, question banks, and automatic grading.
+- **Exams and Quizzes:** Online exams, question banks, and automatic grading.
 - **AI Study Assistant:** Course-grounded chat and practice quiz generation powered by Gemini.
 - **Role-based Access:** Student, Lecturer, HOD/Dean, and Staff Admin portals.
 
@@ -96,10 +96,10 @@ docker compose down
 - `SPRING_DATASOURCE_URL`: Database connection URL
 - `SPRING_DATASOURCE_USERNAME`: Database username
 - `SPRING_DATASOURCE_PASSWORD`: Database password
-- `JWT_SECRET`: Secret key for JWT tokens (at least 32 characters)
+- `JWT_SECRET`: Secret key for JWT tokens
 - `GEMINI_API_KEY`: Google Gemini API key
-- `GEMINI_API_MODEL`: Gemini model name (default: `gemini-2.5-flash`)
-- `STORJ_*`: Cloud storage credentials (optional, defaults to local folder)
+- `GEMINI_API_MODEL`: Gemini model name 
+- `STORJ_*`: Cloud storage credentials 
 
 ### Frontend (`client/.env.local`)
 
