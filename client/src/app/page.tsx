@@ -42,7 +42,6 @@ interface PublicFaculty {
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [faculties, setFaculties] = useState<PublicFaculty[]>([]);
-  const [selectedFacultyCode, setSelectedFacultyCode] = useState<string>("");
   const [isLoadingFaculties, setIsLoadingFaculties] = useState(true);
   const [liveEvents, setLiveEvents] = useState<EventDisplayItem[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
@@ -57,9 +56,6 @@ export default function Home() {
         if (res.ok) {
           const data: PublicFaculty[] = await res.json();
           setFaculties(data || []);
-          if (data && data.length > 0) {
-            setSelectedFacultyCode(data[0].code);
-          }
         } else {
           setFaculties([]);
         }
@@ -309,12 +305,12 @@ export default function Home() {
 
           {isLoadingFaculties ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <div className="flex gap-3">
+              {/* Simple loading boxes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                 {[1, 2, 3].map((n) => (
-                  <div key={n} className="h-11 w-36 rounded-2xl bg-[var(--surface-container-high)] animate-pulse" />
+                  <div key={n} className="h-56 rounded-3xl bg-[var(--surface-container-high)]/40 animate-pulse border border-[var(--outline-variant)]" />
                 ))}
               </div>
-              <div className="w-full max-w-5xl h-64 rounded-3xl bg-[var(--surface-container-high)]/40 animate-pulse border border-[var(--outline-variant)]" />
             </div>
           ) : faculties.length === 0 ? (
             <div className="text-center py-16 text-sm text-[var(--on-surface-variant)] card max-w-lg mx-auto p-8 border border-[var(--outline-variant)]">
@@ -322,56 +318,36 @@ export default function Home() {
               No academic faculties registered yet.
             </div>
           ) : (
-            <>
-              {/* Faculty Selector Tabs */}
-              <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
-                {faculties.map((fac) => {
-                  const isSelected = (selectedFacultyCode || faculties[0]?.code) === fac.code;
-                  return (
-                    <button
-                      key={fac.code}
-                      onClick={() => setSelectedFacultyCode(fac.code)}
-                      className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-display font-bold text-sm transition-all duration-200 border ${
-                        isSelected
-                          ? "bg-[var(--primary)] text-[var(--on-primary)] border-[var(--primary)] shadow-lg shadow-[var(--primary)]/15 scale-105"
-                          : "bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
-                      }`}
-                    >
-                      <i className={`ti ti-school text-lg ${isSelected ? "text-[var(--secondary-container)]" : ""}`}></i>
-                      <span>{fac.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Selected Faculty Details Card */}
-              {(() => {
-                const currentFaculty = faculties.find((f) => f.code === selectedFacultyCode) || faculties[0];
-                if (!currentFaculty) return null;
-                return (
-                  <div className="glass rounded-3xl p-6 sm:p-10 border border-[var(--glass-border)] shadow-2xl max-w-5xl mx-auto space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--outline-variant)]">
-                      <div>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] text-xs font-bold mb-2">
-                          <span>Faculty Code: {currentFaculty.code}</span>
-                        </div>
-                        <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--on-surface)]">
-                          {currentFaculty.name}
-                        </h3>
-                        <p className="text-sm text-[var(--on-surface-variant)] mt-2 max-w-2xl leading-relaxed">
-                          {currentFaculty.description}
-                        </p>
-                      </div>
-                      <div className="text-left md:text-right">
-                        <span className="text-xs font-bold text-[var(--secondary)] bg-[var(--secondary-container)]/30 px-3.5 py-1.5 rounded-xl border border-[var(--secondary)]/20">
-                          Official Academic Faculty
-                        </span>
-                      </div>
+            /* Show every faculty as its own card */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {faculties.map((fac) => (
+                <div
+                  key={fac.code}
+                  id={`faculty-${fac.code}`}
+                  className="glass rounded-3xl p-6 sm:p-8 border border-[var(--glass-border)] shadow-xl flex flex-col gap-4 scroll-mt-28 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-[var(--on-primary)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/15">
+                      <i className="ti ti-school text-2xl"></i>
                     </div>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-[var(--tertiary-container)]/30 text-[var(--tertiary)] text-xs font-bold">
+                      {fac.code}
+                    </span>
                   </div>
-                );
-              })()}
-            </>
+                  <h3 className="font-display font-extrabold text-xl text-[var(--on-surface)]">
+                    {fac.name}
+                  </h3>
+                  <p className="text-sm text-[var(--on-surface-variant)] leading-relaxed flex-1">
+                    {fac.description}
+                  </p>
+                  <div className="pt-4 border-t border-[var(--outline-variant)]">
+                    <span className="text-xs font-bold text-[var(--secondary)] bg-[var(--secondary-container)]/30 px-3.5 py-1.5 rounded-xl border border-[var(--secondary)]/20">
+                      Official Academic Faculty
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
         </section>
@@ -616,27 +592,23 @@ export default function Home() {
             {/* Middle: Vertical Faculties List (3 cols) */}
             <div className="md:col-span-3">
               <p className="font-display font-bold text-sm mb-3.5 text-white">Faculties</p>
+              {/* Real faculties from the database */}
               <ul className="space-y-2 text-xs">
-                <li>
-                  <a href="#faculties" className="hover:text-cyan-300 transition">
-                    Faculty of Computing
-                  </a>
-                </li>
-                <li>
-                  <a href="#faculties" className="hover:text-cyan-300 transition">
-                    Faculty of Business
-                  </a>
-                </li>
-                <li>
-                  <a href="#faculties" className="hover:text-cyan-300 transition">
-                    Faculty of Engineering
-                  </a>
-                </li>
-                <li>
-                  <a href="#faculties" className="hover:text-cyan-300 transition">
-                    Faculty of Applied Sciences
-                  </a>
-                </li>
+                {faculties.length === 0 ? (
+                  <li>
+                    <a href="#faculties" className="hover:text-cyan-300 transition">
+                      View faculties
+                    </a>
+                  </li>
+                ) : (
+                  faculties.map((fac) => (
+                    <li key={fac.code}>
+                      <a href={`#faculty-${fac.code}`} className="hover:text-cyan-300 transition">
+                        {fac.name}
+                      </a>
+                    </li>
+                  ))
+                )}
               </ul>
             </div>
 

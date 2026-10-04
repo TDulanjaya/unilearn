@@ -53,10 +53,13 @@ public class FacultyMapper {
         if (faculty == null) {
             throw new ValidationException("Faculty cannot be null");
         }
+        // Don't add "Faculty of" again if the name already has it
+        String name = faculty.getName() == null ? "" : faculty.getName().trim();
+        String title = name.toLowerCase().startsWith("faculty") ? name : "Faculty of " + name;
         return com.unilearn.server.dto.response.FacultyPublicResponse.builder()
                 .name(faculty.getName())
                 .code(faculty.getCode())
-                .description("Faculty of " + faculty.getName() + " dedicated to higher academic learning and research.")
+                .description(title + ", dedicated to higher academic learning and research.")
                 .build();
     }
 }
