@@ -5,14 +5,17 @@ import { apiFetch } from "@/lib/api";
 import { setToken, setUser, clearAuth, AuthUser } from "@/lib/auth";
 
 export interface AuthResponse {
-  token: string;
-  tokenType: string;
-  userId: number;
-  fullName: string;
-  email: string;
-  role: string;
-  status: string;
+  token?: string;
+  tokenType?: string;
+  userId?: number;
+  fullName?: string;
+  email?: string;
+  role?: string;
+  status?: string;
   mustChangePassword?: boolean;
+  otpRequired?: boolean;
+  challengeId?: string;
+  message?: string;
 }
 
 interface AuthContextType {
@@ -20,6 +23,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthResponse>;
+  verifySuperAdminOtp: (challengeId: string, otp: string) => Promise<AuthResponse>;
   logout: () => void;
   markPasswordChanged: (newToken?: string) => void;
 }
@@ -79,6 +83,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
 
+    if (res.otpRequired) {
+      return res;
+    }
+
+    if (!res.token || !res.userId || !res.fullName || !res.email || !res.role || !res.status) {
+      throw new Error("Login response was incomplete.");
+    }
+
     const userInfo: AuthUser = {
       userId: res.userId,
       fullName: res.fullName,
@@ -95,6 +107,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokenState(res.token);
     setUserState(userInfo);
 
+    return res;
+  };
+
+  const verifySuperAdminOtp = async (challengeId: string, otp: string): Promise<AuthResponse> => {
+    const res = await apiFetch<AuthResponse>("/api/v1/auth/superadmin/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ challengeId, otp }),
+    });
+    if (!res.token || !res.userId || !res.fullName || !res.email || !res.role || !res.status) {
+      throw new Error("Verification response was incomplete.");
+    }
+    const userInfo: AuthUser = {
+      userId: res.userId,
+      fullName: res.fullName,
+      email: res.email,
+      role: res.role,
+      status: res.status,
+      tokenType: res.tokenType,
+      token: res.token,
+      mustChangePassword: res.mustChangePassword,
+    };
+    setToken(res.token);
+    setUser(userInfo);
+    setTokenState(res.token);
+    setUserState(userInfo);
     return res;
   };
 
@@ -139,6 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         isLoading,
         login,
+        verifySuperAdminOtp,
         logout,
         markPasswordChanged,
       }}

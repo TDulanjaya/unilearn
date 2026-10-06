@@ -12,6 +12,8 @@ public interface AuthService {
 
     AuthResponse login(LoginRequest request);
 
+    AuthResponse verifySuperAdminOtp(com.unilearn.server.dto.request.VerifyOtpRequest request);
+
     com.unilearn.server.dto.response.RefreshTokenResponse refresh(com.unilearn.server.dto.request.RefreshTokenRequest request);
 
     // returns new tokens, the old ones stop working

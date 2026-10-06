@@ -13,6 +13,7 @@ import com.unilearn.server.model.Student;
 import com.unilearn.server.model.Lecturer;
 import com.unilearn.server.model.StaffAdmin;
 import com.unilearn.server.model.HodDeanAssignment;
+import com.unilearn.server.model.SuperAdminOtpChallenge;
 import com.unilearn.server.repository.FacultyRepository;
 import com.unilearn.server.repository.HodDeanAssignmentRepository;
 import com.unilearn.server.exception.EntryNotFoundException;
@@ -24,8 +25,11 @@ import com.unilearn.server.repository.LecturerRepository;
 import com.unilearn.server.repository.StaffAdminRepository;
 import com.unilearn.server.repository.StudentRepository;
 import com.unilearn.server.repository.UserRepository;
+import com.unilearn.server.repository.SuperAdminOtpChallengeRepository;
 import com.unilearn.server.security.JwtService;
 import com.unilearn.server.service.AuthService;
+import com.unilearn.server.service.SuperAdminOtpEmailService;
+import com.unilearn.server.dto.request.VerifyOtpRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,6 +44,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
+import java.security.SecureRandom;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -58,12 +64,21 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final SuperAdminOtpChallengeRepository otpChallengeRepository;
+    private final SuperAdminOtpEmailService otpEmailService;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @org.springframework.beans.factory.annotation.Value("${app.registration.public-enabled:false}")
     private boolean publicRegistrationEnabled;
 
     @org.springframework.beans.factory.annotation.Value("${app.security.trust-forwarded-for:false}")
     private boolean trustForwardedFor;
+
+    @org.springframework.beans.factory.annotation.Value("${app.otp.expiry-minutes:10}")
+    private long otpExpiryMinutes;
+
+    @org.springframework.beans.factory.annotation.Value("${app.otp.max-attempts:5}")
+    private int otpMaxAttempts;
 
     @Override
     @Transactional
@@ -208,40 +223,98 @@ public class AuthServiceImpl implements AuthService {
             throw new ValidationException("Login request cannot be null");
         }
 
-        String email = request.getEmail();
+        String email = request.getEmail() != null ? request.getEmail().trim() : "";
         String clientIp = getClientIp();
-        User user = userRepository.findByEmail(email).orElse(null);
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .or(() -> userRepository.findByEmail(email))
+                .orElse(null);
 
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
 
             if (user == null) {
-                user = userRepository.findByEmail(email)
+                user = userRepository.findByEmailIgnoreCase(email)
+                        .or(() -> userRepository.findByEmail(email))
                         .orElseThrow(() -> new ValidationException("User not found with email: " + email));
             }
 
-            logLoginAttempt(email, true, clientIp, user);
+            if ("super_admin".equalsIgnoreCase(user.getRole())) {
+                otpChallengeRepository.invalidateActiveChallenges(user, LocalDateTime.now());
+                String otp = String.format("%06d", secureRandom.nextInt(1_000_000));
+                String challengeToken = UUID.randomUUID().toString();
+                otpChallengeRepository.save(SuperAdminOtpChallenge.builder()
+                        .challengeToken(challengeToken)
+                        .user(user)
+                        .otpHash(passwordEncoder.encode(otp))
+                        .expiresAt(LocalDateTime.now().plusMinutes(otpExpiryMinutes))
+                        .attempts(0)
+                        .createdAt(LocalDateTime.now())
+                        .build());
+                otpEmailService.sendOtp(user, otp);
+                logLoginAttempt(email, true, clientIp, user);
+                return AuthResponse.builder()
+                        .otpRequired(true)
+                        .challengeId(challengeToken)
+                        .message("A verification code was sent to the superadmin email address.")
+                        .userId(user.getUserId())
+                        .email(user.getEmail())
+                        .role(user.getRole())
+                        .build();
+            }
 
-            String token = jwtService.generateAccessToken(user.getEmail(), user.getRole(), user.getTokenVersion());
-            String refreshToken = jwtService.generateRefreshToken(user.getEmail(), user.getTokenVersion());
-
-            return AuthResponse.builder()
-                    .token(token)
-                    .refreshToken(refreshToken)
-                    .tokenType("Bearer")
-                    .userId(user.getUserId())
-                    .fullName(user.getFullName())
-                    .email(user.getEmail())
-                    .role(user.getRole())
-                    .status(user.getStatus())
-                    .mustChangePassword(user.getMustChangePassword() != null && user.getMustChangePassword())
-                    .build();
+            return buildAuthResponse(user);
         } catch (AuthenticationException e) {
             logLoginAttempt(email, false, clientIp, user);
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
         }
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse verifySuperAdminOtp(VerifyOtpRequest request) {
+        if (request == null || request.getChallengeId() == null || request.getOtp() == null) {
+            throw new ValidationException("Challenge ID and OTP are required");
+        }
+
+        SuperAdminOtpChallenge challenge = otpChallengeRepository.findByChallengeToken(request.getChallengeId())
+                .orElseThrow(() -> new ValidationException("Invalid or expired verification challenge"));
+
+        if (!"super_admin".equalsIgnoreCase(challenge.getUser().getRole())
+                || challenge.getUsedAt() != null
+                || challenge.getExpiresAt().isBefore(LocalDateTime.now())
+                || challenge.getAttempts() >= otpMaxAttempts) {
+            throw new ValidationException("Invalid or expired verification challenge");
+        }
+
+        if (!passwordEncoder.matches(request.getOtp(), challenge.getOtpHash())) {
+            challenge.setAttempts(challenge.getAttempts() + 1);
+            otpChallengeRepository.save(challenge);
+            throw new ValidationException("Invalid verification code");
+        }
+
+        challenge.setUsedAt(LocalDateTime.now());
+        otpChallengeRepository.save(challenge);
+        User user = challenge.getUser();
+        logLoginAttempt(user.getEmail(), true, getClientIp(), user);
+        return buildAuthResponse(user);
+    }
+
+    private AuthResponse buildAuthResponse(User user) {
+        String token = jwtService.generateAccessToken(user.getEmail(), user.getRole(), user.getTokenVersion());
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail(), user.getTokenVersion());
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .userId(user.getUserId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .mustChangePassword(user.getMustChangePassword() != null && user.getMustChangePassword())
+                .build();
     }
 
     private void logLoginAttempt(String email, boolean success, String ipAddress, User user) {

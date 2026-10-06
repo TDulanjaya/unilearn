@@ -1,6 +1,7 @@
 package com.unilearn.server.controller;
 
 import com.unilearn.server.dto.request.LoginRequest;
+import com.unilearn.server.dto.request.VerifyOtpRequest;
 import com.unilearn.server.dto.request.RegisterRequest;
 import com.unilearn.server.dto.response.AuthResponse;
 import com.unilearn.server.service.AuthService;
@@ -75,6 +76,19 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         AuthResponse response = authService.login(request);
+        if (response.getRefreshToken() != null) {
+            addRefreshTokenCookie(httpResponse, httpRequest, response.getRefreshToken(), 7 * 24 * 60 * 60);
+            response.setRefreshToken(null);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/superadmin/verify-otp")
+    public ResponseEntity<AuthResponse> verifySuperAdminOtp(
+            @Valid @RequestBody VerifyOtpRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        AuthResponse response = authService.verifySuperAdminOtp(request);
         if (response.getRefreshToken() != null) {
             addRefreshTokenCookie(httpResponse, httpRequest, response.getRefreshToken(), 7 * 24 * 60 * 60);
             response.setRefreshToken(null);

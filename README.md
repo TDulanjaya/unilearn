@@ -1,77 +1,77 @@
 # UniLearn
 
-UniLearn is a university learning management system for students, lecturers, heads of departments, and administrators. It includes course management, exams, attendance tracking, and an AI study assistant.
+UniLearn is a university learning management system built with Next.js and Spring Boot. It provides dedicated portals for students, lecturers, heads of departments (HOD), and administrators — covering course materials, attendance tracking, exams, and an AI study assistant.
 
 ## Features
 
-- **Course Management:** Materials, announcements, and assignments.
-- **Attendance:** Secure QR code check-in with time-limited tokens.
-- **Exams and Quizzes:** Online exams, question banks, and automatic grading.
-- **AI Study Assistant:** Course-grounded chat and practice quiz generation powered by Gemini.
-- **Role-based Access:** Student, Lecturer, HOD/Dean, and Staff Admin portals.
+- **Course Management:** Lecture materials, announcements, and assignment submissions.
+- **QR Attendance:** Fast check-in with dynamic, time-limited QR codes.
+- **Exams & Quizzes:** Online test taking, question banks, and automated grading.
+- **AI Study Assistant:** Course-grounded Q&A and instant practice quiz generation powered by Google Gemini.
+- **Role-Based Access Control:** Dedicated workflows and permissions for Student, Lecturer, HOD/Dean, and Admin.
+- **Super Admin 2FA:** Mandatory 6-digit email OTP verification on login for administrative accounts.
 
 ## Tech Stack
 
-- **Frontend:** Next.js
-- **Backend:** Spring Boot
-- **Database:** MySQL
-- **Storage:** Storj S3
-- **AI:** Google Gemini
+- **Frontend:** Next.js (App Router), React
+- **Backend:** Spring Boot (Java 17+), Spring Security, JWT
+- **Database:** MySQL / TiDB
+- **Storage:** Storj S3 (file uploads)
+- **AI:** Google Gemini API
 
 ---
 
-## Quick Start
+## Getting Started
 
-### 1. Database
+### Prerequisites
 
-Create your database and load the schema:
+- Java 17+
+- Node.js 18+ & npm
+- MySQL (or TiDB Cloud)
+
+### 1. Database Setup
+
+Create the database and load the schema:
 
 ```bash
 mysql -u root -p unilearn_db < unilearn_db.sql
 ```
 
-### 2. Backend
+### 2. Backend Setup
 
-1. Go to the `server` folder:
-   ```bash
-   cd server
-   ```
-2. Copy the example env file:
-   ```bash
-   cp .env.example .env
-   ```
-3. Open `.env` and fill in your database details and Gemini API key.
-4. Run the backend:
-   ```bash
-   ./mvnw spring-boot:run
-   ```
-   The backend runs at `http://localhost:8080`.
+```bash
+cd server
+cp .env.example .env
+```
 
-### 3. Frontend
+Open `.env` and configure your database credentials and `JWT_SECRET`. Then run the backend:
 
-1. Go to the `client` folder:
-   ```bash
-   cd client
-   ```
-2. Install packages:
-   ```bash
-   npm install
-   ```
-3. Copy the example env file:
-   ```bash
-   cp .env.example .env.local
-   ```
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-   The app will be available at `http://localhost:3000`.
+```bash
+# Windows
+./mvnw.cmd spring-boot:run
+
+# Linux / macOS
+./mvnw spring-boot:run
+```
+
+The backend starts at `http://localhost:8080`.
+
+### 3. Frontend Setup
+
+```bash
+cd client
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+The app will be available at `http://localhost:3000`.
 
 ---
 
 ## Running with Docker
 
-You can run the entire project with Docker Compose:
+You can also run everything using Docker Compose:
 
 ```bash
 docker compose up --build
@@ -89,18 +89,59 @@ docker compose down
 
 ---
 
+## Super Admin Two-Factor Authentication (OTP)
+
+To protect administrative operations, all `SUPER_ADMIN` accounts require two-factor verification on login.
+
+### How It Works
+
+1. **Login:** The admin enters their email and password on the login page.
+2. **OTP Sent:** A 6-digit verification code is generated and sent to the admin's registered email.
+3. **Verification:** The admin enters the 6-digit code on the screen to complete sign-in and access the portal.
+
+---
+
 ## Environment Variables
 
 ### Backend (`server/.env`)
 
-- `SPRING_DATASOURCE_URL`: Database connection URL
-- `SPRING_DATASOURCE_USERNAME`: Database username
-- `SPRING_DATASOURCE_PASSWORD`: Database password
-- `JWT_SECRET`: Secret key for JWT tokens
-- `GEMINI_API_KEY`: Google Gemini API key
-- `GEMINI_API_MODEL`: Gemini model name 
-- `STORJ_*`: Cloud storage credentials 
+```env
+# Gemini AI API
+GEMINI_API_KEY=
+GEMINI_API_MODEL=gemini-2.5-flash
+
+# Database Settings (TiDB Cloud / MySQL)
+SPRING_DATASOURCE_URL=
+SPRING_DATASOURCE_USERNAME=
+SPRING_DATASOURCE_PASSWORD=
+
+# Storj S3 Storage Settings
+B2_KEY_ID=
+B2_APPLICATION_KEY=
+B2_ENDPOINT=
+B2_BUCKET_NAME=
+B2_REGION=ap1
+
+# Gmail SMTP Settings for Super Admin OTP Delivery
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_SMTP_AUTH=true
+MAIL_SMTP_STARTTLS=true
+OTP_FROM=
+APP_OTP_LOG_TO_CONSOLE=true
+
+# Public Registration Setting
+APP_REGISTRATION_PUBLIC_ENABLED=true
+
+# JWT Secret Key & CORS
+JWT_SECRET=
+CORS_ALLOWED_ORIGIN=http://localhost:3000
+```
 
 ### Frontend (`client/.env.local`)
 
-- `NEXT_PUBLIC_API_URL`: Backend API URL (default: `http://localhost:8080`)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```

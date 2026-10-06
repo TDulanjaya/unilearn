@@ -331,9 +331,6 @@ public class UserServiceImpl implements UserService {
 
         // Delete user auxiliary records
         try {
-            jdbcTemplate.update("DELETE FROM examiners WHERE examiner_id = ?", userId);
-        } catch (Exception ignored) {}
-        try {
             jdbcTemplate.update("DELETE FROM password_reset_tokens WHERE user_id = ?", userId);
         } catch (Exception ignored) {}
         try {
@@ -378,7 +375,7 @@ public class UserServiceImpl implements UserService {
         }
         boolean allRoles = roleList.isEmpty();
         if (allRoles) {
-            // IN () with an empty list is not valid sql
+            // IN with an empty list is not valid sql
             roleList.add("-");
         }
         String statusText = status == null ? "" : status.trim().toLowerCase();

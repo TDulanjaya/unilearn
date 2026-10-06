@@ -39,9 +39,17 @@ public class SuperAdminSeeder implements CommandLineRunner {
     @Value("${app.superadmin.force-reset:}")
     private String forceReset;
 
+    @Value("${app.superadmin.bootstrap-enabled:false}")
+    private boolean bootstrapEnabled;
+
     @Override
     @Transactional
     public void run(String... args) {
+        if (!bootstrapEnabled) {
+            log.info("Super admin bootstrap is disabled; using the database super admin account if present.");
+            return;
+        }
+
         String name = adminName != null && !adminName.trim().isEmpty() ? adminName.trim()
                 : System.getenv("SUPER_ADMIN_NAME");
         String email = adminEmail != null && !adminEmail.trim().isEmpty() ? adminEmail.trim()

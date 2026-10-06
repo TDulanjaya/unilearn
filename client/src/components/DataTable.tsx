@@ -23,6 +23,7 @@ export interface DataTableProps<T> {
   onSearchChange?: (value: string) => void;
   // extra filters shown next to the search box
   toolbarExtra?: ReactNode;
+  hidePagination?: boolean;
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -35,6 +36,7 @@ export default function DataTable<T extends Record<string, any>>({
   searchValue,
   onSearchChange,
   toolbarExtra,
+  hidePagination = false,
 }: DataTableProps<T>) {
   const serverSearch = !!onSearchChange;
   const [searchTerm, setSearchTerm] = useState("");
@@ -69,9 +71,10 @@ export default function DataTable<T extends Record<string, any>>({
   const currentPageClamped = Math.min(currentPage, totalPages);
 
   const paginatedData = useMemo(() => {
+    if (hidePagination) return filteredData;
     const start = (currentPageClamped - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
-  }, [filteredData, currentPageClamped, pageSize]);
+  }, [filteredData, currentPageClamped, pageSize, hidePagination]);
 
   const handleFilterChange = (key: string, value: string) => {
     setColumnFilters((prev) => ({ ...prev, [key]: value }));
@@ -216,57 +219,59 @@ export default function DataTable<T extends Record<string, any>>({
         </div>
 
         {/* Pagination Bar */}
-        <div className="p-3.5 px-4 border-t border-[var(--outline-variant)] bg-[var(--surface-container-low)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--on-surface-variant)]">
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-            <span>Show</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="px-2 py-1.5 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] min-h-[36px]"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-            <span>entries</span>
-          </div>
-
-          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
-            <span className="text-[11px] sm:text-xs">
-              {filteredData.length === 0 ? 0 : (currentPageClamped - 1) * pageSize + 1}-
-              {Math.min(currentPageClamped * pageSize, filteredData.length)} of {filteredData.length}
-            </span>
-
-            <div className="flex items-center gap-1">
-              <button
-                disabled={currentPageClamped === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
-                title="Previous page"
-                aria-label="Previous page"
+        {!hidePagination && (
+          <div className="p-3.5 px-4 border-t border-[var(--outline-variant)] bg-[var(--surface-container-low)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--on-surface-variant)]">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+              <span>Show</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1.5 rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] min-h-[36px]"
               >
-                <i className="ti ti-chevron-left text-sm"></i>
-              </button>
-              <span className="font-semibold px-2">
-                {currentPageClamped} / {totalPages}
+                {pageSizeOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+              <span>entries</span>
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+              <span className="text-[11px] sm:text-xs">
+                {filteredData.length === 0 ? 0 : (currentPageClamped - 1) * pageSize + 1}-
+                {Math.min(currentPageClamped * pageSize, filteredData.length)} of {filteredData.length}
               </span>
-              <button
-                disabled={currentPageClamped === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
-                title="Next page"
-                aria-label="Next page"
-              >
-                <i className="ti ti-chevron-right text-sm"></i>
-              </button>
+
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={currentPageClamped === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
+                  title="Previous page"
+                  aria-label="Previous page"
+                >
+                  <i className="ti ti-chevron-left text-sm"></i>
+                </button>
+                <span className="font-semibold px-2">
+                  {currentPageClamped} / {totalPages}
+                </span>
+                <button
+                  disabled={currentPageClamped === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[var(--outline-variant)] disabled:opacity-40 hover:bg-[var(--surface-container-high)] transition-colors"
+                  title="Next page"
+                  aria-label="Next page"
+                >
+                  <i className="ti ti-chevron-right text-sm"></i>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

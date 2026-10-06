@@ -23,4 +23,7 @@ public class AuthResponse {
     private String status;
     private String refreshToken;
     private Boolean mustChangePassword;
+    private Boolean otpRequired;
+    private String challengeId;
+    private String message;
 }

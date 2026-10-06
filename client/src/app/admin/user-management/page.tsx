@@ -847,7 +847,7 @@ export default function UserManagementPage() {
               searchValue={searchInput}
               onSearchChange={setSearchInput}
               pageSize={PAGE_SIZE}
-              pageSizeOptions={[PAGE_SIZE]}
+              hidePagination={true}
               toolbarExtra={
                 <select
                   value={roleFilter}

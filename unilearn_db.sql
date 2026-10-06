@@ -89,7 +89,7 @@ CREATE TABLE `users` (
   `token_version` int NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `email` (`email`),
-  CONSTRAINT `users_chk_1` CHECK ((`role` in (_utf8mb4'student',_utf8mb4'lecturer',_utf8mb4'examiner',_utf8mb4'staff_admin',_utf8mb4'super_admin',_utf8mb4'hod_dean',_utf8mb4'guest_lecturer'))),
+  CONSTRAINT `users_chk_1` CHECK ((`role` in (_utf8mb4'student',_utf8mb4'lecturer',_utf8mb4'staff_admin',_utf8mb4'super_admin',_utf8mb4'hod_dean',_utf8mb4'guest_lecturer'))),
   CONSTRAINT `users_chk_2` CHECK ((`status` in (_utf8mb4'active',_utf8mb4'inactive',_utf8mb4'suspended')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -98,8 +98,8 @@ DROP TABLE IF EXISTS `students`;
 CREATE TABLE `students` (
   `student_id` int NOT NULL,
   `student_no` varchar(30) NOT NULL,
-  `department_id` int DEFAULT NULL,
-  `batch_id` int DEFAULT NULL,
+  `department_id` int NOT NULL,
+  `batch_id` int NOT NULL,
   `enrollment_year` int NOT NULL,
   PRIMARY KEY (`student_id`),
   UNIQUE KEY `student_no` (`student_no`),
@@ -159,6 +159,7 @@ CREATE TABLE `hod_dean_assignments` (
   CONSTRAINT `hod_dean_assignments_ibfk_3` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`),
   CONSTRAINT `hod_dean_assignments_chk_1` CHECK ((`scope_type` in (_utf8mb4'faculty',_utf8mb4'department')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 
 -- Table: courses
 DROP TABLE IF EXISTS `courses`;
@@ -660,7 +661,7 @@ CREATE TABLE `ai_quiz_questions` (
 DROP TABLE IF EXISTS `audit_logs`;
 CREATE TABLE `audit_logs` (
   `log_id` bigint NOT NULL AUTO_INCREMENT,
-  `user_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
   `action` varchar(100) NOT NULL,
   `entity_type` varchar(50) NOT NULL,
   `entity_id` int NOT NULL,
@@ -729,4 +730,21 @@ CREATE TABLE `password_reset_tokens` (
   CONSTRAINT `fk_password_reset_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-SET FOREIGN_KEY_CHECKS = 1;
+-- Table: superadmin_otp_challenges
+DROP TABLE IF EXISTS `superadmin_otp_challenges`;
+CREATE TABLE `superadmin_otp_challenges` (
+  `challenge_id` bigint NOT NULL AUTO_INCREMENT,
+  `challenge_token` varchar(64) NOT NULL,
+  `user_id` int NOT NULL,
+  `otp_hash` varchar(255) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `attempts` int NOT NULL DEFAULT '0',
+  `used_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`challenge_id`),
+  UNIQUE KEY `uk_superadmin_otp_challenge_token` (`challenge_token`),
+  KEY `idx_superadmin_otp_user` (`user_id`),
+  CONSTRAINT `fk_superadmin_otp_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;
