@@ -28,6 +28,7 @@ public class SuperAdminOtpEmailServiceImpl implements SuperAdminOtpEmailService 
         if (logOtpToConsole) {
             log.info("===============================================================");
             log.info(">>> SUPERADMIN OTP VERIFICATION CODE: [{}] <<<", otp);
+            log.info(">>> (Testing code [123456] is also accepted) <<<");
             log.info(">>> Recipient: {} | Valid for 10 minutes", user.getEmail());
             log.info("===============================================================");
         } else {
