@@ -45,9 +45,15 @@ public class SuperAdminOtpEmailServiceImpl implements SuperAdminOtpEmailService 
                     + ". It expires in 10 minutes and can be used only once.");
             mailSender.send(message);
             log.info("Successfully dispatched OTP email via SMTP to {}", user.getEmail());
-        } catch (MailException e) {
-            log.error("Failed to send OTP email to {}: {}", user.getEmail(), e.getMessage(), e);
-            throw e;
+        } catch (Exception e) {
+            log.error("Failed to send OTP email to {}: {}", user.getEmail(), e.getMessage());
+            if (!logOtpToConsole) {
+                if (e instanceof RuntimeException re) {
+                    throw re;
+                }
+                throw new RuntimeException("Failed to dispatch OTP email", e);
+            }
+            log.warn("SMTP email dispatch failed, but proceeding because APP_OTP_LOG_TO_CONSOLE is enabled. Use the OTP from the console log.");
         }
     }
 }
