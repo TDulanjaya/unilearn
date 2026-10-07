@@ -1,6 +1,7 @@
 # IDE & System files
 .idea/
 .vscode/
+.agents/
 *.iml
 *.iws
 *.ipr

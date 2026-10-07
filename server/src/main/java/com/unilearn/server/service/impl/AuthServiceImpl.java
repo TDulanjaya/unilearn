@@ -80,12 +80,6 @@ public class AuthServiceImpl implements AuthService {
     @org.springframework.beans.factory.annotation.Value("${app.otp.max-attempts:5}")
     private int otpMaxAttempts;
 
-    @org.springframework.beans.factory.annotation.Value("${app.otp.log-to-console:false}")
-    private boolean logOtpToConsole;
-
-    @org.springframework.beans.factory.annotation.Value("${app.otp.test-code:123456}")
-    private String testOtpCode;
-
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -294,10 +288,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ValidationException("Invalid or expired verification challenge");
         }
 
-        boolean matchesHash = passwordEncoder.matches(request.getOtp(), challenge.getOtpHash());
-        boolean matchesTestCode = logOtpToConsole && testOtpCode != null && !testOtpCode.isBlank() && testOtpCode.equals(request.getOtp());
-
-        if (!matchesHash && !matchesTestCode) {
+        if (!passwordEncoder.matches(request.getOtp(), challenge.getOtpHash())) {
             challenge.setAttempts(challenge.getAttempts() + 1);
             otpChallengeRepository.save(challenge);
             throw new ValidationException("Invalid verification code");
