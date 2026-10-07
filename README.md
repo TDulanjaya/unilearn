@@ -138,6 +138,9 @@ APP_REGISTRATION_PUBLIC_ENABLED=true
 # JWT Secret Key & CORS
 JWT_SECRET=
 CORS_ALLOWED_ORIGIN=http://localhost:3000
+
+# Server Port (default: 8080)
+PORT=8080
 ```
 
 ### Frontend (`client/.env.local`)
